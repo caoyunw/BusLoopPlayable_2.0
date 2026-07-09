@@ -331,21 +331,47 @@ test('mechanic lab styles define the desktop grid and mobile drawer breakpoint',
 
 test('createMechanicLibrary renders unique groups with textContent and rerenders search states', () => {
   const fixture = createLibraryFixture();
-  const mechanic = createTestMechanic('alpha', {
-    name: '<img src=x onerror=alert(1)> Alpha'
-  });
+  const mechanics = [
+    createTestMechanic('alpha', {
+      name: '<img src=x onerror=alert(1)> Alpha',
+      categories: ['Routing']
+    }),
+    createTestMechanic('beta', {
+      categories: ['Scoring']
+    })
+  ];
+  const expectedGroups = new Map([
+    ['Routing', ['alpha']],
+    ['Scoring', ['beta']]
+  ]);
 
   try {
     const library = createMechanicLibrary(fixture.root, {
-      mechanics: [mechanic, mechanic],
-      activeId: mechanic.id
+      mechanics: [...mechanics, mechanics[0]],
+      activeId: mechanics[0].id
     });
+    const groups = fixture.list.querySelectorAll('.mechanic-group');
+    const renderedIds = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .map((button) => button.dataset.mechanicId);
 
-    assert.equal(fixture.list.querySelectorAll('.mechanic-group').length, 1);
-    assert.equal(fixture.list.querySelectorAll('[data-mechanic-id]').length, 1);
+    assert.deepEqual(
+      groups.map((group) => group.querySelector('.mechanic-group-title').textContent),
+      [...expectedGroups.keys()]
+    );
+    for (const group of groups) {
+      const title = group.querySelector('.mechanic-group-title').textContent;
+      assert.deepEqual(
+        group.querySelectorAll('[data-mechanic-id]')
+          .map((button) => button.dataset.mechanicId),
+        expectedGroups.get(title)
+      );
+    }
+    assert.deepEqual(renderedIds, ['alpha', 'beta']);
+    assert.equal(new Set(renderedIds).size, renderedIds.length);
     assert.equal(
       fixture.list.querySelector('.mechanic-item-name').textContent,
-      mechanic.name
+      mechanics[0].name
     );
     assert.equal(fixture.list.querySelector('img'), null);
 
