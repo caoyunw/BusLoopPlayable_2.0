@@ -294,8 +294,15 @@ function formatColor(value) {
   return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
-export function createSceneEditor(root, { getTuning, setTuning, clearSavedTuning = () => {} }) {
-  const defaults = structuredClone(getTuning());
+export function cloneEditorDefaults(value) {
+  return structuredClone(value);
+}
+
+export function createSceneEditor(
+  root,
+  { getTuning, getDefaults = getTuning, setTuning, clearSavedTuning = () => {} }
+) {
+  const defaults = cloneEditorDefaults(getDefaults());
   root.innerHTML = `
     <header class="editor-header">
       <div>
@@ -412,7 +419,7 @@ export function createSceneEditor(root, { getTuning, setTuning, clearSavedTuning
   toggle.addEventListener('click', () => setCollapsed(!root.classList.contains('is-collapsed')));
   root.querySelector('.editor-reset').addEventListener('click', () => {
     clearSavedTuning();
-    setTuning(structuredClone(defaults));
+    setTuning(cloneEditorDefaults(defaults));
     sync();
   });
 

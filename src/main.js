@@ -6,8 +6,13 @@ import { SCENE_TUNING } from './scene-tuning.js';
 import { createGameAudioController } from './audio-controller.js';
 import { MECHANICS, getMechanicById, resolveMechanicId } from './mechanic-registry.js';
 import { createMechanicLibrary } from './mechanic-library.js';
-import { getMechanicIdFromSearch, syncMechanicQuery } from './mechanic-lab.js';
+import {
+  getMechanicIdFromSearch,
+  safeRemoveStorageItem,
+  syncMechanicQuery
+} from './mechanic-lab.js';
 
+const AUTHORED_SCENE_TUNING = structuredClone(SCENE_TUNING);
 const TUNING_STORAGE_KEY = 'bus-loop-scene-tuning-v3';
 const LEGACY_TUNING_STORAGE_KEY = 'bus-loop-scene-tuning-v2';
 const $ = (selector) => document.querySelector(selector);
@@ -111,7 +116,9 @@ function clearSavedTuning() {
   pendingTuningSave = null;
   clearTimeout(tuningSaveTimer);
   tuningSaveTimer = 0;
-  localStorage.removeItem(TUNING_STORAGE_KEY);
+  safeRemoveStorageItem(localStorage, TUNING_STORAGE_KEY, (error) => {
+    console.warn('Saved scene tuning could not be cleared.', error);
+  });
 }
 
 function startRuntime() {
@@ -176,6 +183,7 @@ function startRuntime() {
   import('./scene-editor.js').then(({ createSceneEditor }) => {
     editor = createSceneEditor(sceneEditorRoot, {
       getTuning: () => SCENE_TUNING,
+      getDefaults: () => AUTHORED_SCENE_TUNING,
       setTuning: applyTuningPatch,
       clearSavedTuning
     });

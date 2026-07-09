@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { BusLoopGame } from '../src/game-model.js';
 import { COLORS, LEVEL_1 } from '../src/level-data.js';
 import { SCENE_TUNING } from '../src/scene-tuning.js';
+import * as sceneEditor from '../src/scene-editor.js';
 import {
   buildOutStationPoints,
   buildRoundedPath,
@@ -15,6 +16,8 @@ import {
   sampleHitClip,
   UNITY_VEHICLE_MOTION
 } from '../src/vehicle-motion.js';
+
+const { cloneEditorDefaults } = sceneEditor;
 
 const advance = (game, seconds, step = .05) => {
   for (let time = 0; time < seconds; time += step) game.update(step);
@@ -816,6 +819,26 @@ test('parking spot visual scale changes do not move the authored vehicle path ce
   }
 });
 
+test('editor defaults remain authored when saved tuning later mutates the source deeply', () => {
+  const authored = {
+    camera: { target: { x: 1, z: 2 } },
+    passengerMaterial: { colors: [{ baseColor: 0xffffff }] }
+  };
+
+  assert.equal(typeof cloneEditorDefaults, 'function');
+  const defaults = cloneEditorDefaults(authored);
+  authored.camera.target.x = 9;
+  authored.passengerMaterial.colors[0].baseColor = 0x123456;
+  authored.passengerMaterial.colors.push({ baseColor: 0 });
+
+  assert.deepEqual(defaults, {
+    camera: { target: { x: 1, z: 2 } },
+    passengerMaterial: { colors: [{ baseColor: 0xffffff }] }
+  });
+  assert.notEqual(defaults.camera, authored.camera);
+  assert.notEqual(defaults.passengerMaterial.colors, authored.passengerMaterial.colors);
+});
+
 test('main thread saves and restores scene tuning from localStorage', () => {
   const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
   assert.match(
@@ -825,8 +848,15 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /import\s+\{\s*createMechanicLibrary\s*\}\s+from\s+'\.\/mechanic-library\.js'/);
   assert.match(
     mainSource,
-    /import\s+\{\s*getMechanicIdFromSearch,\s*syncMechanicQuery\s*\}\s+from\s+'\.\/mechanic-lab\.js'/
+    /import\s+\{\s*getMechanicIdFromSearch,\s*safeRemoveStorageItem,\s*syncMechanicQuery\s*\}\s+from\s+'\.\/mechanic-lab\.js'/
   );
+  const authoredCloneIndex = mainSource.indexOf(
+    'const AUTHORED_SCENE_TUNING = structuredClone(SCENE_TUNING);'
+  );
+  const savedTuningLoadIndex = mainSource.indexOf('  loadSavedTuning();');
+  assert.notEqual(authoredCloneIndex, -1);
+  assert.notEqual(savedTuningLoadIndex, -1);
+  assert.ok(authoredCloneIndex < savedTuningLoadIndex);
   assert.match(mainSource, /bus-loop-scene-tuning-v3/);
   assert.match(mainSource, /bus-loop-scene-tuning-v2/);
   assert.match(mainSource, /LEGACY_TUNING_STORAGE_KEY/);
@@ -838,8 +868,10 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /delete legacy\.vehicleArea/);
   assert.match(mainSource, /localStorage\.setItem/);
   assert.match(mainSource, /localStorage\.getItem/);
-  assert.doesNotMatch(mainSource, /function (?:loadSavedTuning|writeTuning|clearSavedTuning)[^{]*\{\s+if \(!/);
-  assert.match(mainSource, /clearSavedTuning/);
+  assert.match(
+    mainSource,
+    /safeRemoveStorageItem\(localStorage,\s*TUNING_STORAGE_KEY,\s*\(error\) => \{/
+  );
   assert.match(mainSource, /isPassengerMaterialTuningPath/);
   assert.match(mainSource, /PASSENGER_MATERIAL_TUNING_PREFIX = 'passengerMaterial\.'/);
   assert.match(mainSource, /PASSENGER_MATERIAL_COLOR_INDEX_PATTERN/);
@@ -888,6 +920,7 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /view\.render\(\)/);
   assert.match(mainSource, /mechanicBackButton\?\.addEventListener\('click', \(\) => selectMechanic\('base'\)\)/);
   assert.match(mainSource, /import\('\.\/scene-editor\.js'\)/);
+  assert.match(mainSource, /getDefaults: \(\) => AUTHORED_SCENE_TUNING/);
   assert.match(mainSource, /editor\.setCollapsed\(true\)/);
   assert.match(mainSource, /function handleBeforeUnload\(\)/);
   assert.match(mainSource, /flushTuningSave\(\)/);

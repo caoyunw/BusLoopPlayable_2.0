@@ -11,6 +11,16 @@ export function replaceMechanicQuery(pathAndSearch, mechanicId) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+export function safeRemoveStorageItem(storage, key, onError = () => {}) {
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch (error) {
+    onError(error);
+    return false;
+  }
+}
+
 export function syncMechanicQuery(
   mechanicId,
   location = window.location,

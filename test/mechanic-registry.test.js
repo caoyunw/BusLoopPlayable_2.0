@@ -12,11 +12,14 @@ import {
   createMechanicLibrary,
   filterMechanicCollection
 } from '../src/mechanic-library.js';
-import {
+import * as mechanicLab from '../src/mechanic-lab.js';
+
+const {
   getMechanicIdFromSearch,
   replaceMechanicQuery,
+  safeRemoveStorageItem,
   syncMechanicQuery
-} from '../src/mechanic-lab.js';
+} = mechanicLab;
 
 const PLANNED_MECHANIC_IDS = [
   'question-passenger',
@@ -595,6 +598,38 @@ test('query parsing resolves known ids and falls back to base', () => {
   assert.equal(getMechanicIdFromSearch('?mechanic=question-vehicle'), 'question-vehicle');
   assert.equal(getMechanicIdFromSearch('?mechanic=missing'), 'base');
   assert.equal(getMechanicIdFromSearch('?foo=1'), 'base');
+});
+
+test('safeRemoveStorageItem returns true when storage removal succeeds', () => {
+  const removedKeys = [];
+  const storage = {
+    removeItem(key) {
+      removedKeys.push(key);
+    }
+  };
+
+  assert.equal(typeof safeRemoveStorageItem, 'function');
+  assert.equal(safeRemoveStorageItem(storage, 'scene-tuning'), true);
+  assert.deepEqual(removedKeys, ['scene-tuning']);
+});
+
+test('safeRemoveStorageItem reports storage removal errors without throwing', () => {
+  const error = new DOMException('Storage access denied', 'SecurityError');
+  const reportedErrors = [];
+  const storage = {
+    removeItem() {
+      throw error;
+    }
+  };
+
+  assert.equal(typeof safeRemoveStorageItem, 'function');
+  assert.doesNotThrow(() => {
+    assert.equal(
+      safeRemoveStorageItem(storage, 'scene-tuning', (caught) => reportedErrors.push(caught)),
+      false
+    );
+  });
+  assert.deepEqual(reportedErrors, [error]);
 });
 
 test('query replacement preserves other parameters and the hash', () => {
