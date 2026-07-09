@@ -38,6 +38,7 @@ export function createMechanicLibrary(root, {
 
   const document = root.ownerDocument;
   const view = document.defaultView;
+  const mobileViewport = view?.matchMedia?.('(max-width: 860px)');
   const mechanicById = new Map(mechanics.map((mechanic) => [mechanic.id, mechanic]));
   const allowedIds = new Set(mechanicById.keys());
   let currentId = mechanicById.has(activeId) ? activeId : mechanics[0]?.id;
@@ -152,20 +153,33 @@ export function createMechanicLibrary(root, {
   }
 
   const handleSearch = () => renderList(search.value);
-  const handleToggle = () => setCollapsed(!root.classList.contains('is-collapsed'));
+  const handleToggle = () => {
+    if (!mobileViewport?.matches) {
+      setCollapsed(false);
+      return;
+    }
+    setCollapsed(!root.classList.contains('is-collapsed'));
+  };
+  const handleViewportChange = (event) => {
+    if (!event.matches) setCollapsed(false);
+  };
   const handleListClick = (event) => {
     const button = event.target.closest('[data-mechanic-id]');
     if (!button || !list.contains(button)) return;
     const id = button.dataset.mechanicId;
     setActive(id);
     onSelect(id);
-    if (view?.matchMedia?.('(max-width: 860px)').matches) setCollapsed(true);
+    if (mobileViewport?.matches) {
+      setCollapsed(true);
+      toggle.focus();
+    }
   };
 
   search.addEventListener('input', handleSearch);
   toggle.addEventListener('click', handleToggle);
   list.addEventListener('click', handleListClick);
-  setCollapsed(root.classList.contains('is-collapsed'));
+  mobileViewport?.addEventListener('change', handleViewportChange);
+  setCollapsed(mobileViewport?.matches && root.classList.contains('is-collapsed'));
   renderList();
   renderDetail();
 
@@ -175,6 +189,7 @@ export function createMechanicLibrary(root, {
       search.removeEventListener('input', handleSearch);
       toggle.removeEventListener('click', handleToggle);
       list.removeEventListener('click', handleListClick);
+      mobileViewport?.removeEventListener('change', handleViewportChange);
     }
   };
 }

@@ -8,7 +8,10 @@ import {
   getMechanicById,
   resolveMechanicId
 } from '../src/mechanic-registry.js';
-import { filterMechanicCollection } from '../src/mechanic-library.js';
+import {
+  createMechanicLibrary,
+  filterMechanicCollection
+} from '../src/mechanic-library.js';
 import {
   getMechanicIdFromSearch,
   replaceMechanicQuery,
@@ -40,6 +43,242 @@ const EXPECTED_SUMMARIES = {
   'order-passenger': '普通车挡住南瓜车，解救后对应乘客上车并给予奖励。',
   valve: '玩家手动控制左右哪边乘客进入。'
 };
+
+class FakeClassList {
+  constructor(element) {
+    this.element = element;
+    this.values = new Set();
+  }
+
+  setFromString(value) {
+    this.values = new Set(String(value).split(/\s+/).filter(Boolean));
+  }
+
+  contains(value) {
+    return this.values.has(value);
+  }
+
+  toggle(value, force) {
+    const enabled = force === undefined ? !this.contains(value) : Boolean(force);
+    if (enabled) this.values.add(value);
+    else this.values.delete(value);
+    return enabled;
+  }
+
+  toString() {
+    return [...this.values].join(' ');
+  }
+}
+
+class FakeElement {
+  constructor(ownerDocument, tagName) {
+    this.ownerDocument = ownerDocument;
+    this.tagName = tagName.toUpperCase();
+    this.parentElement = null;
+    this.children = [];
+    this.attributes = new Map();
+    this.dataset = {};
+    this.classList = new FakeClassList(this);
+    this.listeners = new Map();
+    this.textContent = '';
+    this.value = '';
+  }
+
+  set className(value) {
+    this.classList.setFromString(value);
+  }
+
+  get className() {
+    return this.classList.toString();
+  }
+
+  set id(value) {
+    this.setAttribute('id', value);
+  }
+
+  get id() {
+    return this.getAttribute('id') ?? '';
+  }
+
+  append(...children) {
+    for (const child of children) {
+      child.parentElement = this;
+      this.children.push(child);
+    }
+  }
+
+  replaceChildren(...children) {
+    for (const child of this.children) child.parentElement = null;
+    this.children = [];
+    this.textContent = '';
+    this.append(...children);
+  }
+
+  setAttribute(name, value) {
+    const stringValue = String(value);
+    this.attributes.set(name, stringValue);
+    if (name.startsWith('data-')) {
+      const key = name
+        .slice(5)
+        .replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+      this.dataset[key] = stringValue;
+    }
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type).add(listener);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatchEvent(event) {
+    if (!event.target) event.target = this;
+    for (let current = this; current; current = event.bubbles ? current.parentElement : null) {
+      event.currentTarget = current;
+      for (const listener of [...(current.listeners.get(event.type) ?? [])]) {
+        listener.call(current, event);
+      }
+    }
+    return true;
+  }
+
+  click() {
+    this.dispatchEvent({ type: 'click', bubbles: true, target: null, currentTarget: null });
+  }
+
+  focus() {
+    this.ownerDocument.activeElement = this;
+  }
+
+  contains(element) {
+    return element === this || this.children.some((child) => child.contains(element));
+  }
+
+  matches(selector) {
+    if (selector.startsWith('#')) return this.id === selector.slice(1);
+    if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
+    if (selector === '[data-mechanic-id]') {
+      return Object.hasOwn(this.dataset, 'mechanicId');
+    }
+    return this.tagName === selector.toUpperCase();
+  }
+
+  closest(selector) {
+    for (let current = this; current; current = current.parentElement) {
+      if (current.matches(selector)) return current;
+    }
+    return null;
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
+  querySelectorAll(selector) {
+    const matches = [];
+    for (const child of this.children) {
+      if (child.matches(selector)) matches.push(child);
+      matches.push(...child.querySelectorAll(selector));
+    }
+    return matches;
+  }
+}
+
+class FakeDocument {
+  constructor(defaultView) {
+    this.defaultView = defaultView;
+    this.activeElement = null;
+  }
+
+  createElement(tagName) {
+    return new FakeElement(this, tagName);
+  }
+}
+
+function createMatchMedia(initialMatches) {
+  const listeners = new Set();
+  return {
+    matches: initialMatches,
+    media: '(max-width: 860px)',
+    addEventListener(type, listener) {
+      if (type === 'change') listeners.add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (type === 'change') listeners.delete(listener);
+    },
+    dispatch(matches) {
+      this.matches = matches;
+      for (const listener of [...listeners]) {
+        listener({ matches, media: this.media });
+      }
+    },
+    listenerCount() {
+      return listeners.size;
+    }
+  };
+}
+
+function createLibraryFixture({ mobile = false } = {}) {
+  const previousDocument = globalThis.document;
+  const previousMatchMedia = globalThis.matchMedia;
+  const hadDocument = Object.hasOwn(globalThis, 'document');
+  const hadMatchMedia = Object.hasOwn(globalThis, 'matchMedia');
+  const media = createMatchMedia(mobile);
+  const view = { matchMedia: () => media };
+  const document = new FakeDocument(view);
+  const root = document.createElement('aside');
+  root.id = 'mechanic-library';
+
+  const toggle = document.createElement('button');
+  toggle.id = 'mechanic-library-toggle';
+  const search = document.createElement('input');
+  search.id = 'mechanic-search';
+  const list = document.createElement('div');
+  list.id = 'mechanic-list';
+  const detail = document.createElement('section');
+  detail.id = 'mechanic-detail';
+  root.append(toggle, search, list, detail);
+
+  globalThis.document = document;
+  globalThis.matchMedia = view.matchMedia;
+
+  return {
+    document,
+    root,
+    toggle,
+    search,
+    list,
+    detail,
+    media,
+    restore() {
+      if (hadDocument) globalThis.document = previousDocument;
+      else delete globalThis.document;
+      if (hadMatchMedia) globalThis.matchMedia = previousMatchMedia;
+      else delete globalThis.matchMedia;
+    }
+  };
+}
+
+function createTestMechanic(id, overrides = {}) {
+  return {
+    id,
+    name: `Mechanic ${id}`,
+    categories: ['Routing'],
+    status: 'planned',
+    summary: `Summary ${id}`,
+    effect: `Effect ${id}`,
+    experience: `Experience ${id}`,
+    difficulty: 'Low',
+    ...overrides
+  };
+}
 
 test('page shell exposes the mechanic lab controls without ad CTA copy', () => {
   const html = readFileSync(join('index.html'), 'utf8');
@@ -82,7 +321,137 @@ test('mechanic lab styles define the desktop grid and mobile drawer breakpoint',
   );
   assert.match(css, /@media\s*\(max-width:\s*860px\)/);
   assert.match(css, /\.mechanic-library\.is-collapsed[\s\S]*?width:\s*48px[\s\S]*?height:\s*48px/);
+  assert.match(css, /\.mechanic-library-toggle\s*\{[^}]*display:\s*none/);
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*860px\)[\s\S]*?\n\s{2}\.mechanic-library-toggle\s*\{[^}]*display:\s*block/
+  );
   assert.doesNotMatch(css, /\.cta-button|@keyframes\s+cta-pulse/);
+});
+
+test('createMechanicLibrary renders unique groups with textContent and rerenders search states', () => {
+  const fixture = createLibraryFixture();
+  const mechanic = createTestMechanic('alpha', {
+    name: '<img src=x onerror=alert(1)> Alpha'
+  });
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics: [mechanic, mechanic],
+      activeId: mechanic.id
+    });
+
+    assert.equal(fixture.list.querySelectorAll('.mechanic-group').length, 1);
+    assert.equal(fixture.list.querySelectorAll('[data-mechanic-id]').length, 1);
+    assert.equal(
+      fixture.list.querySelector('.mechanic-item-name').textContent,
+      mechanic.name
+    );
+    assert.equal(fixture.list.querySelector('img'), null);
+
+    fixture.search.value = 'missing';
+    fixture.search.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    assert.ok(fixture.list.querySelector('.mechanic-empty-state'));
+
+    fixture.search.value = 'alpha';
+    fixture.search.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    assert.equal(fixture.list.querySelectorAll('[data-mechanic-id]').length, 1);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('mobile mechanic selection calls onSelect, updates current state, collapses, and focuses toggle', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const selected = [];
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      onSelect: (id) => selected.push(id)
+    });
+    const betaButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'beta');
+
+    betaButton.focus();
+    betaButton.click();
+
+    assert.deepEqual(selected, ['beta']);
+    assert.equal(betaButton.getAttribute('aria-current'), 'true');
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    assert.equal(fixture.document.activeElement, fixture.toggle);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('viewport change expands the mobile drawer on desktop and synchronizes toggle aria', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics: [createTestMechanic('alpha')],
+      activeId: 'alpha'
+    });
+
+    fixture.toggle.click();
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+
+    fixture.media.dispatch(false);
+
+    assert.equal(fixture.root.classList.contains('is-collapsed'), false);
+    assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'true');
+    assert.equal(fixture.toggle.getAttribute('aria-label'), '收起机制库');
+    assert.equal(fixture.media.listenerCount(), 1);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('destroy detaches search, toggle, list, and viewport behavior', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const selected = [];
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      onSelect: (id) => selected.push(id)
+    });
+    const firstGroup = fixture.list.querySelector('.mechanic-group');
+    const betaButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'beta');
+
+    fixture.toggle.click();
+    library.destroy();
+
+    assert.equal(fixture.media.listenerCount(), 0);
+
+    fixture.search.value = 'missing';
+    fixture.search.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    fixture.toggle.click();
+    betaButton.click();
+    fixture.media.dispatch(false);
+
+    assert.equal(fixture.list.querySelector('.mechanic-group'), firstGroup);
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'false');
+    assert.deepEqual(selected, []);
+    assert.equal(betaButton.getAttribute('aria-current'), 'false');
+  } finally {
+    fixture.restore();
+  }
 });
 
 test('registry contains base plus ten unique mechanic entries', () => {
