@@ -27,6 +27,8 @@ const LEVEL12_COLOR_TOTALS = { 0: 68, 1: 34, 2: 18, 3: 22, 4: 12, 5: 198, 6: 20,
 const LEVEL12_INITIAL_MOVABLE_IDS = [1, 4, 34, 51];
 const LEVEL12_DISPATCH_ID = 1;
 const LEVEL12_BLOCKED_ID = 2;
+const PLAYABLE_AD_SOURCE_MARKERS =
+  /cta-button|Play Now|cta-pulse|--cta-|\bcta\.|MRAID|STORE_(?:URL|OPEN)|isIOS|openStore|InstallFullGame|installState|MAX_NUMBER_COUNT_BUS|numberCountBus|isFinish|ctaButton|applyCtaTuning|play\.google\.com\/store|apps\.apple\.com\/app|Bus Fever - Car Jam Escape|Main_Prop_GreenBtn|\/assets\/icon\.png/i;
 
 const countSeatsByColor = () => {
   const counts = {};
@@ -312,22 +314,6 @@ test('editor sizing, source background ratio, and passenger shadow anchor stay w
   assert.equal(SCENE_TUNING.passengerMaterial.solidColors[0], 0x36a6ff);
   assert.equal(SCENE_TUNING.passengerMaterial.colors.length, 11);
   assert.deepEqual(SCENE_TUNING.passengerMaterial.colors[0], { emissionColor: 0x36a6ff, baseColor: 0xffffff });
-  assert.deepEqual(SCENE_TUNING.cta, {
-    enabled: 1,
-    x: 540,
-    y: 1981,
-    worldX: 0,
-    worldY: 0.99,
-    worldZ: 11.57,
-    height: 73,
-    stretchX: 2.83,
-    fontSize: 32,
-    fontHeight: 64,
-    strokeColor: 0x196b07,
-    strokeWidth: 2.9,
-    pulseScale: 1.15,
-    pulseSpeed: 0.21
-  });
   assert.deepEqual(LEVEL_1.passengerQueue, { spacing: 0.4, screenEdgeOffsetSpacing: 4 });
   assert.equal(LEVEL_1.conveyorPathLength, 4.591284809513923);
   assert.deepEqual(SCENE_TUNING.vehicleBoardingPulse, { scale: 1.14, speed: 5 });
@@ -340,41 +326,23 @@ test('editor sizing, source background ratio, and passenger shadow anchor stay w
   assert.equal('conveyorScale' in SCENE_TUNING.passengers, false);
   assert.equal('queueScale' in SCENE_TUNING.passengers, false);
   assert.deepEqual(Object.keys(SCENE_TUNING.passengerShadows), ['conveyor', 'leftQueue', 'rightQueue']);
-  assert.ok(publicAssetExists('/assets/icon.png'));
   assert.ok(publicAssetExists('/assets/main-guide-hand.png'));
-  assert.ok(publicAssetExists('/assets/unity/ui/Main_Prop_GreenBtn.png'));
   assert.match(indexSource, /id="loading-screen"/);
-  assert.match(indexSource, /id="cta-button"/);
-  assert.match(indexSource, /Play Now/);
-  assert.match(indexSource, /Bus Fever - Car Jam Escape/);
-  assert.match(indexSource, /\/assets\/icon\.png/);
   assert.match(indexSource, /role="progressbar"/);
   assert.match(indexSource, /id="loading-progress-bar"/);
   assert.match(indexSource, /id="loading-progress-value"/);
+  assert.doesNotMatch(indexSource, PLAYABLE_AD_SOURCE_MARKERS);
   assert.match(stylesSource, /\.loading-screen/);
   assert.match(stylesSource, /\.loading-screen\.is-hidden/);
   assert.match(stylesSource, /\.loading-progress/);
   assert.match(stylesSource, /\.loading-progress-bar/);
-  assert.match(stylesSource, /Main_Prop_GreenBtn\.png/);
-  assert.match(stylesSource, /@keyframes cta-pulse/);
-  assert.match(stylesSource, /--cta-stroke-color/);
-  assert.match(stylesSource, /\.cta-button:hover \{/);
-  assert.match(stylesSource, /background: transparent url\('\/assets\/unity\/ui\/Main_Prop_GreenBtn\.png'\) center \/ 100% 100% no-repeat/);
+  assert.doesNotMatch(stylesSource, PLAYABLE_AD_SOURCE_MARKERS);
 
   const editorSource = readFileSync(join('src', 'scene-editor.js'), 'utf8');
   assert.match(editorSource, /preview\.width/);
   assert.match(editorSource, /preview\.height/);
   assert.match(editorSource, /lighting\.directional\.enabled/);
-  assert.match(editorSource, /cta\.x/);
-  assert.match(editorSource, /cta\.y/);
-  assert.match(editorSource, /cta\.worldX/);
-  assert.match(editorSource, /cta\.worldY/);
-  assert.match(editorSource, /cta\.worldZ/);
-  assert.match(editorSource, /cta\.stretchX/);
-  assert.match(editorSource, /cta\.fontSize/);
-  assert.match(editorSource, /cta\.fontHeight/);
-  assert.match(editorSource, /cta\.strokeColor/);
-  assert.match(editorSource, /cta\.pulseScale/);
+  assert.doesNotMatch(editorSource, PLAYABLE_AD_SOURCE_MARKERS);
   assert.match(editorSource, /lighting\.directional\.color/);
   assert.match(editorSource, /lighting\.directional\.intensity/);
   assert.match(editorSource, /lighting\.directional\.position\.x/);
@@ -931,8 +899,5 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.equal(mainSource.match(/game\.subscribe\(syncHud\)/g)?.length, 1);
   assert.equal(mainSource.match(/requestAnimationFrame\(frame\)/g)?.length, 2);
   assert.match(mainSource, /\nstartRuntime\(\);\s*$/);
-  assert.doesNotMatch(
-    mainSource,
-    /STORE_URL|STORE_OPEN|MRAID|mraid|isIOS|openStore|InstallFullGame|installState|MAX_NUMBER_COUNT_BUS|numberCountBus|isFinish|ctaButton|applyCtaTuning|--cta-/i
-  );
+  assert.doesNotMatch(mainSource, PLAYABLE_AD_SOURCE_MARKERS);
 });
