@@ -8,6 +8,7 @@ import {
   getMechanicById,
   resolveMechanicId
 } from '../src/mechanic-registry.js';
+import { filterMechanicCollection } from '../src/mechanic-library.js';
 import {
   getMechanicIdFromSearch,
   replaceMechanicQuery,
@@ -52,7 +53,12 @@ test('page shell exposes the mechanic lab controls without ad CTA copy', () => {
     'mechanic-overlay',
     'mechanic-overlay-title',
     'mechanic-overlay-summary',
-    'mechanic-back-button'
+    'mechanic-back-button',
+    'stage',
+    'game-canvas',
+    'loading-screen',
+    'end-panel',
+    'scene-editor'
   ]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
@@ -144,6 +150,42 @@ test('filterMechanics returns a mutable copy for an empty search', () => {
 
   assert.notEqual(result, MECHANICS);
   assert.doesNotThrow(() => result.sort(({ id: a }, { id: b }) => a.localeCompare(b)));
+});
+
+test('filterMechanicCollection searches a provided custom collection', () => {
+  const customMechanics = [
+    {
+      id: 'custom-name',
+      name: 'Signal Relay',
+      summary: 'Redirects arriving buses',
+      categories: ['Routing']
+    },
+    {
+      id: 'custom-summary',
+      name: 'Platform Clock',
+      summary: 'Rewards precise timing',
+      categories: ['Scoring']
+    },
+    {
+      id: 'custom-category',
+      name: 'Depot Queue',
+      summary: 'Stores vehicles off stage',
+      categories: ['Capacity']
+    }
+  ];
+
+  assert.deepEqual(
+    filterMechanicCollection(customMechanics, 'signal').map(({ id }) => id),
+    ['custom-name']
+  );
+  assert.deepEqual(
+    filterMechanicCollection(customMechanics, 'precise').map(({ id }) => id),
+    ['custom-summary']
+  );
+  assert.deepEqual(
+    filterMechanicCollection(customMechanics, 'capacity').map(({ id }) => id),
+    ['custom-category']
+  );
 });
 
 test('invalid mechanic ids fall back to base', () => {

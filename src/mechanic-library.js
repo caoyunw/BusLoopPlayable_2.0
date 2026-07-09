@@ -1,9 +1,17 @@
-import { filterMechanics } from './mechanic-registry.js';
-
 const STATUS_LABELS = {
   playable: '可试玩',
   planned: '待实现'
 };
+
+export function filterMechanicCollection(mechanics, query = '') {
+  const value = query.trim().toLocaleLowerCase('zh-CN');
+  if (!value) return [...mechanics];
+
+  return mechanics.filter((mechanic) => (
+    [mechanic.name, mechanic.summary, ...mechanic.categories]
+      .some((text) => text.toLocaleLowerCase('zh-CN').includes(value))
+  ));
+}
 
 function appendTextElement(document, parent, tagName, className, text) {
   const element = document.createElement(tagName);
@@ -17,7 +25,7 @@ export function createMechanicLibrary(root, {
   mechanics,
   activeId,
   onSelect = () => {},
-  filter = filterMechanics
+  filter = filterMechanicCollection
 }) {
   const search = root?.querySelector('#mechanic-search');
   const list = root?.querySelector('#mechanic-list');
@@ -87,7 +95,7 @@ export function createMechanicLibrary(root, {
 
   function renderList(query = '') {
     list.replaceChildren();
-    const matches = filter(query, mechanics).filter((mechanic) => allowedIds.has(mechanic.id));
+    const matches = filter(mechanics, query).filter((mechanic) => allowedIds.has(mechanic.id));
 
     if (!matches.length) {
       appendTextElement(document, list, 'p', 'mechanic-empty-state', '没有找到匹配的机制');
