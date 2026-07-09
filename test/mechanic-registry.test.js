@@ -140,6 +140,7 @@ test('query replacement preserves a double-slash pathname', () => {
 test('query synchronization replaces the current location with a resolved id', () => {
   const calls = [];
   const location = {
+    origin: 'https://busloop.local',
     pathname: '/lab',
     search: '?foo=1',
     hash: '#preview'
@@ -152,5 +153,28 @@ test('query synchronization replaces the current location with a resolved id', (
 
   syncMechanicQuery('missing', location, history);
 
-  assert.deepEqual(calls, [[null, '', '/lab?foo=1&mechanic=base#preview']]);
+  assert.deepEqual(calls, [[null, '', 'https://busloop.local/lab?foo=1&mechanic=base#preview']]);
+});
+
+test('query synchronization keeps a double-slash pathname on the current origin', () => {
+  const calls = [];
+  const location = {
+    origin: 'https://busloop.local',
+    pathname: '//lab',
+    search: '?foo=1',
+    hash: '#x'
+  };
+  const history = {
+    replaceState(...args) {
+      calls.push(args);
+    }
+  };
+
+  syncMechanicQuery('garage', location, history);
+
+  assert.deepEqual(calls, [[
+    null,
+    '',
+    'https://busloop.local//lab?foo=1&mechanic=garage#x'
+  ]]);
 });

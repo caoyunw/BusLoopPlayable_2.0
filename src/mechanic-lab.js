@@ -19,9 +19,9 @@ export function syncMechanicQuery(
   history.replaceState(
     null,
     '',
-    replaceMechanicQuery(
+    `${location.origin}${replaceMechanicQuery(
       `${location.pathname}${location.search}${location.hash}`,
       mechanicId
-    )
+    )}`
   );
 }
