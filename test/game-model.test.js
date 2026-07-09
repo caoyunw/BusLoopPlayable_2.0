@@ -850,18 +850,27 @@ test('parking spot visual scale changes do not move the authored vehicle path ce
 
 test('main thread saves and restores scene tuning from localStorage', () => {
   const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
+  assert.match(
+    mainSource,
+    /import\s+\{\s*MECHANICS,\s*getMechanicById,\s*resolveMechanicId\s*\}\s+from\s+'\.\/mechanic-registry\.js'/
+  );
+  assert.match(mainSource, /import\s+\{\s*createMechanicLibrary\s*\}\s+from\s+'\.\/mechanic-library\.js'/);
+  assert.match(
+    mainSource,
+    /import\s+\{\s*getMechanicIdFromSearch,\s*syncMechanicQuery\s*\}\s+from\s+'\.\/mechanic-lab\.js'/
+  );
   assert.match(mainSource, /bus-loop-scene-tuning-v3/);
   assert.match(mainSource, /bus-loop-scene-tuning-v2/);
   assert.match(mainSource, /LEGACY_TUNING_STORAGE_KEY/);
   assert.match(mainSource, /function deepMerge/);
-  assert.match(mainSource, /classList\.toggle\('is-phone-preview', EDITOR_ENABLED && Boolean\(preview\?\.enabled\)\)/);
-  assert.match(mainSource, /function loadSavedTuning\(\) \{\s+if \(!EDITOR_ENABLED\) return;/);
+  assert.match(mainSource, /classList\.toggle\('is-phone-preview', Boolean\(preview\?\.enabled\)\)/);
+  assert.match(mainSource, /const sceneEditorRoot = \$\('#scene-editor'\)/);
+  assert.doesNotMatch(mainSource, /EDITOR_ENABLED/);
   assert.match(mainSource, /deepMerge\(SCENE_TUNING, JSON\.parse\(saved\)\)/);
   assert.match(mainSource, /delete legacy\.vehicleArea/);
   assert.match(mainSource, /localStorage\.setItem/);
   assert.match(mainSource, /localStorage\.getItem/);
-  assert.match(mainSource, /function writeTuning\(value\) \{\s+if \(!EDITOR_ENABLED\) return;/);
-  assert.match(mainSource, /function clearSavedTuning\(\) \{\s+if \(!EDITOR_ENABLED\) return;/);
+  assert.doesNotMatch(mainSource, /function (?:loadSavedTuning|writeTuning|clearSavedTuning)[^{]*\{\s+if \(!/);
   assert.match(mainSource, /clearSavedTuning/);
   assert.match(mainSource, /isPassengerMaterialTuningPath/);
   assert.match(mainSource, /PASSENGER_MATERIAL_TUNING_PREFIX = 'passengerMaterial\.'/);
@@ -870,7 +879,6 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /startsWith\(PASSENGER_MATERIAL_TUNING_PREFIX\)/);
   assert.match(mainSource, /mode: materialOnly \? 'passengerMaterial' : 'full', colorIndex/);
   assert.match(mainSource, /setTimeout\(flushTuningSave, 150\)/);
-  assert.match(mainSource, /beforeunload', flushTuningSave/);
   assert.match(mainSource, /if \(!materialOnly\) \{/);
   assert.match(mainSource, /game\.initializeQueues\(view\.getQueueCapacities\(\), view\.getQueueSpacing\(\), view\.getQueueLengths\(\), view\.getConveyorPathLength\(\)\)/);
   assert.match(mainSource, /createGameAudioController\(LEVEL_1\.assets\.audio\)/);
@@ -883,73 +891,48 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /view\.ready\?\.finally/);
   assert.match(mainSource, /updateLoadingProgress\(1\)/);
   assert.match(mainSource, /loadingScreen\?\.classList\.add\('is-hidden'\)/);
-  assert.match(mainSource, /const ctaButton = \$\('#cta-button'\)/);
-  assert.match(mainSource, /web: 'https:\/\/play\.google\.com\/store\/apps\/details\?id=gridplus\.busjam\.carpuzzle'/);
-  assert.match(mainSource, /web: 'https:\/\/apps\.apple\.com\/app\/id6746743297'/);
-  assert.match(mainSource, /itms-apps:\/\/itunes\.apple\.com\/app\/id6746743297/);
-  assert.match(mainSource, /STORE_OPEN_COOLDOWN_MS = 800/);
-  assert.match(mainSource, /MAX_NUMBER_COUNT_BUS = 10/);
-  assert.match(mainSource, /function applyCtaTuning/);
-  assert.match(mainSource, /function InstallFullGame/);
-  assert.match(mainSource, /let lastStoreOpenAt = 0/);
-  assert.match(mainSource, /let storeOpenAttempts = 0/);
-  assert.match(mainSource, /function isIOSDevice\(\)/);
-  assert.match(mainSource, /Macintosh/);
-  assert.match(mainSource, /navigator\.maxTouchPoints > 1/);
-  assert.match(mainSource, /function getStoreTarget\(\)/);
-  assert.match(mainSource, /function getMraidStoreUrl\(target\)/);
-  assert.match(mainSource, /function openStore\(\)/);
-  assert.match(mainSource, /now - lastStoreOpenAt < STORE_OPEN_COOLDOWN_MS/);
-  assert.match(mainSource, /const target = getStoreTarget\(\)/);
-  assert.match(mainSource, /storeOpenAttempts \+= 1/);
-  assert.match(mainSource, /function waitForMraidReady\(onReady\)/);
-  assert.match(mainSource, /mraid\.getState\(\)/);
-  assert.match(mainSource, /state === 'loading'/);
-  assert.match(mainSource, /mraid\.addEventListener\('ready', startOnce\)/);
-  assert.match(mainSource, /state === 'default'/);
-  assert.match(mainSource, /waitForMraidReady\(startRuntime\)/);
-  assert.match(mainSource, /window\.mraid\?\.open/);
-  assert.match(mainSource, /window\.mraid\.open\(url\)/);
-  assert.match(mainSource, /window\.open\(target\.web, '_blank', 'noopener'\)/);
-  assert.match(mainSource, /let numberCountBus = 0/);
-  assert.match(mainSource, /let isFinish = false/);
-  assert.match(mainSource, /countedInstallVehicles = new Set\(\)/);
-  assert.match(mainSource, /INSTALL_GATE_VEHICLE_STATES = new Set\(\['at-spot', 'boarding-final', 'departing', 'done'\]\)/);
-  assert.match(mainSource, /const markInstallVehicle = \(vehicleId\) => \{/);
-  assert.match(mainSource, /countedInstallVehicles\.has\(vehicleId\)/);
+
+  assert.match(mainSource, /const initialMechanicId = getMechanicIdFromSearch\(location\.search\)/);
+  assert.match(mainSource, /let activeMechanic = getMechanicById\(resolveMechanicId\(initialMechanicId\)\)/);
+  assert.match(mainSource, /let paused = activeMechanic\.status !== 'playable'/);
+  assert.match(mainSource, /function selectMechanic\(id, \{ syncUrl = true \} = \{\}\)/);
+  assert.match(mainSource, /const resolvedId = resolveMechanicId\(id\)/);
+  assert.match(mainSource, /activeMechanic = getMechanicById\(resolvedId\)/);
+  assert.match(mainSource, /paused = activeMechanic\.status !== 'playable'/);
+  assert.match(mainSource, /mechanicLibrary\.setActive\(resolvedId\)/);
+  assert.match(mainSource, /mechanicOverlay\.hidden = !paused/);
+  assert.match(mainSource, /mechanicOverlayTitle\.textContent = activeMechanic\.name/);
+  assert.match(mainSource, /mechanicOverlaySummary\.textContent = activeMechanic\.summary/);
+  assert.match(mainSource, /canvas\.inert = paused/);
+  assert.match(mainSource, /stage\?\.classList\.toggle\('is-mechanic-paused', paused\)/);
+  assert.match(mainSource, /if \(paused\) endPanel\.hidden = true/);
+  assert.match(mainSource, /if \(syncUrl\) syncMechanicQuery\(resolvedId\)/);
+  assert.match(
+    mainSource,
+    /createMechanicLibrary\(mechanicLibraryRoot,\s*\{\s*mechanics: MECHANICS,\s*activeId: initialMechanicId,\s*onSelect: selectMechanic\s*\}\)/
+  );
+  assert.match(mainSource, /selectMechanic\(initialMechanicId, \{ syncUrl: false \}\)/);
   assert.match(mainSource, /const handleVehicleClick = \(vehicleId\) => \{/);
+  assert.match(mainSource, /if \(paused\) return \{ ok: false, reason: 'mechanic-preview-paused' \}/);
   assert.match(mainSource, /const result = game\.clickVehicle\(vehicleId\)/);
-  assert.match(mainSource, /result\?\.ok && markInstallVehicle\(vehicleId\)/);
-  assert.match(mainSource, /function updateInstallGate\(state\)/);
-  assert.match(mainSource, /for \(const vehicle of state\.vehicles \?\? \[\]\)/);
-  assert.match(mainSource, /countedInstallVehicles\.has\(vehicle\.id\)/);
-  assert.match(mainSource, /markInstallVehicle\(vehicle\.id\)/);
-  assert.match(mainSource, /numberCountBus \+= 1/);
-  assert.match(mainSource, /numberCountBus >= MAX_NUMBER_COUNT_BUS/);
-  assert.match(mainSource, /if \(isFinish\) \{/);
-  assert.match(mainSource, /stopImmediatePropagation\(\)/);
-  assert.match(mainSource, /ctaButton\?\.addEventListener\('click', \(event\) => \{/);
-  assert.match(mainSource, /event\.stopPropagation\(\)/);
-  assert.match(mainSource, /installState: \(\) => \(\{ numberCountBus, maxNumberCountBus: MAX_NUMBER_COUNT_BUS, isFinish \}\)/);
-  assert.match(mainSource, /height \* \(Number\(cta\.stretchX\)/);
-  assert.match(mainSource, /Number\.isFinite\(Number\(cta\.x\)\)/);
-  assert.match(mainSource, /Number\.isFinite\(Number\(cta\.y\)\)/);
-  assert.match(mainSource, /Number\(cta\.worldX\)/);
-  assert.match(mainSource, /Number\(cta\.worldZ\)/);
-  assert.match(mainSource, /projectWorldToCanvas/);
-  assert.match(mainSource, /function cssPx\(value\)/);
-  assert.match(mainSource, /--cta-width', cssPx\(width\)/);
-  assert.match(mainSource, /--cta-height', cssPx\(height\)/);
-  assert.match(mainSource, /--cta-font-size', cssPx\(fontSize\)/);
-  assert.match(mainSource, /--cta-stroke-width', cssPx\(Math\.max\(0, Number\(cta\.strokeWidth\) \|\| 0\)\)/);
-  assert.match(mainSource, /const stageRect = stage\?\.getBoundingClientRect\(\)/);
-  assert.match(mainSource, /const positionScale = getStagePositionScale\(stageWidth, designWidth\)/);
-  assert.match(mainSource, /worldPosition\?\.x \?\? stageWidth \/ 2 \+ \(centerX - designWidth \/ 2\) \* positionScale/);
-  assert.match(mainSource, /worldPosition\?\.y \?\? stageHeight \/ 2 \+ \(centerY - designHeight \/ 2\) \* positionScale/);
-  assert.match(mainSource, /--cta-font-height/);
-  assert.match(mainSource, /--cta-stroke-color/);
-  assert.match(mainSource, /--cta-pulse-duration/);
-  assert.match(mainSource, /const updateCtaPosition = \(\) => \{/);
-  assert.match(mainSource, /applyCtaTuning\(view\)/);
-  assert.match(mainSource, /updateCtaPosition\(\)/);
+  assert.match(mainSource, /if \(!paused\) game\.update\(delta\)/);
+  assert.match(mainSource, /view\.update\(game\.snapshot\(\), game\)/);
+  assert.match(mainSource, /view\.render\(\)/);
+  assert.match(mainSource, /mechanicBackButton\?\.addEventListener\('click', \(\) => selectMechanic\('base'\)\)/);
+  assert.match(mainSource, /import\('\.\/scene-editor\.js'\)/);
+  assert.match(mainSource, /editor\.setCollapsed\(true\)/);
+  assert.match(mainSource, /function handleBeforeUnload\(\)/);
+  assert.match(mainSource, /flushTuningSave\(\)/);
+  assert.match(mainSource, /mechanicLibrary\.destroy\(\)/);
+  assert.match(mainSource, /window\.addEventListener\('beforeunload', handleBeforeUnload\)/);
+  assert.match(mainSource, /currentMechanic: \(\) => activeMechanic/);
+  assert.match(mainSource, /selectMechanic,/);
+  assert.match(mainSource, /isPaused: \(\) => paused/);
+  assert.equal(mainSource.match(/game\.subscribe\(syncHud\)/g)?.length, 1);
+  assert.equal(mainSource.match(/requestAnimationFrame\(frame\)/g)?.length, 2);
+  assert.match(mainSource, /\nstartRuntime\(\);\s*$/);
+  assert.doesNotMatch(
+    mainSource,
+    /STORE_URL|STORE_OPEN|MRAID|mraid|isIOS|openStore|InstallFullGame|installState|MAX_NUMBER_COUNT_BUS|numberCountBus|isFinish|ctaButton|applyCtaTuning|--cta-/i
+  );
 });

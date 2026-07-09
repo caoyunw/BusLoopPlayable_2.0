@@ -50,25 +50,6 @@ const FIELD_GROUPS = [
     ]
   },
   {
-    title: 'CTA',
-    fields: [
-      ['Enabled', 'cta.enabled', 0, 1, 1],
-      ['X', 'cta.x', 0, 1080, 1],
-      ['Y', 'cta.y', 0, 2160, 1],
-      ['World X', 'cta.worldX', -10, 10, 0.01],
-      ['World Y', 'cta.worldY', -1, 4, 0.01],
-      ['World Z', 'cta.worldZ', -12, 16, 0.01],
-      ['Height', 'cta.height', 36, 140, 1],
-      ['Stretch X', 'cta.stretchX', 1, 5, 0.01],
-      ['Font Size', 'cta.fontSize', 12, 64, 1],
-      ['Font Height', 'cta.fontHeight', 8, 100, 1],
-      ['Stroke Color', 'cta.strokeColor', 0, 16777215, 1],
-      ['Stroke Width', 'cta.strokeWidth', 0, 8, 0.1],
-      ['Pulse Scale', 'cta.pulseScale', 1, 1.35, 0.01],
-      ['Pulse Speed', 'cta.pulseSpeed', 0.1, 3, 0.01]
-    ]
-  },
-  {
     title: 'Passenger Material',
     fields: [
       ['Mode', 'passengerMaterial.mode', 0, 0, 1, [
