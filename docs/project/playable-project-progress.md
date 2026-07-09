@@ -1,6 +1,38 @@
 # Playable Project Progress
 
-## Current Snapshot - 2026-07-08
+## Current Snapshot - 2026-07-09
+
+The active project is now the BusLoop mechanic lab, not an advertising playable. The lab is for designing and experiencing gameplay mechanisms and contains no active advertising package flow or store redirect.
+
+### Mechanic Lab Foundation
+
+- The registry contains one playable `base` rule set plus ten complete mechanism definitions currently marked `planned`.
+- The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
+- The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
+- Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
+
+### Advertising Cleanup And Runtime Assets
+
+- CTA/store routing, install gates, MRAID startup, advertising package scripts/checkers, generated package artifacts, and platform-specific runtime ownership were removed.
+- Active compressed web assets moved to neutral `/assets/runtime/...` paths. Unity source/export assets remain under `/assets/unity/...`.
+- Historical platform and playable-delivery documents remain for provenance but are no longer the default workflow.
+
+### Verification
+
+- Targeted lab tests: `node --test test/mechanic-registry.test.js` passed 22/22.
+- Production build: `npm run build` passed with the existing Vite large-chunk warning.
+- Full suite: `npm test` passed 66/73. The seven existing `test/game-model.test.js` failures are recorded in `task_plan.md`; the full suite is not green.
+- Browser visual QA is still pending for desktop/mobile layout, canvas rendering, drawer overlap/focus, mechanism selection/overlay, editor behavior, and console output.
+
+### Next Step
+
+Implement mechanisms one at a time behind the lab boundaries, starting with `question-vehicle` and `garage`. Keep each entry `planned` until its rules, focused tests, and desktop/mobile browser QA are complete.
+
+## Historical Playable/Advertising Log
+
+The entries below describe the repository before or during the conversion to the mechanic lab. They are retained as implementation history and are not the current SOP.
+
+### Historical Snapshot - 2026-07-08
 
 The project moved from the original 6-vehicle level1 prototype to the imported level12-style playable layout on 2026-07-07. The active runtime now targets `GameSceneDualQueue2` with 94 visible vehicles, two fixed passenger queues, authored depth blockers, Unity-style motion/effects/audio, and editor controls for major visual tuning.
 

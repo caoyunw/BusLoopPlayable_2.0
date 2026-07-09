@@ -1,49 +1,67 @@
-﻿# Findings
+# Findings
 
-## Current Durable Findings - 2026-07-08
+## Current Durable Findings - 2026-07-09
+
+### Mechanic Lab Boundaries
+
+- The active product is a mechanic design and experience lab. `base` is playable; ten additional definitions are discoverable but remain `planned`.
+- `src/mechanic-registry.js` is the source of truth for mechanism identity, metadata, state, lookup, fallback, and search.
+- `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
+- `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
+- New mechanism behavior should live behind an isolated module boundary and reuse base runtime contracts. Do not grow a large mechanism switch inside `src/main.js`.
+- A mechanism stays `planned` until its real play loop, focused tests, and browser QA are complete.
+
+### Runtime Asset Naming
+
+- Web-optimized assets used by the lab live under `public/assets/runtime/` and are referenced as `/assets/runtime/...`.
+- Unity models, source textures, effects, fonts, and audio remain under `public/assets/unity/`.
+- Runtime asset paths must use neutral names. Advertising platform names are not runtime ownership boundaries.
+- `src/level-data.js` is the primary asset URL inventory; `src/scene-view.js` directly owns the runtime guide-hand URL.
+
+### Persistent Editor And Authored Defaults
+
+- The scene editor is a permanent lab tool and defaults to collapsed; it is no longer stripped from a production-oriented runtime path.
+- `src/main.js` clones `SCENE_TUNING` before any saved override is merged. Reset therefore returns to authored source values instead of values already mutated during the session.
+- Exported `artifacts/scene-tuning.json` is a handoff for `npm run apply:tuning`; browser storage alone is not an authored source change.
+
+### Safe Storage
+
+- Scene tuning uses `bus-loop-scene-tuning-v3`; legacy `v2` data is migrated without replacing the current `vehicleArea` object wholesale.
+- Storage reads, JSON parsing, writes, and removal are exception-safe. Failure should warn and leave the lab usable.
+- Tuning writes are debounced and flushed on unload; explicit save can flush immediately.
+- Mechanic selection is represented by `?mechanic=` rather than sharing the tuning storage key. Unknown IDs resolve to `base`.
 
 ### Active Level Layout
 
-- The playable now targets imported level12-style data for `GameSceneDualQueue2` rather than the original 6-vehicle level1 prototype.
+- The base mechanism targets imported level12-style `GameSceneDualQueue2` data rather than the original six-vehicle prototype.
 - Active data has 94 visible vehicles, two fixed queues with 219 groups each, and authored `vehicleDepthes` blocker data for 90 vehicles.
 - Vehicle seat totals match fixed passenger queue totals by color. Initial movable vehicles are `1, 4, 34, 51`.
 
-### Conveyor / Passenger Entry Parity
+### Conveyor And Passenger Entry
 
-- Unity conveyor progress is based on actual spline path length: initial fill uses passenger speed, normal belt motion uses conveyor speed, both divided by spline length.
-- Unity queue supply waits until the queue head is ready. During initial fill, empty belt slots clamp just before the entry with `InitialEntryOffsetPercent = 0.0001` until a passenger can enter.
-- Web should reuse the full queue-entry visual path for both initial-fill and later refill groups.
+- Unity conveyor progress is based on actual spline path length: initial fill uses passenger speed and normal belt motion uses conveyor speed, both divided by spline length.
+- Queue supply waits until the head is ready. During initial fill, empty belt slots clamp just before the entry until a passenger can enter.
+- The web runtime reuses the full queue-entry visual path for initial-fill and later refill groups.
 
-### Vehicle / Passenger Materials
+### Materials, Effects, Audio, And Shadows
 
-- Vehicle prefabs use full Unity color atlases; authored model UVs should remain active for window/light/body regions.
-- Passenger prefabs are color-specific materials/textures rather than simple runtime swatches. Unity materials combine `_MainTex`, `_BaseCol`, and `_EmissionCol` through `AnimSimpleLit`.
-- Current web tuning exposes passenger material color/brightness controls for parity adjustment.
+- Vehicle prefabs use full Unity color atlases; authored model UVs remain active for windows, lights, and body regions.
+- Passenger prefabs are color-specific materials/textures rather than simple runtime swatches. Current tuning also supports solid-color adjustment while retaining VAT animation data.
+- Core audio is wired for collision, passenger boarding, and full-vehicle departure.
+- Collision, smoke trail, ribbon, and boarding effects retain Unity-authored source relationships.
+- Authored fake shadows are the active solution; the heavier real-time Three.js shadow-map experiment was removed.
 
-### Effects / Audio / Shadows
+### Camera And Motion
 
-- Effect_Hit uses ParticleHit_2/Circle_01_Add, ParticleHit_1/Round_02_Add, and ParticleHit/Round_01_Add at vehicle collision contact.
-- Effect_SmokeTrail uses ParticleTrail/Round_01_Alp as a looping moving-vehicle trail.
-- Core audio clips are wired for collision, passenger boarding, and full-vehicle departure.
-- Real-time Three.js shadow maps were removed after experimentation; authored fake shadows are the active shadow layer.
+- Current authored camera behavior keeps configured visible height across viewport aspects; wider screens reveal more horizontal content.
+- Phone preview framing is an editor tool and must not be confused with the actual responsive stage dimensions during browser QA.
+- Vehicle arrows move with the vehicle hit root. Collision and station paths remain owned by `src/vehicle-motion.js` and tuning.
 
-### AppLovin Packaging
+## Historical Advertising Packaging - Removed
 
-- When inserting large inlined JS/CSS strings into HTML, use function replacers with `String.replace`; plain replacement strings interpret minified `$&` sequences and can inject the matched `</head>` text into the bundle, causing `SyntaxError: Unexpected token '<'` and a loading screen stuck at 0%.
-- Editor tuning saved in browser `localStorage` is not a delivery artifact. Before AppLovin packaging, export the tuning JSON and apply it into `src/scene-tuning.js`; the AppLovin single HTML should not include the scene editor UI or editor code.
-- Production/AppLovin runtime must not restore editor tuning from `localStorage`; stale platform-preview storage can override newly baked camera/CTA adaptation values and make repeated package changes appear unchanged on device.
-- iOS AppLovin store jumps should use `itms-apps://itunes.apple.com/app/id6746743297` as the first MRAID URL, with the `https://apps.apple.com/app/id6746743297` link retained as a fallback. The static AppLovin checker now verifies the direct iOS scheme is present.
-- The 10-vehicle install gate must fire from a successful vehicle dispatch user gesture on real devices; waiting until an asynchronous arrival/frame update can lose the MRAID-open gesture context.
-
-### Camera / Screen Adaptation
-
-- Current trial design-cover behavior is fixed visible height: `camera.fitHeight` remains the vertical visible height across viewport aspects. With `fitHeight: 14.9`, short/wide screens keep visible height 14.9 and only reveal more horizontal content.
-- The phone preview frame is an editor-only tool. Production/AppLovin must not add `is-phone-preview`, otherwise CSS can force the stage back to the 1080x2160 design aspect and prevent camera adaptation from seeing the real device/container aspect.
-
-### Vehicle Arrow / Motion
-
-- Bus prefab hierarchy treats Arrow as part of the vehicle visual. Web hit clips should move the vehicle model and arrow under one shared hit root.
-- Arrow outline parity is approximated with a dark outline layer behind the white Arrow_01 geometry.
+- The advertising package, platform-specific runtime assets, CTA/store flow, install gate, MRAID startup path, package scripts, static package checker, and generated package artifacts were removed in commit `8f78492`.
+- Earlier inline-HTML replacement, store-routing, and package-cache findings apply only to archived advertising-delivery history. They are not requirements for the mechanic lab.
+- Historical platform and delivery documents remain available for provenance under `docs/platforms/`, `docs/playable/`, and `docs/project/archive/`.
 
 ## Archive
 

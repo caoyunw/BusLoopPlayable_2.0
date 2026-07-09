@@ -1,5 +1,6 @@
 {
-  "name": "bus-loop-playable-prototype",
+  "name": "bus-loop-mechanic-lab",
+  "description": "BusLoop gameplay mechanic design and experimentation lab",
   "version": "0.1.0",
   "private": true,
   "type": "module",

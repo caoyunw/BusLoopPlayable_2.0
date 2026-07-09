@@ -1,131 +1,76 @@
 # CLAUDE.md
 
-<!-- build-playable-ads:start -->
-# Playable Ads Working Rules
+# BusLoop 机制实验台工作规则
 
-这是一套安装到当前 playable 工程根目录的长期规则。后续即使不再显式调用 skill，Codex / Claude 也应持续遵守这里的流程推进项目。
+当前工程用于设计、实现和浏览器内体验 BusLoop 机制，不是广告交付工程。默认任务是维护机制实验台、基础运行时、场景和编辑器；历史广告平台文档仅供追溯，不是当前 SOP。
 
-## 你现在在做什么
+## 默认阅读顺序
 
-当前工程默认按“资源解耦、编辑器优先、AppLovin 基线、人工验收优先、静态校验补漏、最后混淆”的 playable SOP 推进。
-
-你的核心职责不是一次性把试玩页写完，而是持续维护这几个事实来源：
-
-- `docs/project/playable-project-progress.md`
-- `docs/project/playable-core-rules.md`
-- `docs/project/playable-resource-status.md`
-- `docs/project/playable-multi-platform-execution-plan.md`
-- `docs/project/platform-manual-validation-checklist.md`
-- `docs/platforms/*.md`
-
-## 文档分工
-
-这些文档分三类，不是同一用途。
-
-- 通用流程文档
-  - 作用：告诉你这套 playable SOP 怎么做、为什么这么做。
-  - 特点：跨项目通用，偏方法论，不记录当前项目事实。
-- 项目文档
-  - 作用：记录当前项目现在做到哪、缺什么、下一步做什么。
-  - 特点：只服务当前项目，是每轮都要先读的事实来源。
-- 平台文档
-  - 作用：记录跨平台差异和单个平台的硬约束、坑点、验收重点。
-  - 特点：进入平台阶段或处理某个平台问题时重点读。
-
-## 首次进入项目先读什么
-
-第一次接手这个 playable 工程，先按这个顺序读：
-
-1. `docs/playable/playable-sop.md`
-2. `docs/playable/platform-delivery.md`
-3. `docs/playable/project-document-rules.md`
-4. `docs/playable/busjam-practice-timeline.md`
-5. `docs/platforms/platform-deltas.md`
-
-然后再读当前项目文档：
+每轮先读：
 
 1. `docs/project/playable-project-progress.md`
-2. `docs/project/playable-core-rules.md`
-3. `docs/project/playable-resource-status.md`
-4. `docs/project/playable-multi-platform-execution-plan.md`
-5. 当前目标平台对应的 `docs/platforms/*-playable-audit.md`
+2. `docs/project/code-navigation.md`
+3. 导航表映射到的源码与配套测试
 
-## 后续每轮继续工作先读什么
+涉及当前优先级或交接时，再读 `task_plan.md`、`progress.md`。涉及玩法事实、资源、调参、存储或模块边界时，读 `findings.md`。
 
-不是第一次接手，而是已经在这个项目里持续推进了，那每轮先读项目文档：
+`docs/platforms/`、`docs/playable/` 和旧归档可以保留，但除非用户明确要求研究历史，不要把平台打包、商店跳转或广告流程重新纳入任务。
 
-1. `docs/project/playable-project-progress.md`
-2. `docs/project/playable-core-rules.md`
-3. `docs/project/playable-resource-status.md`
-4. `docs/project/playable-multi-platform-execution-plan.md`
-5. 当前目标平台对应的 `docs/platforms/*-playable-audit.md`
+## 机制优先
 
-如果对流程顺序、平台策略、文档维护规则忘了，再回头补读：
+1. 先写清机制规则、玩家决策变化和验收条件。
+2. 在 `src/mechanic-registry.js` 补全定义；没有真实可玩实现时保持 `planned`。
+3. 机制数据和规则放在独立模块，复用基础运行时边界，不把大量机制分支塞进 `src/main.js`。
+4. 通过实验台层接入选择、URL、暂停、重置和错误恢复。
+5. 增加注册表测试与对应玩法测试。
+6. 完成桌面和手机浏览器视觉 QA 后，才可标记为 `playable`。
 
-- `docs/playable/playable-sop.md`
-- `docs/playable/platform-delivery.md`
-- `docs/playable/project-document-rules.md`
+## 代码边界
 
-## 7 步 SOP
+- `src/main.js`：实验台装配、基础运行时、调参存储、动画循环与 QA API。
+- `src/mechanic-registry.js`：机制 ID、元数据、状态和查询。
+- `src/mechanic-lab.js`：`?mechanic=` 解析/同步及安全存储清理。
+- `src/mechanic-library.js`：机制库搜索、分组、详情与手机抽屉交互。
+- `src/game-model.js`、`src/level-data.js`、`src/scene-view.js`：基础玩法、关卡数据和 Three.js 场景。
+- `src/scene-editor.js`、`src/scene-tuning.js`：常驻场景编辑器和 authored defaults。
 
-1. 提炼玩法规则与限制。
-2. 资源解耦并记录缺口。
-3. 先做编辑器。
-4. 先做 AppLovin 基线包。
-5. 基于 AppLovin 扩其他平台。
-6. 全平台人工验收并回写。
-7. 最后做静态校验与 hardening / 混淆。
+Web 运行优化资源放在 `public/assets/runtime/`；Unity 原始导出放在 `public/assets/unity/`。不要静默编造 Unity 资源或 authored 数值。
 
-## 不能破的规则
+## 调参与存储
 
-- 不要在玩法规则没写清楚前先做最终试玩页。
-- 不要默认自动抽取 Unity 美术、音频和配表。
-- 不要把“本地能跑”当成“平台可交付”。
-- 不要跳过真实平台上传与人工试玩。
-- 不要让关键结论只留在对话里不回写文档。
-- 不要在平台链路未稳定前提前接重型混淆。
+- 场景编辑器是实验台常驻能力，默认折叠。
+- 应先克隆 authored defaults，再合并浏览器本地覆盖，保证“恢复默认”可靠。
+- `localStorage` 是可选增强；读取、迁移、写入、清除失败不能阻塞启动。
+- 需要把调参固化到源码时，先检查导出 JSON，再使用 `npm run apply:tuning` 并审阅 diff。
 
-## 浏览器自动化
+## 测试基线
 
-以下情况优先考虑浏览器自动化：
+2026-07-09 已确认：
 
-- 视觉布局问题
-- 点击路径或 CTA 问题
-- 最终包交互异常
-- 音频触发时机异常
-- 需要截图、录像或控制台证据
+- 机制定向测试：22/22 通过。
+- 全量测试：73 项中 66 项通过，7 项既有失败记录在 `task_plan.md`。
+- 构建：通过，但有既有的大 chunk 警告。
 
-优先测最终构建产物，不要只看 editor 或 dev server。
-默认优先用 `Browser Use`，具体看 `docs/playable/browser-automation.md`。
+不得把全量测试描述为全部通过。修改机制时先跑最窄相关测试；涉及共享运行时、布局、配置或交付状态时，再跑全量测试和构建。
 
-## 文档更新
+## 浏览器视觉 QA
 
-每完成一个阶段、每发现一个平台差异、每确认一个资源缺口、每完成一次真实测试，都要更新项目文档。
+UI、交互或渲染改动必须检查：
 
-最少要维护：
+- 桌面三栏与手机抽屉。
+- 画布非空、车辆可操作、控制区不遮挡主要盘面。
+- 机制搜索、空结果、选择、URL 刷新保持。
+- 待实现机制冻结输入与说明覆盖层。
+- 场景编辑器、重置、胜负面板和控制台错误。
 
-- `docs/project/playable-project-progress.md`
-- `docs/project/playable-core-rules.md`
-- `docs/project/playable-resource-status.md`
-- `docs/project/playable-multi-platform-execution-plan.md`
-- `docs/project/platform-manual-validation-checklist.md`
+记录实际 viewport、验证对象与未完成项；不要用静态测试代替视觉结论。
 
-## 文档索引
+## 文档维护
 
-- 通用流程文档：
-  - `docs/playable/playable-sop.md`
-  - `docs/playable/platform-delivery.md`
-  - `docs/playable/project-document-rules.md`
-  - `docs/playable/browser-automation.md`
-  - `docs/playable/busjam-practice-timeline.md`
-- 项目文档：
-  - `docs/project/playable-project-progress.md`
-  - `docs/project/playable-core-rules.md`
-  - `docs/project/playable-resource-status.md`
-  - `docs/project/playable-multi-platform-execution-plan.md`
-  - `docs/project/platform-manual-validation-checklist.md`
-- 平台文档：
-  - `docs/platforms/platform-deltas.md`
-  - `docs/platforms/cross-platform-playable-summary.md`
-  - 各平台 `*-playable-audit.md`
-<!-- build-playable-ads:end -->
+- 里程碑与验证状态：`docs/project/playable-project-progress.md`
+- 代码职责：`docs/project/code-navigation.md`
+- 持久结论：`findings.md`
+- 当前目标与优先级：`task_plan.md`
+- 会话交接：`progress.md`
+
+保留有价值历史，但用“历史/归档”明确隔开。不要写内部绝对路径、秘密或未验证结论。
