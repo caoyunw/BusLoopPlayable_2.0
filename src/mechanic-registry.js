@@ -126,7 +126,7 @@ export function resolveMechanicId(id) {
 
 export function filterMechanics(query = '') {
   const value = query.trim().toLocaleLowerCase('zh-CN');
-  if (!value) return MECHANICS;
+  if (!value) return [...MECHANICS];
 
   return MECHANICS.filter((mechanic) => (
     [mechanic.name, mechanic.summary, ...mechanic.categories]

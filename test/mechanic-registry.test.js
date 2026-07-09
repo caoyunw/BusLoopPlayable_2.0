@@ -95,7 +95,14 @@ test('filterMechanics searches names, summaries, and categories', () => {
     filterMechanics('信息隐藏').map(({ id }) => id),
     ['question-passenger', 'question-vehicle']
   );
-  assert.equal(filterMechanics('  '), MECHANICS);
+  assert.deepEqual(filterMechanics('  '), MECHANICS);
+});
+
+test('filterMechanics returns a mutable copy for an empty search', () => {
+  const result = filterMechanics('');
+
+  assert.notEqual(result, MECHANICS);
+  assert.doesNotThrow(() => result.sort(({ id: a }, { id: b }) => a.localeCompare(b)));
 });
 
 test('invalid mechanic ids fall back to base', () => {
@@ -120,6 +127,13 @@ test('query replacement preserves other parameters and the hash', () => {
   assert.equal(
     replaceMechanicQuery('/lab?mechanic=garage&foo=1#preview', 'missing'),
     '/lab?mechanic=base&foo=1#preview'
+  );
+});
+
+test('query replacement preserves a double-slash pathname', () => {
+  assert.equal(
+    replaceMechanicQuery('//lab?foo=1#preview', 'garage'),
+    '//lab?foo=1&mechanic=garage#preview'
   );
 });
 

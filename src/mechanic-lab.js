@@ -5,7 +5,8 @@ export function getMechanicIdFromSearch(search = '') {
 }
 
 export function replaceMechanicQuery(pathAndSearch, mechanicId) {
-  const url = new URL(pathAndSearch, 'https://busloop.local');
+  const base = 'https://busloop.local';
+  const url = new URL(pathAndSearch.startsWith('//') ? `${base}${pathAndSearch}` : pathAndSearch, base);
   url.searchParams.set('mechanic', resolveMechanicId(mechanicId));
   return `${url.pathname}${url.search}${url.hash}`;
 }
