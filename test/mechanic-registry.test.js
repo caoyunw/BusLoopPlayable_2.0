@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   MECHANICS,
   filterMechanics,
@@ -37,6 +39,45 @@ const EXPECTED_SUMMARIES = {
   'order-passenger': '普通车挡住南瓜车，解救后对应乘客上车并给予奖励。',
   valve: '玩家手动控制左右哪边乘客进入。'
 };
+
+test('page shell exposes the mechanic lab controls without ad CTA copy', () => {
+  const html = readFileSync(join('index.html'), 'utf8');
+
+  for (const id of [
+    'mechanic-library',
+    'mechanic-library-toggle',
+    'mechanic-search',
+    'mechanic-list',
+    'mechanic-detail',
+    'mechanic-overlay',
+    'mechanic-overlay-title',
+    'mechanic-overlay-summary',
+    'mechanic-back-button'
+  ]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+
+  assert.match(html, /id="app" class="mechanic-lab"/);
+  assert.doesNotMatch(html, /cta-button|Play Now/);
+});
+
+test('mechanic library module exports its UI factory', () => {
+  const librarySource = readFileSync(join('src', 'mechanic-library.js'), 'utf8');
+
+  assert.match(librarySource, /export function createMechanicLibrary/);
+});
+
+test('mechanic lab styles define the desktop grid and mobile drawer breakpoint', () => {
+  const css = readFileSync(join('src', 'styles.css'), 'utf8');
+
+  assert.match(
+    css,
+    /grid-template-columns:\s*minmax\(236px,\s*286px\)\s+minmax\(0,\s*1fr\)\s+auto/
+  );
+  assert.match(css, /@media\s*\(max-width:\s*860px\)/);
+  assert.match(css, /\.mechanic-library\.is-collapsed[\s\S]*?width:\s*48px[\s\S]*?height:\s*48px/);
+  assert.doesNotMatch(css, /\.cta-button|@keyframes\s+cta-pulse/);
+});
 
 test('registry contains base plus ten unique mechanic entries', () => {
   assert.equal(MECHANICS.length, 11);
