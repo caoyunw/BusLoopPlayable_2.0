@@ -27,7 +27,7 @@ import {
 const ease = (t) => 1 - Math.pow(1 - t, 3);
 const deg = (value) => THREE.MathUtils.degToRad(value);
 const ARROW_OUTLINE_SCALE = 1.28;
-const GUIDE_HAND_TEXTURE_URL = '/assets/applovin/main-guide-hand_q80.webp';
+const GUIDE_HAND_TEXTURE_URL = '/assets/runtime/main-guide-hand_q80.webp';
 const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
   { baseColor: 0xffffff, emissionColor: 0x36a6ff },
   { baseColor: 0xffffff, emissionColor: 0xadd98a },

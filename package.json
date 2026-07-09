@@ -7,8 +7,6 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "apply:tuning": "node scripts/apply-scene-tuning.mjs",
-    "check:applovin": "node scripts/check-applovin-package.mjs",
-    "package:applovin": "node scripts/package-applovin-single-html.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test"
   },

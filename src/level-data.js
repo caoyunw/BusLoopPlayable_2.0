@@ -298,9 +298,9 @@ export const LEVEL_1 = Object.freeze({
   // level12.asset provides fixed passenger entries for both DualQueue2 queues.
   passengerQueues: LEVEL12_PASSENGER_QUEUES,
   assets: {
-    loopScene: '/assets/applovin/Loop_02_q80.webp',
+    loopScene: '/assets/runtime/Loop_02_q80.webp',
     loopSpriteRect: { x: 0, y: 57, width: 2100, height: 1243, imageWidth: 2100, imageHeight: 1300 },
-    background: '/assets/applovin/textures/BG01_split01_q60.jpg',
+    background: '/assets/runtime/textures/BG01_split01_q60.jpg',
     audio: {
       bus_hit: {
         clips: ['/assets/unity/audio/bus_hit_V5.mp3'],
@@ -320,17 +320,17 @@ export const LEVEL_1 = Object.freeze({
       }
     },
     colorTextures: [
-      '/assets/applovin/textures/color_0_blue_q85.webp',
-      '/assets/applovin/textures/color_1_green_q85.webp',
-      '/assets/applovin/textures/color_2_pink_q85.webp',
-      '/assets/applovin/textures/color_3_purple_q85.webp',
-      '/assets/applovin/textures/color_4_red_q85.webp',
-      '/assets/applovin/textures/color_5_yellow_q85.webp',
-      '/assets/applovin/textures/color_6_orange_q85.webp',
-      '/assets/applovin/textures/color_7_lightblue_q85.webp',
-      '/assets/applovin/textures/color_8_brown_q85.webp',
-      '/assets/applovin/textures/color_9_darkgreen_q85.webp',
-      '/assets/applovin/textures/color_10_darkblue_q85.webp'
+      '/assets/runtime/textures/color_0_blue_q85.webp',
+      '/assets/runtime/textures/color_1_green_q85.webp',
+      '/assets/runtime/textures/color_2_pink_q85.webp',
+      '/assets/runtime/textures/color_3_purple_q85.webp',
+      '/assets/runtime/textures/color_4_red_q85.webp',
+      '/assets/runtime/textures/color_5_yellow_q85.webp',
+      '/assets/runtime/textures/color_6_orange_q85.webp',
+      '/assets/runtime/textures/color_7_lightblue_q85.webp',
+      '/assets/runtime/textures/color_8_brown_q85.webp',
+      '/assets/runtime/textures/color_9_darkgreen_q85.webp',
+      '/assets/runtime/textures/color_10_darkblue_q85.webp'
     ],
     models: {
       passengerVatMesh: '/assets/unity/models/Idle_boy01_vatmesh.bin',
@@ -356,9 +356,9 @@ export const LEVEL_1 = Object.freeze({
       effects: {
         aboardSmoke: '/assets/unity/effects/Round_01.png',
         ribbon: '/assets/unity/effects/Ribbon_01.png',
-        ribbonSmoke: '/assets/applovin/effects/Smoke_08_q80.webp',
+        ribbonSmoke: '/assets/runtime/effects/Smoke_08_q80.webp',
         hitCircle: '/assets/unity/effects/Circle_01.png',
-        hitRound2: '/assets/applovin/effects/Round_02_q80.webp',
+        hitRound2: '/assets/runtime/effects/Round_02_q80.webp',
         hitRound1: '/assets/unity/effects/Round_01.png',
         smokeTrail: '/assets/unity/effects/Round_01.png'
       },

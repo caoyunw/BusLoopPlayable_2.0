@@ -21,22 +21,6 @@
     "offsetX": 0,
     "offsetY": 211
   },
-  "cta": {
-    "enabled": 1,
-    "x": 540,
-    "y": 1981,
-    "worldX": 0,
-    "worldY": 0.99,
-    "worldZ": 11.57,
-    "height": 73,
-    "stretchX": 2.83,
-    "fontSize": 32,
-    "fontHeight": 64,
-    "strokeColor": 1665799,
-    "strokeWidth": 2.9,
-    "pulseScale": 1.15,
-    "pulseSpeed": 0.21
-  },
   "facing": {
     "passengerYawDegrees": 180,
     "passengerModelYawDegrees": -90,

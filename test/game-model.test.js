@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { BusLoopGame } from '../src/game-model.js';
 import { COLORS, LEVEL_1 } from '../src/level-data.js';
@@ -24,6 +24,10 @@ const advance = (game, seconds, step = .05) => {
 };
 
 const publicAssetExists = (url) => existsSync(join('public', url.replace(/^\//, '')));
+const listFiles = (directory) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+  const path = join(directory, entry.name);
+  return entry.isDirectory() ? listFiles(path) : [path];
+});
 
 const LEVEL12_TOTAL_PASSENGERS = 438;
 const LEVEL12_COLOR_TOTALS = { 0: 68, 1: 34, 2: 18, 3: 22, 4: 12, 5: 198, 6: 20, 7: 52, 8: 14 };
@@ -32,6 +36,8 @@ const LEVEL12_DISPATCH_ID = 1;
 const LEVEL12_BLOCKED_ID = 2;
 const PLAYABLE_AD_SOURCE_MARKERS =
   /cta-button|Play Now|cta-pulse|--cta-|\bcta\.|MRAID|STORE_(?:URL|OPEN)|isIOS|openStore|InstallFullGame|installState|MAX_NUMBER_COUNT_BUS|numberCountBus|isFinish|ctaButton|applyCtaTuning|play\.google\.com\/store|apps\.apple\.com\/app|Bus Fever - Car Jam Escape|Main_Prop_GreenBtn|\/assets\/icon\.png/i;
+const ACTIVE_AD_DELIVERY_MARKERS =
+  /mraid|InstallFullGame|play\.google\.com\/store|apps\.apple\.com\/app|Play Now|package:applovin|check:applovin|\/assets\/applovin\/|["']cta["']\s*:/i;
 
 const countSeatsByColor = () => {
   const counts = {};
@@ -239,6 +245,59 @@ test('Unity visual assets and tunable camera configuration are complete', () => 
     volume: 0.50023913
   });
   assert.equal(LEVEL_1.assets.passengerAnimations.move.duration, 0.60000014);
+});
+
+test('neutral runtime assets replace playable ad delivery files', () => {
+  assert.equal(LEVEL_1.assets.loopScene, '/assets/runtime/Loop_02_q80.webp');
+  assert.ok(LEVEL_1.assets.colorTextures.every((url) => url.startsWith('/assets/runtime/textures/')));
+  assert.equal(LEVEL_1.assets.textures.effects.ribbonSmoke, '/assets/runtime/effects/Smoke_08_q80.webp');
+  assert.equal(LEVEL_1.assets.textures.effects.hitRound2, '/assets/runtime/effects/Round_02_q80.webp');
+
+  const runtimeAssets = [
+    'Loop_02_q80.webp',
+    'main-guide-hand_q80.webp',
+    join('effects', 'Round_02_q80.webp'),
+    join('effects', 'Smoke_08_q80.webp'),
+    join('textures', 'BG01_split01_q60.jpg'),
+    ...Array.from({ length: 11 }, (_, index) => join(
+      'textures',
+      `color_${index}_${[
+        'blue', 'green', 'pink', 'purple', 'red', 'yellow',
+        'orange', 'lightblue', 'brown', 'darkgreen', 'darkblue'
+      ][index]}_q85.webp`
+    ))
+  ];
+
+  assert.ok(runtimeAssets.every((path) => existsSync(join('public', 'assets', 'runtime', path))));
+  assert.equal(existsSync(join('public', 'assets', 'runtime', 'icon_q75.jpg')), false);
+  assert.equal(existsSync(join('public', 'assets', 'applovin')), false);
+  assert.equal(existsSync(join('scripts', 'package-applovin-single-html.mjs')), false);
+  assert.equal(existsSync(join('scripts', 'check-applovin-package.mjs')), false);
+  assert.equal(existsSync(join('artifacts', 'applovin')), false);
+  assert.equal(existsSync(join('artifacts', 'asset-compress-tests')), false);
+  assert.deepEqual(
+    readdirSync('artifacts').filter((name) => /^bg_q\d+\.jpg$/i.test(name)),
+    []
+  );
+});
+
+test('active runtime files contain no playable ad delivery markers', () => {
+  const activePaths = [
+    'index.html',
+    'package.json',
+    ...listFiles('src'),
+    ...listFiles('scripts')
+  ];
+  const activeSource = activePaths
+    .map((path) => `${path}\n${readFileSync(path, 'utf8')}`)
+    .join('\n');
+  const packageData = JSON.parse(readFileSync('package.json', 'utf8'));
+  const tuningArtifact = JSON.parse(readFileSync(join('artifacts', 'scene-tuning.json'), 'utf8'));
+
+  assert.doesNotMatch(activeSource, ACTIVE_AD_DELIVERY_MARKERS);
+  assert.deepEqual(Object.keys(packageData.scripts).sort(), ['apply:tuning', 'build', 'dev', 'preview', 'test']);
+  assert.equal('cta' in SCENE_TUNING, false);
+  assert.equal('cta' in tuningArtifact, false);
 });
 
 test('vehicle generation region matches GameSceneDualQueue2 VehicleRoot Cube', () => {
