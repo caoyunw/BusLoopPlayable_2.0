@@ -19,10 +19,10 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Targeted lab tests: `node --test test/mechanic-registry.test.js` passed 22/22.
+- Targeted lab tests: `node --test test/mechanic-registry.test.js` passed 23/23.
 - Production build: `npm run build` passed with the existing Vite large-chunk warning.
-- Full suite: `npm test` passed 66/73. The seven existing `test/game-model.test.js` failures are recorded in `task_plan.md`; the full suite is not green.
-- Browser visual QA is still pending for desktop/mobile layout, canvas rendering, drawer overlap/focus, mechanism selection/overlay, editor behavior, and console output.
+- Full suite: `npm test` passed 67/74. The seven existing `test/game-model.test.js` failures are recorded in `task_plan.md`; the full suite is not green.
+- Browser visual QA passed on desktop 1440x1000 and mobile 390x844 using Playwright with system Edge: canvas pixel checks were nonblank, mobile library/editor drawers started collapsed, planned-mechanic overlays paused input, base gameplay click worked after returning from preview, and there were no console errors or failed HTTP responses.
 
 ### Next Step
 

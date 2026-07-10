@@ -27,7 +27,7 @@ For each mechanism: confirm rules, keep it `planned`, implement in an isolated m
 
 ## Existing Test Debt
 
-Full baseline on 2026-07-09 is 66/73 passing. These seven failures already existed before the documentation handoff:
+Full baseline on 2026-07-09 is 67/74 passing. These seven failures already existed before the documentation handoff:
 
 1. `Unity visual assets and tunable camera configuration are complete`
 2. `editor sizing, source background ratio, and passenger shadow anchor stay wired`

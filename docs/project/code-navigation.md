@@ -76,7 +76,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ## Known Test Baseline
 
-As of 2026-07-09, the lab-focused test file passes 22/22. The full suite passes 66/73; seven existing `test/game-model.test.js` failures are tracked in `task_plan.md`. Do not treat those failures as new without comparing names and assertions.
+As of 2026-07-09, the lab-focused test file passes 23/23. The full suite passes 67/74; seven existing `test/game-model.test.js` failures are tracked in `task_plan.md`. Do not treat those failures as new without comparing names and assertions.
 
 ## Historical Material
 

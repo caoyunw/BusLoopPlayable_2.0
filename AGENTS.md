@@ -57,8 +57,8 @@ The current base runtime is composed from `game-model`, `level-data`, `scene-vie
 
 Known baseline on 2026-07-09:
 
-- `test/mechanic-registry.test.js`: 22/22 passing.
-- Full `npm test`: 66/73 passing with 7 existing failures recorded in `task_plan.md`.
+- `test/mechanic-registry.test.js`: 23/23 passing.
+- Full `npm test`: 67/74 passing with 7 existing failures recorded in `task_plan.md`.
 - `npm run build`: passing with the existing large-chunk warning.
 
 Do not report the full suite as passing until the seven recorded debts are resolved. Use the narrowest relevant tests while implementing, then run the full suite and build for cross-module or release-facing changes.

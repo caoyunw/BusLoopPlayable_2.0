@@ -12,7 +12,7 @@ npm run build
 ```
 
 - `npm run dev`：启动 Vite 本地开发服务器。
-- `npm test`：运行 Node 测试。当前已知基线是 73 项中 66 项通过、7 项历史测试债务失败，详情见 `task_plan.md`。
+- `npm test`：运行 Node 测试。当前已知基线是 74 项中 67 项通过、7 项历史测试债务失败，详情见 `task_plan.md`。
 - `npm run build`：生成生产构建到 `dist/`。
 - `npm run apply:tuning`：将 `artifacts/scene-tuning.json` 合并到 authored scene tuning；仅在确认要固化调参时使用。
 
