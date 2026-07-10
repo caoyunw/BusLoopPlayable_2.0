@@ -10,7 +10,7 @@ The foundation is complete:
 
 - Mechanic registry and searchable library are present.
 - Desktop three-column and mobile drawer layouts are present.
-- `base` is playable; ten mechanism presets are registered as `planned`.
+- `base` is playable; sixteen mechanism presets are registered as `planned`.
 - URL selection, planned-mechanic input freeze, persistent scene editor, safe tuning storage, neutral runtime assets, and advertising cleanup are in place.
 
 The next phase is mechanism implementation, not more shell or platform packaging work.

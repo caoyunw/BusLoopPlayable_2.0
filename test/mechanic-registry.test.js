@@ -31,7 +31,13 @@ const PLANNED_MECHANIC_IDS = [
   'special-gate',
   'star-passenger',
   'order-passenger',
-  'valve'
+  'valve',
+  'train',
+  'locked-garage',
+  'count-garage',
+  'rotating-spots',
+  'double-gate',
+  'maglev-spot'
 ];
 
 const EXPECTED_SUMMARIES = {
@@ -44,7 +50,13 @@ const EXPECTED_SUMMARIES = {
   'special-gate': '车辆经过停车场两侧特殊门时触发对应效果。',
   'star-passenger': '上车时获得星星并为道具充能。',
   'order-passenger': '普通车挡住南瓜车，解救后对应乘客上车并给予奖励。',
-  valve: '玩家手动控制左右哪边乘客进入。'
+  valve: '玩家手动控制左右哪边乘客进入。',
+  train: '车厢移至轨道，集齐4节并上满乘客后开走。',
+  'locked-garage': '带钥匙车辆开走后解锁上锁停车场。',
+  'count-garage': '开走指定数量车辆后解锁车库。',
+  'rotating-spots': '每点击一次车辆，车位上的车顺时针旋转90°。',
+  'double-gate': '乘客经过闸门时数量翻倍。',
+  'maglev-spot': '点击切换车位升降，升起时不阻挡地面车辆。'
 };
 
 class FakeClassList {
@@ -502,9 +514,9 @@ test('destroy detaches search, toggle, list, and viewport behavior', () => {
   }
 });
 
-test('registry contains base plus ten unique mechanic entries', () => {
-  assert.equal(MECHANICS.length, 11);
-  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 11);
+test('registry contains base plus sixteen unique mechanic entries', () => {
+  assert.equal(MECHANICS.length, 17);
+  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 17);
   assert.deepEqual(
     MECHANICS.map(({ id }) => id),
     ['base', ...PLANNED_MECHANIC_IDS]
@@ -538,10 +550,10 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base is playable and all ten presets are planned', () => {
+test('base is playable and all sixteen presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
   assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 1);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 10);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 16);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {
@@ -553,8 +565,13 @@ test('registry and nested category arrays are deeply frozen', () => {
 });
 
 test('filterMechanics searches names, summaries, and categories', () => {
-  assert.deepEqual(filterMechanics('车库').map(({ id }) => id), ['garage']);
+  assert.deepEqual(
+    filterMechanics('车库').map(({ id }) => id),
+    ['garage', 'locked-garage', 'count-garage']
+  );
   assert.deepEqual(filterMechanics('南瓜车').map(({ id }) => id), ['order-passenger']);
+  assert.deepEqual(filterMechanics('火车').map(({ id }) => id), ['train']);
+  assert.deepEqual(filterMechanics('磁悬浮').map(({ id }) => id), ['maglev-spot']);
   assert.deepEqual(
     filterMechanics('信息隐藏').map(({ id }) => id),
     ['question-passenger', 'question-vehicle']

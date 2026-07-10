@@ -30,7 +30,7 @@ npm run build
 
 `base` 基础规则已经可试玩：点击无阻挡车辆进入停车位，同色乘客依次上车，满载车辆离场并释放停车位。
 
-以下 10 个机制已登记为 `planned`，目前只提供说明入口，不会接收游戏输入：
+以下 16 个机制已登记为 `planned`，目前只提供说明入口，不会接收游戏输入：
 
 | ID | 名称 |
 | --- | --- |
@@ -44,6 +44,12 @@ npm run build
 | `star-passenger` | 星星乘客 |
 | `order-passenger` | 订单乘客 |
 | `valve` | 阀门 |
+| `train` | 火车 |
+| `locked-garage` | 上锁车库 |
+| `count-garage` | 次数车库 |
+| `rotating-spots` | 旋转车位 |
+| `double-gate` | 翻倍闸门 |
+| `maglev-spot` | 磁悬浮车位 |
 
 可用 URL 直接选择机制：
 

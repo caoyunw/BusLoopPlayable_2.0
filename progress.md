@@ -2,7 +2,7 @@
 
 ## Handoff - 2026-07-09
 
-The repository has been converted from an advertising-oriented playable into the BusLoop mechanic lab. The base game remains playable, while ten proposed mechanisms are available as searchable `planned` entries with descriptions and frozen preview states.
+The repository has been converted from an advertising-oriented playable into the BusLoop mechanic lab. The base game remains playable, while sixteen proposed mechanisms are available as searchable `planned` entries with descriptions and frozen preview states.
 
 ## Main Implementation Commits
 
@@ -13,11 +13,12 @@ The repository has been converted from an advertising-oriented playable into the
 - `a6227df`: preserved authored scene defaults and made tuning reset/storage safer.
 - `8f78492`: removed advertising delivery scripts/artifacts and migrated active web assets to neutral runtime paths.
 - `4d364ab`: clarified historical docs, fixed mobile drawer startup, and added a favicon data URL to avoid the default 404.
+- Panel update: added six more planned mechanisms: train, locked garage, count garage, rotating spots, double gate, and maglev spot.
 
 ## Current Runtime State
 
 - `base` is playable against the imported level12-style layout.
-- Ten proposed mechanisms remain `planned`; they display complete metadata but do not receive gameplay input.
+- Sixteen proposed mechanisms remain `planned`; they display complete metadata but do not receive gameplay input.
 - Desktop uses a three-column lab layout. Narrow screens use mechanism and editor drawers.
 - `?mechanic=<id>` selects a mechanism and safely falls back to `base`.
 - The scene editor is always available, defaults to collapsed, and stores local overrides separately from mechanism selection.

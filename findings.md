@@ -4,7 +4,7 @@
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. `base` is playable; ten additional definitions are discoverable but remain `planned`.
+- The active product is a mechanic design and experience lab. `base` is playable; sixteen additional definitions are discoverable but remain `planned`.
 - `src/mechanic-registry.js` is the source of truth for mechanism identity, metadata, state, lookup, fallback, and search.
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.

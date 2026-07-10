@@ -108,6 +108,66 @@ const definitions = [
     effect: '提供可切换的阀门状态，只允许当前选定一侧的乘客进入传送带。',
     experience: '玩家直接控制乘客汇入方向，以匹配场内车辆和队列节奏。',
     difficulty: '中'
+  },
+  {
+    id: 'train',
+    name: '火车',
+    categories: ['车辆', '目标', '空间规划'],
+    status: 'planned',
+    summary: '车厢移至轨道，集齐4节并上满乘客后开走。',
+    effect: '在车位区域增加火车轨道，点击停车场内车厢后将其移入轨道；同一轨道集齐4节车厢并完成乘客上车后整列离场。',
+    experience: '玩家需要同时管理普通停车位和轨道容量，判断何时优先收集车厢以释放长期占位。',
+    difficulty: '高'
+  },
+  {
+    id: 'locked-garage',
+    name: '上锁车库',
+    categories: ['车辆', '出车装置', '条件解锁'],
+    status: 'planned',
+    summary: '带钥匙车辆开走后解锁上锁停车场。',
+    effect: '划分一块上锁停车场，并在普通区域放置带钥匙车辆；钥匙车成功开走后解除该停车场锁定。',
+    experience: '玩家会先寻找关键钥匙车，并围绕解锁顺序规划前期停车位和车辆释放节奏。',
+    difficulty: '中'
+  },
+  {
+    id: 'count-garage',
+    name: '次数车库',
+    categories: ['车辆', '出车装置', '条件解锁'],
+    status: 'planned',
+    summary: '开走指定数量车辆后解锁车库。',
+    effect: '为车库设置剩余解锁次数，每成功开走一辆车就推进计数，达到指定数量后开放车库。',
+    experience: '玩家需要在短期清车和等待车库解锁之间做节奏规划，形成明确的阶段目标。',
+    difficulty: '低'
+  },
+  {
+    id: 'rotating-spots',
+    name: '旋转车位',
+    categories: ['车位', '场地机关', '空间变化'],
+    status: 'planned',
+    summary: '每点击一次车辆，车位上的车顺时针旋转90°。',
+    effect: '每次玩家点击车辆后，旋转车位上的所有车辆按固定方向同步旋转90度，改变其朝向和阻挡关系。',
+    experience: '玩家需要预测下一次点击后的朝向变化，利用旋转制造通路或避免把关键车辆转入死角。',
+    difficulty: '高'
+  },
+  {
+    id: 'double-gate',
+    name: '翻倍闸门',
+    categories: ['乘客', '奖励', '场地机关'],
+    status: 'planned',
+    summary: '乘客经过闸门时数量翻倍。',
+    effect: '乘客经过翻倍闸门时生成额外同色乘客，使该批乘客数量按配置倍增。',
+    experience: '玩家可以主动放大有利颜色的乘客收益，但也要避免把当前缺车颜色翻倍后压垮队列。',
+    difficulty: '中'
+  },
+  {
+    id: 'maglev-spot',
+    name: '磁悬浮车位',
+    categories: ['车位', '状态变化', '空间管理'],
+    status: 'planned',
+    summary: '点击切换车位升降，升起时不阻挡地面车辆。',
+    effect: '点击磁悬浮车位上的车辆时，在升起和降落两种状态之间切换；升起状态不参与地面阻挡判断。',
+    experience: '玩家获得临时改造阻挡关系的能力，需要决定何时抬升车辆让地面车通行、何时降落继续接客。',
+    difficulty: '高'
   }
 ];
 

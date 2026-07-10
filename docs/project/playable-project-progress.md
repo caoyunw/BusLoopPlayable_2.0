@@ -6,7 +6,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Mechanic Lab Foundation
 
-- The registry contains one playable `base` rule set plus ten complete mechanism definitions currently marked `planned`.
+- The registry contains one playable `base` rule set plus sixteen complete mechanism definitions currently marked `planned`.
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
 - The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
