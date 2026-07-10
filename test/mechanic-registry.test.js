@@ -392,6 +392,24 @@ test('createMechanicLibrary renders unique groups with textContent and rerenders
   }
 });
 
+test('mobile mechanic library starts collapsed with toggle state synchronized', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics: [createTestMechanic('alpha')],
+      activeId: 'alpha'
+    });
+
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'false');
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
 test('mobile mechanic selection calls onSelect, updates current state, collapses, and focuses toggle', () => {
   const fixture = createLibraryFixture({ mobile: true });
   const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
@@ -430,8 +448,9 @@ test('viewport change expands the mobile drawer on desktop and synchronizes togg
       activeId: 'alpha'
     });
 
-    fixture.toggle.click();
     assert.ok(fixture.root.classList.contains('is-collapsed'));
+    fixture.toggle.click();
+    assert.equal(fixture.root.classList.contains('is-collapsed'), false);
 
     fixture.media.dispatch(false);
 
@@ -462,7 +481,7 @@ test('destroy detaches search, toggle, list, and viewport behavior', () => {
       .querySelectorAll('[data-mechanic-id]')
       .find((button) => button.dataset.mechanicId === 'beta');
 
-    fixture.toggle.click();
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
     library.destroy();
 
     assert.equal(fixture.media.listenerCount(), 0);

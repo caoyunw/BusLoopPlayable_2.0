@@ -276,12 +276,12 @@ The project moved from the original 6-vehicle level1 prototype to the imported l
 - Some full test/build runs passed with the existing Vite `>500 kB` chunk warning.
 - Later queue/conveyor full-suite verification was blocked by existing blocker-test expectation failures and then by usage-limit rejection for elevated build execution.
 
-## Current Risks / Open Follow-Up
+## Historical Risks / Follow-Up From Playable Phase
 
-- Re-check current full `node --test` when the environment allows child-process spawning reliably.
-- Revisit existing blocker expectation failures around querying blockers while a vehicle is colliding.
-- Manually compare current level12 gameplay, passenger entry, effects, audio timing, fake shadows, and material colors against Unity reference.
-- Keep platform packaging paused until the AppLovin baseline visual/playability pass is accepted.
+- At that point, the playable project still needed a full `node --test` re-check when the environment allowed child-process spawning reliably.
+- Existing blocker expectation failures around querying blockers while a vehicle is colliding still needed investigation.
+- Level12 gameplay, passenger entry, effects, audio timing, fake shadows, and material colors still needed comparison against the Unity reference.
+- Platform packaging was intentionally paused during the old AppLovin playable phase; it is no longer part of the active mechanic-lab workflow.
 
 ## Archive
 

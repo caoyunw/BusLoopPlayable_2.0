@@ -85,4 +85,4 @@ npm run build
 
 ## 范围说明
 
-本工程不包含广告平台打包脚本、MRAID/CTA、安装门槛、应用商店 URL 或商店跳转。`docs/platforms/` 和旧 playable 文档仅保留历史背景，不是当前开发流程。
+本工程不包含广告平台打包脚本、MRAID/CTA、安装门槛、应用商店 URL 或商店跳转。`docs/platforms/`、`docs/playable/`、`docs/project/playable-multi-platform-execution-plan.md` 和旧归档仅保留历史背景，不是当前开发流程。

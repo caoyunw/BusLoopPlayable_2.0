@@ -14,7 +14,7 @@
 
 涉及当前优先级或交接时，再读 `task_plan.md`、`progress.md`。涉及玩法事实、资源、调参、存储或模块边界时，读 `findings.md`。
 
-`docs/platforms/`、`docs/playable/` 和旧归档可以保留，但除非用户明确要求研究历史，不要把平台打包、商店跳转或广告流程重新纳入任务。
+`docs/platforms/`、`docs/playable/`、`docs/project/playable-multi-platform-execution-plan.md` 和旧归档可以保留，但除非用户明确要求研究历史，不要把平台打包、商店跳转或广告流程重新纳入任务。
 
 ## 机制优先
 

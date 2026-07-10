@@ -179,7 +179,7 @@ export function createMechanicLibrary(root, {
   toggle.addEventListener('click', handleToggle);
   list.addEventListener('click', handleListClick);
   mobileViewport?.addEventListener('change', handleViewportChange);
-  setCollapsed(mobileViewport?.matches && root.classList.contains('is-collapsed'));
+  setCollapsed(mobileViewport?.matches);
   renderList();
   renderDetail();
 

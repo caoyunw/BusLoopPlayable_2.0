@@ -80,7 +80,7 @@ As of 2026-07-09, the lab-focused test file passes 22/22. The full suite passes 
 
 ## Historical Material
 
-`docs/platforms/`, `docs/playable/`, and archived project logs describe the repository's former advertising-delivery phase. They are useful for provenance only and are not active code navigation or implementation instructions.
+`docs/platforms/`, `docs/playable/`, `docs/project/playable-multi-platform-execution-plan.md`, and archived project logs describe the repository's former advertising-delivery phase. They are useful for provenance only and are not active code navigation or implementation instructions.
 
 ## Maintenance Rule
 

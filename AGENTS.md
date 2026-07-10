@@ -14,7 +14,7 @@ For ordinary work, read:
 
 For current priorities or a handoff, also read `task_plan.md` and `progress.md`. Read `findings.md` when gameplay facts, assets, tuning, or module boundaries matter.
 
-Legacy files under `docs/platforms/` and `docs/playable/` are historical references. They are not the default SOP and do not create a requirement to rebuild advertising packages or store flows.
+Legacy files under `docs/platforms/`, `docs/playable/`, and `docs/project/playable-multi-platform-execution-plan.md` are historical references. They are not the default SOP and do not create a requirement to rebuild advertising packages or store flows.
 
 ## Code Navigation
 
