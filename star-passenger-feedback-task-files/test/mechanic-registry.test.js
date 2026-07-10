@@ -1,0 +1,730 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  MECHANICS,
+  filterMechanics,
+  getMechanicById,
+  resolveMechanicId
+} from '../src/mechanic-registry.js';
+import {
+  createMechanicLibrary,
+  filterMechanicCollection
+} from '../src/mechanic-library.js';
+import * as mechanicLab from '../src/mechanic-lab.js';
+
+const {
+  getMechanicIdFromSearch,
+  replaceMechanicQuery,
+  safeRemoveStorageItem,
+  syncMechanicQuery
+} = mechanicLab;
+
+const PLANNED_MECHANIC_IDS = [
+  'question-passenger',
+  'question-vehicle',
+  'elevator-bay',
+  'garage',
+  'linked-passengers',
+  'linked-vehicles',
+  'special-gate',
+  'star-passenger',
+  'order-passenger',
+  'valve',
+  'train',
+  'locked-garage',
+  'count-garage',
+  'rotating-spots',
+  'double-gate',
+  'maglev-spot'
+];
+
+const EXPECTED_SUMMARIES = {
+  'question-passenger': '左右队列不可见颜色，进入传送带后显示。',
+  'question-vehicle': '颜色不可见，前方无阻挡时显示。',
+  'elevator-bay': '舱门前车辆移开后才打开并传出下一组车辆。',
+  garage: '车库口前车开走后下一辆才出现。',
+  'linked-passengers': '前后排粘连，必须同时上一辆车。',
+  'linked-vehicles': '两辆车联动，同时进入并各占一个停车位。',
+  'special-gate': '车辆经过停车场两侧特殊门时触发对应效果。',
+  'star-passenger': '上车时获得星星并为道具充能。',
+  'order-passenger': '普通车挡住南瓜车，解救后对应乘客上车并给予奖励。',
+  valve: '玩家手动控制左右哪边乘客进入。',
+  train: '车厢移至轨道，集齐4节并上满乘客后开走。',
+  'locked-garage': '带钥匙车辆开走后解锁上锁停车场。',
+  'count-garage': '开走指定数量车辆后解锁车库。',
+  'rotating-spots': '每点击一次车辆，车位上的车顺时针旋转90°。',
+  'double-gate': '乘客经过闸门时数量翻倍。',
+  'maglev-spot': '点击切换车位升降，升起时不阻挡地面车辆。'
+};
+
+class FakeClassList {
+  constructor(element) {
+    this.element = element;
+    this.values = new Set();
+  }
+
+  setFromString(value) {
+    this.values = new Set(String(value).split(/\s+/).filter(Boolean));
+  }
+
+  contains(value) {
+    return this.values.has(value);
+  }
+
+  toggle(value, force) {
+    const enabled = force === undefined ? !this.contains(value) : Boolean(force);
+    if (enabled) this.values.add(value);
+    else this.values.delete(value);
+    return enabled;
+  }
+
+  toString() {
+    return [...this.values].join(' ');
+  }
+}
+
+class FakeElement {
+  constructor(ownerDocument, tagName) {
+    this.ownerDocument = ownerDocument;
+    this.tagName = tagName.toUpperCase();
+    this.parentElement = null;
+    this.children = [];
+    this.attributes = new Map();
+    this.dataset = {};
+    this.classList = new FakeClassList(this);
+    this.listeners = new Map();
+    this.textContent = '';
+    this.value = '';
+  }
+
+  set className(value) {
+    this.classList.setFromString(value);
+  }
+
+  get className() {
+    return this.classList.toString();
+  }
+
+  set id(value) {
+    this.setAttribute('id', value);
+  }
+
+  get id() {
+    return this.getAttribute('id') ?? '';
+  }
+
+  append(...children) {
+    for (const child of children) {
+      child.parentElement = this;
+      this.children.push(child);
+    }
+  }
+
+  replaceChildren(...children) {
+    for (const child of this.children) child.parentElement = null;
+    this.children = [];
+    this.textContent = '';
+    this.append(...children);
+  }
+
+  setAttribute(name, value) {
+    const stringValue = String(value);
+    this.attributes.set(name, stringValue);
+    if (name.startsWith('data-')) {
+      const key = name
+        .slice(5)
+        .replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+      this.dataset[key] = stringValue;
+    }
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type).add(listener);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatchEvent(event) {
+    if (!event.target) event.target = this;
+    for (let current = this; current; current = event.bubbles ? current.parentElement : null) {
+      event.currentTarget = current;
+      for (const listener of [...(current.listeners.get(event.type) ?? [])]) {
+        listener.call(current, event);
+      }
+    }
+    return true;
+  }
+
+  click() {
+    this.dispatchEvent({ type: 'click', bubbles: true, target: null, currentTarget: null });
+  }
+
+  focus() {
+    this.ownerDocument.activeElement = this;
+  }
+
+  contains(element) {
+    return element === this || this.children.some((child) => child.contains(element));
+  }
+
+  matches(selector) {
+    if (selector.startsWith('#')) return this.id === selector.slice(1);
+    if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
+    if (selector === '[data-mechanic-id]') {
+      return Object.hasOwn(this.dataset, 'mechanicId');
+    }
+    return this.tagName === selector.toUpperCase();
+  }
+
+  closest(selector) {
+    for (let current = this; current; current = current.parentElement) {
+      if (current.matches(selector)) return current;
+    }
+    return null;
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
+  querySelectorAll(selector) {
+    const matches = [];
+    for (const child of this.children) {
+      if (child.matches(selector)) matches.push(child);
+      matches.push(...child.querySelectorAll(selector));
+    }
+    return matches;
+  }
+}
+
+class FakeDocument {
+  constructor(defaultView) {
+    this.defaultView = defaultView;
+    this.activeElement = null;
+  }
+
+  createElement(tagName) {
+    return new FakeElement(this, tagName);
+  }
+}
+
+function createMatchMedia(initialMatches) {
+  const listeners = new Set();
+  return {
+    matches: initialMatches,
+    media: '(max-width: 860px)',
+    addEventListener(type, listener) {
+      if (type === 'change') listeners.add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (type === 'change') listeners.delete(listener);
+    },
+    dispatch(matches) {
+      this.matches = matches;
+      for (const listener of [...listeners]) {
+        listener({ matches, media: this.media });
+      }
+    },
+    listenerCount() {
+      return listeners.size;
+    }
+  };
+}
+
+function createLibraryFixture({ mobile = false } = {}) {
+  const previousDocument = globalThis.document;
+  const previousMatchMedia = globalThis.matchMedia;
+  const hadDocument = Object.hasOwn(globalThis, 'document');
+  const hadMatchMedia = Object.hasOwn(globalThis, 'matchMedia');
+  const media = createMatchMedia(mobile);
+  const view = { matchMedia: () => media };
+  const document = new FakeDocument(view);
+  const root = document.createElement('aside');
+  root.id = 'mechanic-library';
+
+  const toggle = document.createElement('button');
+  toggle.id = 'mechanic-library-toggle';
+  const search = document.createElement('input');
+  search.id = 'mechanic-search';
+  const list = document.createElement('div');
+  list.id = 'mechanic-list';
+  const detail = document.createElement('section');
+  detail.id = 'mechanic-detail';
+  root.append(toggle, search, list, detail);
+
+  globalThis.document = document;
+  globalThis.matchMedia = view.matchMedia;
+
+  return {
+    document,
+    root,
+    toggle,
+    search,
+    list,
+    detail,
+    media,
+    restore() {
+      if (hadDocument) globalThis.document = previousDocument;
+      else delete globalThis.document;
+      if (hadMatchMedia) globalThis.matchMedia = previousMatchMedia;
+      else delete globalThis.matchMedia;
+    }
+  };
+}
+
+function createTestMechanic(id, overrides = {}) {
+  return {
+    id,
+    name: `Mechanic ${id}`,
+    categories: ['Routing'],
+    status: 'planned',
+    summary: `Summary ${id}`,
+    effect: `Effect ${id}`,
+    experience: `Experience ${id}`,
+    difficulty: 'Low',
+    ...overrides
+  };
+}
+
+test('page shell exposes the mechanic lab controls without ad CTA copy', () => {
+  const html = readFileSync(join('index.html'), 'utf8');
+
+  for (const id of [
+    'mechanic-library',
+    'mechanic-library-toggle',
+    'mechanic-search',
+    'mechanic-list',
+    'mechanic-detail',
+    'mechanic-overlay',
+    'mechanic-overlay-title',
+    'mechanic-overlay-summary',
+    'mechanic-back-button',
+    'stage',
+    'game-canvas',
+    'loading-screen',
+    'end-panel',
+    'scene-editor'
+  ]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+
+  assert.match(html, /id="app" class="mechanic-lab"/);
+  assert.doesNotMatch(html, /cta-button|Play Now/);
+});
+
+test('mechanic library module exports its UI factory', () => {
+  const librarySource = readFileSync(join('src', 'mechanic-library.js'), 'utf8');
+
+  assert.match(librarySource, /export function createMechanicLibrary/);
+});
+
+test('mechanic lab styles define the desktop grid and mobile drawer breakpoint', () => {
+  const css = readFileSync(join('src', 'styles.css'), 'utf8');
+
+  assert.match(
+    css,
+    /grid-template-columns:\s*minmax\(236px,\s*286px\)\s+minmax\(0,\s*1fr\)\s+auto/
+  );
+  assert.match(css, /@media\s*\(max-width:\s*860px\)/);
+  assert.match(css, /\.mechanic-library\.is-collapsed[\s\S]*?width:\s*48px[\s\S]*?height:\s*48px/);
+  assert.match(css, /\.mechanic-library-toggle\s*\{[^}]*display:\s*none/);
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*860px\)[\s\S]*?\n\s{2}\.mechanic-library-toggle\s*\{[^}]*display:\s*block/
+  );
+  assert.doesNotMatch(css, /\.cta-button|@keyframes\s+cta-pulse/);
+});
+
+test('createMechanicLibrary renders unique groups with textContent and rerenders search states', () => {
+  const fixture = createLibraryFixture();
+  const mechanics = [
+    createTestMechanic('alpha', {
+      name: '<img src=x onerror=alert(1)> Alpha',
+      categories: ['Routing']
+    }),
+    createTestMechanic('beta', {
+      categories: ['Scoring']
+    })
+  ];
+  const expectedGroups = new Map([
+    ['Routing', ['alpha']],
+    ['Scoring', ['beta']]
+  ]);
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics: [...mechanics, mechanics[0]],
+      activeId: mechanics[0].id
+    });
+    const groups = fixture.list.querySelectorAll('.mechanic-group');
+    const renderedIds = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .map((button) => button.dataset.mechanicId);
+
+    assert.deepEqual(
+      groups.map((group) => group.querySelector('.mechanic-group-title').textContent),
+      [...expectedGroups.keys()]
+    );
+    for (const group of groups) {
+      const title = group.querySelector('.mechanic-group-title').textContent;
+      assert.deepEqual(
+        group.querySelectorAll('[data-mechanic-id]')
+          .map((button) => button.dataset.mechanicId),
+        expectedGroups.get(title)
+      );
+    }
+    assert.deepEqual(renderedIds, ['alpha', 'beta']);
+    assert.equal(new Set(renderedIds).size, renderedIds.length);
+    assert.equal(
+      fixture.list.querySelector('.mechanic-item-name').textContent,
+      mechanics[0].name
+    );
+    assert.equal(fixture.list.querySelector('img'), null);
+
+    fixture.search.value = 'missing';
+    fixture.search.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    assert.ok(fixture.list.querySelector('.mechanic-empty-state'));
+
+    fixture.search.value = 'alpha';
+    fixture.search.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    assert.equal(fixture.list.querySelectorAll('[data-mechanic-id]').length, 1);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('mobile mechanic library starts collapsed with toggle state synchronized', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics: [createTestMechanic('alpha')],
+      activeId: 'alpha'
+    });
+
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'false');
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('mobile mechanic selection calls onSelect, updates current state, collapses, and focuses toggle', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const selected = [];
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      onSelect: (id) => selected.push(id)
+    });
+    const betaButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'beta');
+
+    betaButton.focus();
+    betaButton.click();
+
+    assert.deepEqual(selected, ['beta']);
+    assert.equal(betaButton.getAttribute('aria-current'), 'true');
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    assert.equal(fixture.document.activeElement, fixture.toggle);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('viewport change expands the mobile drawer on desktop and synchronizes toggle aria', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics: [createTestMechanic('alpha')],
+      activeId: 'alpha'
+    });
+
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    fixture.toggle.click();
+    assert.equal(fixture.root.classList.contains('is-collapsed'), false);
+
+    fixture.media.dispatch(false);
+
+    assert.equal(fixture.root.classList.contains('is-collapsed'), false);
+    assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'true');
+    assert.equal(fixture.toggle.getAttribute('aria-label'), '收起机制库');
+    assert.equal(fixture.media.listenerCount(), 1);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('destroy detaches search, toggle, list, and viewport behavior', () => {
+  const fixture = createLibraryFixture({ mobile: true });
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const selected = [];
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      onSelect: (id) => selected.push(id)
+    });
+    const firstGroup = fixture.list.querySelector('.mechanic-group');
+    const betaButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'beta');
+
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    library.destroy();
+
+    assert.equal(fixture.media.listenerCount(), 0);
+
+    fixture.search.value = 'missing';
+    fixture.search.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    fixture.toggle.click();
+    betaButton.click();
+    fixture.media.dispatch(false);
+
+    assert.equal(fixture.list.querySelector('.mechanic-group'), firstGroup);
+    assert.ok(fixture.root.classList.contains('is-collapsed'));
+    assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'false');
+    assert.deepEqual(selected, []);
+    assert.equal(betaButton.getAttribute('aria-current'), 'false');
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('registry contains base plus sixteen unique mechanic entries', () => {
+  assert.equal(MECHANICS.length, 17);
+  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 17);
+  assert.deepEqual(
+    MECHANICS.map(({ id }) => id),
+    ['base', ...PLANNED_MECHANIC_IDS]
+  );
+});
+
+test('every mechanic has complete Chinese metadata and the expected summary', () => {
+  const requiredFields = [
+    'id',
+    'name',
+    'categories',
+    'status',
+    'summary',
+    'effect',
+    'experience',
+    'difficulty'
+  ];
+
+  for (const mechanic of MECHANICS) {
+    assert.deepEqual(Object.keys(mechanic).sort(), [...requiredFields].sort());
+    for (const field of requiredFields.filter((field) => field !== 'categories')) {
+      assert.equal(typeof mechanic[field], 'string');
+      assert.ok(mechanic[field].trim(), `${mechanic.id}.${field} must not be empty`);
+    }
+    assert.ok(mechanic.categories.length, `${mechanic.id}.categories must not be empty`);
+    assert.ok(mechanic.categories.every((category) => typeof category === 'string' && category.trim()));
+  }
+
+  for (const [id, summary] of Object.entries(EXPECTED_SUMMARIES)) {
+    assert.equal(getMechanicById(id).summary, summary);
+  }
+});
+
+test('base and star passenger are playable while remaining presets are planned', () => {
+  assert.equal(getMechanicById('base').status, 'playable');
+  assert.equal(getMechanicById('star-passenger').status, 'playable');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 2);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 15);
+});
+
+test('registry and nested category arrays are deeply frozen', () => {
+  assert.ok(Object.isFrozen(MECHANICS));
+  for (const mechanic of MECHANICS) {
+    assert.ok(Object.isFrozen(mechanic));
+    assert.ok(Object.isFrozen(mechanic.categories));
+  }
+});
+
+test('filterMechanics searches names, summaries, and categories', () => {
+  assert.deepEqual(
+    filterMechanics('车库').map(({ id }) => id),
+    ['garage', 'locked-garage', 'count-garage']
+  );
+  assert.deepEqual(filterMechanics('南瓜车').map(({ id }) => id), ['order-passenger']);
+  assert.deepEqual(filterMechanics('火车').map(({ id }) => id), ['train']);
+  assert.deepEqual(filterMechanics('磁悬浮').map(({ id }) => id), ['maglev-spot']);
+  assert.deepEqual(
+    filterMechanics('信息隐藏').map(({ id }) => id),
+    ['question-passenger', 'question-vehicle']
+  );
+  assert.deepEqual(filterMechanics('  '), MECHANICS);
+});
+
+test('filterMechanics returns a mutable copy for an empty search', () => {
+  const result = filterMechanics('');
+
+  assert.notEqual(result, MECHANICS);
+  assert.doesNotThrow(() => result.sort(({ id: a }, { id: b }) => a.localeCompare(b)));
+});
+
+test('filterMechanicCollection searches a provided custom collection', () => {
+  const customMechanics = [
+    {
+      id: 'custom-name',
+      name: 'Signal Relay',
+      summary: 'Redirects arriving buses',
+      categories: ['Routing']
+    },
+    {
+      id: 'custom-summary',
+      name: 'Platform Clock',
+      summary: 'Rewards precise timing',
+      categories: ['Scoring']
+    },
+    {
+      id: 'custom-category',
+      name: 'Depot Queue',
+      summary: 'Stores vehicles off stage',
+      categories: ['Capacity']
+    }
+  ];
+
+  assert.deepEqual(
+    filterMechanicCollection(customMechanics, 'signal').map(({ id }) => id),
+    ['custom-name']
+  );
+  assert.deepEqual(
+    filterMechanicCollection(customMechanics, 'precise').map(({ id }) => id),
+    ['custom-summary']
+  );
+  assert.deepEqual(
+    filterMechanicCollection(customMechanics, 'capacity').map(({ id }) => id),
+    ['custom-category']
+  );
+});
+
+test('invalid mechanic ids fall back to base', () => {
+  assert.equal(getMechanicById('garage').id, 'garage');
+  assert.equal(getMechanicById('missing'), null);
+  assert.equal(resolveMechanicId('garage'), 'garage');
+  assert.equal(resolveMechanicId('missing'), 'base');
+  assert.equal(resolveMechanicId(null), 'base');
+});
+
+test('query parsing resolves known ids and falls back to base', () => {
+  assert.equal(getMechanicIdFromSearch('?mechanic=question-vehicle'), 'question-vehicle');
+  assert.equal(getMechanicIdFromSearch('?mechanic=missing'), 'base');
+  assert.equal(getMechanicIdFromSearch('?foo=1'), 'base');
+});
+
+test('safeRemoveStorageItem returns true when storage removal succeeds', () => {
+  const removedKeys = [];
+  const storage = {
+    removeItem(key) {
+      removedKeys.push(key);
+    }
+  };
+
+  assert.equal(typeof safeRemoveStorageItem, 'function');
+  assert.equal(safeRemoveStorageItem(storage, 'scene-tuning'), true);
+  assert.deepEqual(removedKeys, ['scene-tuning']);
+});
+
+test('safeRemoveStorageItem reports storage removal errors without throwing', () => {
+  const error = new DOMException('Storage access denied', 'SecurityError');
+  const reportedErrors = [];
+  const storage = {
+    removeItem() {
+      throw error;
+    }
+  };
+
+  assert.equal(typeof safeRemoveStorageItem, 'function');
+  assert.doesNotThrow(() => {
+    assert.equal(
+      safeRemoveStorageItem(storage, 'scene-tuning', (caught) => reportedErrors.push(caught)),
+      false
+    );
+  });
+  assert.deepEqual(reportedErrors, [error]);
+});
+
+test('query replacement preserves other parameters and the hash', () => {
+  assert.equal(
+    replaceMechanicQuery('/lab?foo=1#preview', 'garage'),
+    '/lab?foo=1&mechanic=garage#preview'
+  );
+  assert.equal(
+    replaceMechanicQuery('/lab?mechanic=garage&foo=1#preview', 'missing'),
+    '/lab?mechanic=base&foo=1#preview'
+  );
+});
+
+test('query replacement preserves a double-slash pathname', () => {
+  assert.equal(
+    replaceMechanicQuery('//lab?foo=1#preview', 'garage'),
+    '//lab?foo=1&mechanic=garage#preview'
+  );
+});
+
+test('query synchronization replaces the current location with a resolved id', () => {
+  const calls = [];
+  const location = {
+    origin: 'https://busloop.local',
+    pathname: '/lab',
+    search: '?foo=1',
+    hash: '#preview'
+  };
+  const history = {
+    replaceState(...args) {
+      calls.push(args);
+    }
+  };
+
+  syncMechanicQuery('missing', location, history);
+
+  assert.deepEqual(calls, [[null, '', 'https://busloop.local/lab?foo=1&mechanic=base#preview']]);
+});
+
+test('query synchronization keeps a double-slash pathname on the current origin', () => {
+  const calls = [];
+  const location = {
+    origin: 'https://busloop.local',
+    pathname: '//lab',
+    search: '?foo=1',
+    hash: '#x'
+  };
+  const history = {
+    replaceState(...args) {
+      calls.push(args);
+    }
+  };
+
+  syncMechanicQuery('garage', location, history);
+
+  assert.deepEqual(calls, [[
+    null,
+    '',
+    'https://busloop.local//lab?foo=1&mechanic=garage#x'
+  ]]);
+});

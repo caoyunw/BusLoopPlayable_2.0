@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#e7e9e6" />
+    <link rel="icon" href="data:," />
+    <title>BusLoop 机制实验台</title>
+  </head>
+  <body>
+    <div id="app" class="mechanic-lab">
+      <aside id="mechanic-library" class="mechanic-library" aria-label="机制库">
+        <header class="library-header">
+          <div class="library-title-row">
+            <div class="library-title">
+              <p class="library-kicker">BUSLOOP LAB</p>
+              <h1>机制实验台</h1>
+            </div>
+            <button
+              id="mechanic-library-toggle"
+              class="mechanic-library-toggle"
+              type="button"
+              aria-controls="mechanic-list mechanic-detail"
+              aria-expanded="true"
+              aria-label="收起机制库"
+            >‹</button>
+          </div>
+          <label class="mechanic-search-label" for="mechanic-search">搜索机制</label>
+          <input id="mechanic-search" class="mechanic-search" type="search" placeholder="名称、说明或分类" />
+        </header>
+        <div id="mechanic-list" class="mechanic-list" aria-label="机制列表"></div>
+        <section id="mechanic-detail" class="mechanic-detail" aria-live="polite">
+          <p class="mechanic-detail-empty">选择机制查看规则。</p>
+        </section>
+      </aside>
+      <main id="stage" class="stage">
+        <canvas id="game-canvas" aria-label="BusLoop 机制体验盘面"></canvas>
+        <div id="loading-screen" class="loading-screen" role="status" aria-live="polite">
+          <p class="loading-kicker">BUSLOOP LAB</p>
+          <h2>正在准备机制场景</h2>
+          <div class="loading-progress" role="progressbar" aria-label="加载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="loading-progress-bar" class="loading-progress-bar"></div>
+          </div>
+          <p id="loading-progress-value" class="loading-progress-value">0%</p>
+        </div>
+        <section id="mechanic-overlay" class="mechanic-overlay" hidden>
+          <p class="mechanic-overlay-kicker">机制预览</p>
+          <h2 id="mechanic-overlay-title"></h2>
+          <p id="mechanic-overlay-summary"></p>
+          <button id="mechanic-back-button" type="button">返回基础规则</button>
+        </section>
+        <div id="end-panel" class="end-panel" hidden>
+          <p id="end-kicker">关卡完成</p>
+          <h2 id="end-title">全部车辆已发车</h2>
+          <button id="end-reset-button" type="button">重新体验</button>
+        </div>
+      </main>
+      <aside id="scene-editor" class="scene-editor" aria-label="场景调参"></aside>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
