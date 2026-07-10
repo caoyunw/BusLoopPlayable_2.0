@@ -30,7 +30,9 @@ npm run build
 
 `base` 基础规则已经可试玩：点击无阻挡车辆进入停车位，同色乘客依次上车，满载车辆离场并释放停车位。
 
-以下 16 个机制已登记为 `planned`，目前只提供说明入口，不会接收游戏输入：
+`star-passenger` 星星乘客也已可试玩：随机乘客带星星标记，成功上车时获得金币充能；若该乘客在传送带上经过出口 3 次仍未上车，星星奖励消失但乘客保留。
+
+以下 15 个机制已登记为 `planned`，目前只提供说明入口，不会接收游戏输入：
 
 | ID | 名称 |
 | --- | --- |
@@ -41,7 +43,6 @@ npm run build
 | `linked-passengers` | 连体乘客 |
 | `linked-vehicles` | 连体车 |
 | `special-gate` | 特殊门 |
-| `star-passenger` | 星星乘客 |
 | `order-passenger` | 订单乘客 |
 | `valve` | 阀门 |
 | `train` | 火车 |
@@ -55,6 +56,7 @@ npm run build
 
 ```text
 /?mechanic=base
+/?mechanic=star-passenger
 /?mechanic=question-vehicle
 ```
 

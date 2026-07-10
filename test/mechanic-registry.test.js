@@ -550,10 +550,11 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base is playable and all sixteen presets are planned', () => {
+test('base and star passenger are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 1);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 16);
+  assert.equal(getMechanicById('star-passenger').status, 'playable');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 2);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 15);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {

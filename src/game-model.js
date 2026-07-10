@@ -18,6 +18,12 @@ const wrap01 = (value) => ((value % 1) + 1) % 1;
 const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 const INITIAL_ENTRY_OFFSET_PERCENT = 0.0001;
 const PASSENGER_READY_DISTANCE_THRESHOLD = 0.02;
+const STAR_PASSENGER_MECHANIC_ID = 'star-passenger';
+const DEFAULT_STAR_PASSENGER_CONFIG = Object.freeze({
+  chance: 0.18,
+  expireExitPasses: 3,
+  progressTarget: 3
+});
 
 function visualToVehicleAreaPoint(x, z) {
   const area = SCENE_TUNING.vehicleArea;
@@ -97,10 +103,34 @@ function blocksVehicleExit(attacker, candidate, dimensions) {
 
 
 export class BusLoopGame {
-  constructor(level = LEVEL_1) {
+  constructor(level = LEVEL_1, options = {}) {
     this.level = level;
     this.listeners = new Set();
+    this.random = typeof options.random === 'function' ? options.random : Math.random;
+    this.starPassengerConfig = {
+      ...DEFAULT_STAR_PASSENGER_CONFIG,
+      ...(options.starPassenger ?? {})
+    };
+    this.mechanicId = options.mechanicId === STAR_PASSENGER_MECHANIC_ID
+      ? STAR_PASSENGER_MECHANIC_ID
+      : 'base';
     this.reset();
+  }
+
+  getMechanicId() {
+    return this.mechanicId;
+  }
+
+  setMechanic(id) {
+    const next = id === STAR_PASSENGER_MECHANIC_ID ? STAR_PASSENGER_MECHANIC_ID : 'base';
+    if (next === this.mechanicId) return false;
+    this.mechanicId = next;
+    this.reset();
+    return true;
+  }
+
+  isStarPassengerEnabled() {
+    return this.mechanicId === STAR_PASSENGER_MECHANIC_ID;
   }
 
   reset() {
@@ -112,6 +142,7 @@ export class BusLoopGame {
     this.nextPassengerId = 1;
     this.initialFillActive = true;
     this.initialFilledSlotIndices = new Set();
+    this.starReward = this.createStarRewardState();
     this.conveyorPathLength = Math.max(0.0001, this.level.conveyorPathLength ?? 1);
     const authoredQueues = this.level.passengerQueues ?? [this.level.passengerSequence];
     this.queueSpacing = this.level.passengerQueue?.spacing ?? 0.4;
@@ -133,8 +164,10 @@ export class BusLoopGame {
       progress: wrap01(index / this.level.conveyorCapacity),
       previousProgress: wrap01(index / this.level.conveyorCapacity),
       colorIndex: null,
+      passengerId: null,
       entryIndex: null,
-      entryMotion: null
+      entryMotion: null,
+      starReward: null
     }));
     this.lastEvent = { type: 'reset' };
     this.emit();
@@ -181,7 +214,10 @@ export class BusLoopGame {
       initialFillActive: this.initialFillActive,
       sourceRemaining: this.sourceQueues.reduce((sum, queue) => sum + queue.length, 0),
       queues: this.queues.map((queue) => queue.map((item) => item.colorIndex)),
-      queueItems: this.queues.map((queue) => queue.map((item) => ({ ...item }))),
+      queueItems: this.queues.map((queue) => queue.map((item) => ({
+        ...item,
+        starReward: item.starReward ? { ...item.starReward } : null
+      }))),
       queueRemaining: this.queues.map((queue) => queue.length),
       vehicles: this.vehicles.map((vehicle) => ({
         ...vehicle,
@@ -192,9 +228,11 @@ export class BusLoopGame {
       spots: this.spots.map((spot) => ({ ...spot })),
       slots: this.slots.map((slot) => ({
         ...slot,
-        entryMotion: slot.entryMotion ? { ...slot.entryMotion } : null
+        entryMotion: slot.entryMotion ? { ...slot.entryMotion } : null,
+        starReward: slot.starReward ? { ...slot.starReward } : null
       })),
       boardingEvents: this.boardingEvents.map((event) => ({ ...event })),
+      starReward: { ...this.starReward },
       lastEvent: { ...this.lastEvent },
       remainingGroups: this.getRemainingGroups(),
       remainingByColor: this.getRemainingByColor()
@@ -404,10 +442,17 @@ export class BusLoopGame {
           continue;
         }
         slot.colorIndex = passenger.colorIndex;
+        slot.passengerId = passenger.id;
         slot.entryIndex = entry.index;
         slot.entryMotion = this.createEntryMotion(entry.index, passenger);
+        slot.starReward = this.cloneStarReward(passenger.starReward);
         if (this.initialFillActive) this.initialFilledSlotIndices.add(slot.index);
-        this.lastEvent = { type: 'group-entered-belt', colorIndex: passenger.colorIndex, entryIndex: entry.index };
+        this.lastEvent = {
+          type: 'group-entered-belt',
+          colorIndex: passenger.colorIndex,
+          entryIndex: entry.index,
+          passengerId: passenger.id
+        };
         changed = true;
       }
     }
@@ -429,27 +474,40 @@ export class BusLoopGame {
     }
 
     for (const slot of this.slots) {
-      if (slot.colorIndex === null || !this.inExitRange(slot.progress)) continue;
-      const vehicle = this.findBoardableVehicle(slot.colorIndex);
-      if (!vehicle) continue;
+      if (slot.colorIndex === null) continue;
+      const crossedExit = this.crossedPoint(slot.previousProgress, slot.progress, this.level.exitStart);
+      const inExit = this.inExitRange(slot.progress);
+      const vehicle = inExit ? this.findBoardableVehicle(slot.colorIndex) : null;
+      if (!vehicle) {
+        if (crossedExit) changed = this.countStarPassengerExitPass(slot) || changed;
+        continue;
+      }
       const colorIndex = slot.colorIndex;
+      const passengerId = slot.passengerId;
+      const starRewardCollected = this.collectStarPassengerReward(slot);
       this.boardingEvents.push({
         id: ++this.boardingEventId,
         vehicleId: vehicle.id,
         spotIndex: vehicle.spotIndex,
         colorIndex,
+        passengerId,
+        starRewardCollected,
         slotIndex: slot.index,
         progress: slot.progress,
         startedAt: this.time
       });
       if (this.boardingEvents.length > 24) this.boardingEvents.shift();
       slot.colorIndex = null;
+      slot.passengerId = null;
       slot.entryIndex = null;
       slot.entryMotion = null;
+      slot.starReward = null;
       vehicle.boardedGroups += 1;
       this.lastEvent = {
         type: 'group-boarded', vehicleId: vehicle.id, colorIndex,
-        boardedGroups: vehicle.boardedGroups
+        boardedGroups: vehicle.boardedGroups,
+        passengerId,
+        starRewardCollected
       };
       changed = true;
       if (vehicle.boardedGroups >= vehicle.seats) {
@@ -541,10 +599,13 @@ export class BusLoopGame {
           spawnDistance,
           0,
           this.queueAvailableLengths[queueIndex] ?? spawnDistance
-        )
+        ),
+        starReward: this.createStarPassengerReward()
       });
     }
-    return includeDetails ? { ...passenger } : passenger.colorIndex;
+    return includeDetails
+      ? { ...passenger, starReward: this.cloneStarReward(passenger.starReward) }
+      : passenger.colorIndex;
   }
 
   createQueueItems(colors, queueIndex) {
@@ -554,8 +615,59 @@ export class BusLoopGame {
       id: this.nextPassengerId++,
       colorIndex,
       createdAt: this.time,
-      distanceFromHead: Math.min(index * (this.queueSpacing ?? 0.4), availableLength)
+      distanceFromHead: Math.min(index * (this.queueSpacing ?? 0.4), availableLength),
+      starReward: this.createStarPassengerReward()
     }));
+  }
+
+  createStarRewardState() {
+    const target = Math.max(1, Math.round(this.starPassengerConfig.progressTarget ?? 3));
+    return {
+      enabled: this.isStarPassengerEnabled(),
+      coins: 0,
+      collected: 0,
+      expired: 0,
+      target
+    };
+  }
+
+  createStarPassengerReward() {
+    if (!this.isStarPassengerEnabled()) return null;
+    const chance = clampNumber(Number(this.starPassengerConfig.chance ?? 0), 0, 1);
+    if (this.random() >= chance) return null;
+    return { active: true, exitPasses: 0, expired: false };
+  }
+
+  cloneStarReward(reward) {
+    return reward ? { ...reward } : null;
+  }
+
+  collectStarPassengerReward(slot) {
+    if (!this.isStarPassengerEnabled() || !slot.starReward?.active || slot.starReward.expired) {
+      return false;
+    }
+    slot.starReward.active = false;
+    this.starReward.coins += 1;
+    this.starReward.collected += 1;
+    return true;
+  }
+
+  countStarPassengerExitPass(slot) {
+    const reward = slot.starReward;
+    if (!this.isStarPassengerEnabled() || !reward?.active || reward.expired) return false;
+    reward.exitPasses = Math.max(0, reward.exitPasses ?? 0) + 1;
+    const limit = Math.max(1, Math.round(this.starPassengerConfig.expireExitPasses ?? 3));
+    if (reward.exitPasses < limit) return true;
+    reward.active = false;
+    reward.expired = true;
+    this.starReward.expired += 1;
+    this.lastEvent = {
+      type: 'star-passenger-expired',
+      passengerId: slot.passengerId,
+      slotIndex: slot.index,
+      exitPasses: reward.exitPasses
+    };
+    return true;
   }
 
   updateQueues(delta) {

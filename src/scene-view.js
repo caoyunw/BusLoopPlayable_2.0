@@ -450,6 +450,52 @@ function makeVehiclePlaceholder(vehicle) {
   return root;
 }
 
+function makeStarBadge() {
+  const shape = new THREE.Shape();
+  const outerRadius = 0.15;
+  const innerRadius = 0.065;
+  for (let i = 0; i < 10; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + i * Math.PI / 5;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+
+  const root = new THREE.Group();
+  const badge = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({
+      color: 0xffce42,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      toneMapped: false
+    })
+  );
+  badge.rotation.x = -Math.PI / 2;
+  badge.position.set(0, 0.58, -0.02);
+  badge.renderOrder = 80;
+  const halo = new THREE.Mesh(
+    new THREE.CircleGeometry(0.18, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      toneMapped: false
+    })
+  );
+  halo.rotation.x = -Math.PI / 2;
+  halo.position.set(0, 0.575, -0.02);
+  halo.renderOrder = 79;
+  root.add(halo, badge);
+  root.visible = false;
+  return root;
+}
+
 function makePassengerGroup(groupScale) {
   const group = new THREE.Group();
   group.scale.setScalar(groupScale);
@@ -468,6 +514,9 @@ function makePassengerGroup(groupScale) {
     group.userData.personSlots.push(slot);
     group.add(slot);
   }
+  const starBadge = makeStarBadge();
+  group.userData.starBadge = starBadge;
+  group.add(starBadge);
   return group;
 }
 
@@ -1321,6 +1370,16 @@ export class SceneView {
     }
   }
 
+  updateStarPassengerBadge(view, reward, time = 0) {
+    const badge = view.userData.starBadge;
+    if (!badge) return;
+    const visible = Boolean(reward?.active && !reward.expired);
+    badge.visible = visible;
+    if (!visible) return;
+    const pulse = 1 + Math.sin(time * 6) * 0.08;
+    badge.scale.setScalar(pulse);
+  }
+
   applyTuning() {
     this.applySceneLighting();
     const background = SCENE_TUNING.background;
@@ -1488,7 +1547,10 @@ export class SceneView {
     for (const slot of snapshot.slots) {
       const view = this.passengerViews[slot.index];
       view.visible = slot.colorIndex !== null;
-      if (!view.visible) continue;
+      if (!view.visible) {
+        this.updateStarPassengerBadge(view, null, snapshot.time);
+        continue;
+      }
       const point = this.curve.getPointAt(slot.progress);
       const tangent = this.curve.getTangentAt(slot.progress);
       point.y += passengerHeight;
@@ -1513,6 +1575,7 @@ export class SceneView {
       }
       this.setPassengerColor(view, slot.colorIndex);
       this.setPassengerAnimation(view, 'move', slot.index > 0 && slot.index % 2 === 0 ? 0.3 : 0);
+      this.updateStarPassengerBadge(view, slot.starReward, snapshot.time);
     }
     this.pruneInitialEntryPathStates(activeInitialEntryKeys);
 
@@ -1530,7 +1593,10 @@ export class SceneView {
         const item = queue[i];
         const colorIndex = item?.colorIndex;
         view.visible = colorIndex !== undefined;
-        if (!view.visible) continue;
+        if (!view.visible) {
+          this.updateStarPassengerBadge(view, null, snapshot.time);
+          continue;
+        }
         const t = this.getQueueProgressAtDistance(curve, item.distanceFromHead);
         const point = curve.getPointAt(t);
         const tangent = curve.getTangentAt(t);
@@ -1548,6 +1614,7 @@ export class SceneView {
         view.rotation.y = Math.atan2(-queueVisual.tangent.x, -queueVisual.tangent.z) + passengerYaw;
         this.setPassengerColor(view, colorIndex);
         this.setPassengerAnimation(view, 'idle', (i % 4) * 0.17);
+        this.updateStarPassengerBadge(view, item.starReward, snapshot.time);
       }
     });
     this.pruneQueueEntryPathStates(queueSnapshots);
