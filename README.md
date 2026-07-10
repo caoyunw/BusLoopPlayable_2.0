@@ -64,7 +64,7 @@ npm run build
 
 ## 新增或实现机制
 
-机制定义位于 `src/mechanic-registry.js`，字段如下：
+机制定义位于各机制目录的 `src/mechanics/<mechanic-id>/index.js`，`src/mechanic-registry.js` 只负责聚合并提供查询接口。字段如下：
 
 - `id`：稳定、唯一、适合 URL 的标识。
 - `name`：机制显示名称。
@@ -77,13 +77,15 @@ npm run build
 
 接入步骤：
 
-1. 先在注册表补全机制定义，并保持 `status: 'planned'`。
-2. 在独立模块中实现机制数据和规则；复用 `game-model`、`level-data`、`scene-view` 的现有边界，不把机制规则堆回 `main.js`。
-3. 通过 `src/mechanic-lab.js` / `src/main.js` 的选择流程接入运行、暂停、重置和 URL 同步。
+1. 先在 `src/mechanics/<mechanic-id>/index.js` 补全机制定义，并保持 `status: 'planned'`。
+2. 如需可玩 Demo，在同目录补 `model.js` 并导出 `createRuntime`；复用 `game-model` 的 hook，不把机制规则堆回 `main.js`。
+3. 如需专属 HUD，在同目录补 `view.js` / `styles.css`，并通过 `src/mechanics/ui.js` 接入。
 4. 为注册表、查询参数、输入隔离和具体玩法增加配套测试。
 5. 完成真实可玩流程与浏览器视觉 QA 后，再把状态改为 `playable`。
 
 机制库 UI 会自动读取注册表；通常不需要在 `index.html` 中手写新条目。
+
+多人并行实现机制 Demo 时，请先阅读 [机制 Demo 协作规范](docs/mechanic-collaboration.md)。新机制默认放在 `src/mechanics/<mechanic-id>/`，尽量只在自己的机制目录内实现规则、UI 和样式；需要新增公共 hook 时再修改 `game-model.js` / `main.js`。
 
 ## 场景调参与存储
 

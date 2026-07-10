@@ -114,11 +114,13 @@ test('star passenger UI shell exposes coin progress and collection effects', () 
   const html = readFileSync(join('index.html'), 'utf8');
   const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
   const sceneSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
-  const styles = readFileSync(join('src', 'styles.css'), 'utf8');
+  const viewSource = readFileSync(join('src', 'mechanics', 'star-passenger', 'view.js'), 'utf8');
+  const styles = readFileSync(join('src', 'mechanics', 'star-passenger', 'styles.css'), 'utf8');
 
-  assert.match(html, /id="star-reward-hud"/);
-  assert.match(html, /id="star-reward-progress-bar"/);
-  assert.match(mainSource, /spawnStarRewardFlyEffect/);
+  assert.doesNotMatch(html, /id="star-reward-hud"/);
+  assert.match(mainSource, /createMechanicUiControllers/);
+  assert.match(viewSource, /id = 'star-reward-hud'/);
+  assert.match(viewSource, /spawnStarRewardFlyEffect/);
   assert.match(sceneSource, /updateStarPassengerBadge/);
   assert.match(styles, /\.star-reward-fly/);
 });

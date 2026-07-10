@@ -964,7 +964,9 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /mechanicOverlaySummary\.textContent = activeMechanic\.summary/);
   assert.match(mainSource, /canvas\.inert = paused/);
   assert.match(mainSource, /stage\?\.classList\.toggle\('is-mechanic-paused', paused\)/);
-  assert.match(mainSource, /if \(paused\) endPanel\.hidden = true/);
+  assert.match(mainSource, /createMechanicUiControllers/);
+  assert.match(mainSource, /function syncMechanicUi\(state\)/);
+  assert.match(mainSource, /if \(paused\) \{\s*syncMechanicUi\(game\.snapshot\(\)\);\s*endPanel\.hidden = true;\s*\}/);
   assert.match(mainSource, /if \(syncUrl\) syncMechanicQuery\(resolvedId\)/);
   assert.match(
     mainSource,

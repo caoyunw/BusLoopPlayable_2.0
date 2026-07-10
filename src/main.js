@@ -6,6 +6,7 @@ import { SCENE_TUNING } from './scene-tuning.js';
 import { createGameAudioController } from './audio-controller.js';
 import { MECHANICS, getMechanicById, resolveMechanicId } from './mechanic-registry.js';
 import { createMechanicLibrary } from './mechanic-library.js';
+import { createMechanicUiControllers } from './mechanics/ui.js';
 import {
   getMechanicIdFromSearch,
   safeRemoveStorageItem,
@@ -29,10 +30,6 @@ const mechanicOverlay = $('#mechanic-overlay');
 const mechanicOverlayTitle = $('#mechanic-overlay-title');
 const mechanicOverlaySummary = $('#mechanic-overlay-summary');
 const mechanicBackButton = $('#mechanic-back-button');
-const starRewardHud = $('#star-reward-hud');
-const starRewardCount = $('#star-reward-count');
-const starRewardProgress = starRewardHud?.querySelector('.star-reward-progress');
-const starRewardProgressBar = $('#star-reward-progress-bar');
 const PASSENGER_MATERIAL_TUNING_PREFIX = 'passengerMaterial.';
 const PASSENGER_MATERIAL_COLOR_INDEX_PATTERN = /^passengerMaterial\.(?:solidColors|colors)\.(\d+)(?:\.|$)/;
 const isPassengerMaterialTuningPath = (path) => path?.startsWith(PASSENGER_MATERIAL_TUNING_PREFIX);
@@ -139,7 +136,7 @@ function startRuntime() {
   let activeMechanic = getMechanicById(resolveMechanicId(initialMechanicId));
   let paused = activeMechanic.status !== 'playable';
   let mechanicLibrary = { setActive: () => {}, destroy: () => {} };
-  let lastStarCoins = 0;
+  const mechanicUiControllers = createMechanicUiControllers({ stage });
 
   function updateLoadingProgress(progress) {
     const percent = Math.max(0, Math.min(100, Math.round((Number(progress) || 0) * 100)));
@@ -197,40 +194,19 @@ function startRuntime() {
     console.warn('Scene editor could not be loaded.', error);
   });
 
-  function spawnStarRewardFlyEffect() {
-    if (!stage || !starRewardHud || starRewardHud.hidden) return;
-    const effect = document.createElement('span');
-    effect.className = 'star-reward-fly';
-    effect.textContent = '★';
-    effect.setAttribute('aria-hidden', 'true');
-    stage.append(effect);
-    effect.addEventListener('animationend', () => effect.remove(), { once: true });
-    window.setTimeout(() => effect.remove(), 900);
+  function resetMechanicUi() {
+    for (const controller of mechanicUiControllers) controller.reset?.();
   }
 
-  function syncStarRewardHud(state) {
-    if (!starRewardHud) return;
-    const visible = activeMechanic.id === 'star-passenger';
-    starRewardHud.hidden = !visible;
-    if (!visible) {
-      lastStarCoins = 0;
-      return;
+  function syncMechanicUi(state) {
+    for (const controller of mechanicUiControllers) {
+      controller.sync?.({ state, mechanic: activeMechanic });
     }
-    const reward = state.starReward ?? { coins: 0, target: 3 };
-    const target = Math.max(1, reward.target ?? 3);
-    const coins = Math.max(0, reward.coins ?? 0);
-    const progress = Math.min(1, coins / target);
-    if (starRewardCount) starRewardCount.textContent = `${coins}/${target}`;
-    if (starRewardProgressBar) starRewardProgressBar.style.width = `${Math.round(progress * 100)}%`;
-    starRewardProgress?.setAttribute('aria-valuemax', String(target));
-    starRewardProgress?.setAttribute('aria-valuenow', String(Math.min(coins, target)));
-    if (coins > lastStarCoins) spawnStarRewardFlyEffect();
-    lastStarCoins = coins;
   }
 
   function syncHud(state) {
     audio.handleGameEvent(state.lastEvent, state.time);
-    syncStarRewardHud(state);
+    syncMechanicUi(state);
     if (paused || state.status === 'playing') {
       endPanel.hidden = true;
       return;
@@ -249,7 +225,7 @@ function startRuntime() {
     paused = activeMechanic.status !== 'playable';
     const gameMechanicId = activeMechanic.status === 'playable' ? resolvedId : 'base';
     if (game.setMechanic(gameMechanicId)) {
-      lastStarCoins = 0;
+      resetMechanicUi();
       game.initializeQueues(view.getQueueCapacities(), view.getQueueSpacing(), view.getQueueLengths(), view.getConveyorPathLength());
     }
     mechanicLibrary.setActive(resolvedId);
@@ -258,8 +234,12 @@ function startRuntime() {
     mechanicOverlaySummary.textContent = activeMechanic.summary;
     canvas.inert = paused;
     stage?.classList.toggle('is-mechanic-paused', paused);
-    if (paused) endPanel.hidden = true;
-    else syncHud(game.snapshot());
+    if (paused) {
+      syncMechanicUi(game.snapshot());
+      endPanel.hidden = true;
+    } else {
+      syncHud(game.snapshot());
+    }
     if (syncUrl) syncMechanicQuery(resolvedId);
     return activeMechanic;
   }
@@ -273,7 +253,7 @@ function startRuntime() {
 
   function reset() {
     endPanel.hidden = true;
-    lastStarCoins = 0;
+    resetMechanicUi();
     game.reset();
     game.initializeQueues(view.getQueueCapacities(), view.getQueueSpacing(), view.getQueueLengths(), view.getConveyorPathLength());
   }
