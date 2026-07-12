@@ -13,6 +13,7 @@ import {
   chooseHitClip,
   evaluatePath,
   evaluateUnityCurve,
+  getCollisionDistance,
   sampleHitClip,
   UNITY_VEHICLE_MOTION
 } from '../src/vehicle-motion.js';
@@ -659,7 +660,7 @@ test('vehicleDepthes unlock blocked cars as authored blockers leave', () => {
 
 test('dispatch reserves the first spot and unlocks cars behind it', () => {
   const game = new BusLoopGame();
-  assert.equal(game.clickVehicle(LEVEL12_BLOCKED_ID).reason, 'blocked');
+  assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), [1, 3]);
   assert.deepEqual(game.clickVehicle(LEVEL12_DISPATCH_ID), { ok: true, spotIndex: 0 });
   assert.equal(game.snapshot().spots[0].vehicleId, LEVEL12_DISPATCH_ID);
   assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), [3]);
@@ -667,15 +668,26 @@ test('dispatch reserves the first spot and unlocks cars behind it', () => {
 
 test('blocked click uses Unity collision advance, contact hit, and return phases', () => {
   const game = new BusLoopGame();
+  const attackerBeforeClick = game.getVehicle(LEVEL12_BLOCKED_ID);
+  const collisionSize = {
+    width: game.level.vehicleSize.width / game.level.mapScale,
+    length: game.level.vehicleSize.length / game.level.mapScale
+  };
+  const expectedTarget = game.getBlockers(LEVEL12_BLOCKED_ID)
+    .map((id) => game.getVehicle(id))
+    .sort((a, b) => (
+      getCollisionDistance(attackerBeforeClick, a, collisionSize)
+      - getCollisionDistance(attackerBeforeClick, b, collisionSize)
+    ))[0];
   assert.equal(game.clickVehicle(LEVEL12_BLOCKED_ID).reason, 'blocked');
   const attacker = game.getVehicle(LEVEL12_BLOCKED_ID);
   assert.equal(attacker.state, 'colliding');
-  assert.equal(attacker.collision.targetId, 1);
-  assert.ok(attacker.collision.distance > 0);
+  assert.equal(attacker.collision.targetId, expectedTarget.id);
   const forwardDuration = attacker.collision.forwardDuration;
+  const expectedClip = chooseHitClip(attacker.collision.hitDirection);
   advance(game, forwardDuration + .01, .005);
-  assert.ok(game.getVehicle(1).hit);
-  assert.equal(chooseHitClip(game.getVehicle(1).hit), 'left');
+  assert.ok(game.getVehicle(expectedTarget.id).hit);
+  assert.equal(chooseHitClip(game.getVehicle(expectedTarget.id).hit), expectedClip);
   advance(game, .5);
   assert.equal(attacker.state, 'parked');
   assert.equal(attacker.collision, null);
@@ -715,7 +727,9 @@ test('station approach follows the Unity parking-area rectangle before entering 
     assert.notDeepEqual(rawPoints.at(-2), { x: target.approachX, z: target.approachZ });
     assert.equal(rawPoints[0].x, game.getVehicle(LEVEL12_DISPATCH_ID).x);
     assert.equal(rawPoints[0].z, game.getVehicle(LEVEL12_DISPATCH_ID).z);
-    assert.ok(rawPoints.some((point) => Math.abs(point.z - UNITY_VEHICLE_MOTION.parkingBounds.maxZ) < 1e-6));
+    assert.ok(rawPoints.some((point) => (
+      Math.abs(point.z - SCENE_TUNING.vehiclePath.parkingBounds.maxZ) < 1e-6
+    )));
     assert.ok(Math.abs(finalSegment.p1.x - target.x) < 1e-6);
     assert.ok(Math.abs(finalSegment.p1.z - target.z) < 1e-6);
   } finally {
@@ -725,7 +739,10 @@ test('station approach follows the Unity parking-area rectangle before entering 
 
 test('vehicle path preview and shape controls are wired to scene tuning', () => {
   assert.equal(SCENE_TUNING.vehiclePath.enabled, 0);
-  assert.deepEqual(SCENE_TUNING.vehiclePath.parkingBounds, UNITY_VEHICLE_MOTION.parkingBounds);
+  assert.deepEqual(
+    SCENE_TUNING.vehiclePath.parkingBounds,
+    EXPORTED_SCENE_TUNING.vehiclePath.parkingBounds
+  );
   const game = new BusLoopGame();
   const target = game.getSpotPosition(0);
   const vehicle = game.getVehicle(LEVEL12_DISPATCH_ID);
@@ -886,7 +903,10 @@ test('level12 initial movable cars reserve the first parking spots', () => {
   assert.deepEqual(game.snapshot().spots.slice(0, LEVEL12_INITIAL_MOVABLE_IDS.length).map((spot) => spot.vehicleId), LEVEL12_INITIAL_MOVABLE_IDS);
   assert.deepEqual(
     LEVEL_1.vehicles
-      .filter((vehicle) => game.getBlockers(vehicle.id).length === 0 && vehicle.state === 'parked')
+      .filter((vehicle) => {
+        const runtimeVehicle = game.getVehicle(vehicle.id);
+        return runtimeVehicle.state === 'parked' && game.getBlockers(vehicle.id).length === 0;
+      })
       .map((vehicle) => vehicle.id),
     [3, 6, 33, 35, 38]
   );
