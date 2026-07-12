@@ -268,7 +268,7 @@ The project moved from the original 6-vehicle level1 prototype to the imported l
 - Added directional-light/editor controls, passenger material controls, vehicle arrow outline controls, and Map Scale editor naming.
 - Restored bus/van fake shadow sizing and removed the bottom operation toast while preserving gameplay events/audio/end panel.
 
-## Current Verification State
+## Historical Verification State — 2026-07-07
 
 - Many touched files passed `node --check` during the 2026-07-07 sessions.
 - Several targeted tests passed with elevated execution where sandboxed Node child process spawning hit `EPERM`.
