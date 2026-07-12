@@ -12,8 +12,8 @@ npm run build
 ```
 
 - `npm run dev`：启动 Vite 本地开发服务器。
-- `npm test`：运行 Node 测试。当前已知基线是 74 项中 67 项通过、7 项历史测试债务失败，详情见 `task_plan.md`。
-- `npm run build`：生成生产构建到 `dist/`。
+- `npm test`：运行 Node 测试。当前基线是 83/83 通过。
+- `npm run build`：生成生产构建到 `dist/`；当前构建通过，但有既有的非阻塞 chunk-size 警告。
 - `npm run apply:tuning`：将 `artifacts/scene-tuning.json` 合并到 authored scene tuning；仅在确认要固化调参时使用。
 
 ## 界面
@@ -27,6 +27,8 @@ npm run build
 手机宽度下，机制库变为左侧抽屉，场景编辑器变为独立工具抽屉，画布保持主要可视区域。
 
 ## 当前机制
+
+注册表共有 17 个机制定义：2 个可试玩（`base`、`star-passenger`），15 个为 `planned`。
 
 `base` 基础规则已经可试玩：点击无阻挡车辆进入停车位，同色乘客依次上车，满载车辆离场并释放停车位。
 

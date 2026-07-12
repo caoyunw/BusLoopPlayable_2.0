@@ -42,7 +42,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ### Mechanic Lab
 
-- `src/mechanic-registry.js`: immutable registry for `base` plus sixteen planned mechanisms. Owns IDs, names, categories, status, summary/effect/experience/difficulty, exact lookup, fallback to `base`, and text filtering.
+- `src/mechanic-registry.js`: immutable registry for 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned. Owns IDs, names, categories, status, summary/effect/experience/difficulty, exact lookup, fallback to `base`, and text filtering.
 - `src/mechanic-lab.js`: pure lab helpers. Owns query parsing, same-origin query replacement/sync, unknown-ID fallback through the registry, and exception-safe storage removal.
 - `src/mechanic-library.js`: mechanism browser UI. Owns search, unique primary-category grouping, status labels, detail rendering with `textContent`, active state, mobile collapse/focus behavior, viewport synchronization, and listener cleanup.
 - `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
@@ -76,7 +76,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ## Known Test Baseline
 
-As of 2026-07-09, the lab-focused test file passes 23/23. The full suite passes 67/74; seven existing `test/game-model.test.js` failures are tracked in `task_plan.md`. Do not treat those failures as new without comparing names and assertions.
+As of 2026-07-12, the full suite passes 83/83. `pnpm run build` passes with the existing non-blocking chunk-size warning.
 
 ## Historical Material
 

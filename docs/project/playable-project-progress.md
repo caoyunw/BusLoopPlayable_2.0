@@ -1,12 +1,12 @@
 # Playable Project Progress
 
-## Current Snapshot - 2026-07-09
+## Current Snapshot - 2026-07-12
 
 The active project is now the BusLoop mechanic lab, not an advertising playable. The lab is for designing and experiencing gameplay mechanisms and contains no active advertising package flow or store redirect.
 
 ### Mechanic Lab Foundation
 
-- The registry contains one playable `base` rule set plus sixteen complete mechanism definitions currently marked `planned`.
+- The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
 - The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
@@ -19,14 +19,13 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Targeted lab tests: `node --test test/mechanic-registry.test.js` passed 23/23.
-- Production build: `npm run build` passed with the existing Vite large-chunk warning.
-- Full suite: `npm test` passed 67/74. The seven existing `test/game-model.test.js` failures are recorded in `task_plan.md`; the full suite is not green.
+- Full suite: `pnpm test` passed 83/83.
+- Production build: `pnpm run build` passed with the existing non-blocking chunk-size warning.
 - Browser visual QA passed on desktop 1440x1000 and mobile 390x844 using Playwright with system Edge: canvas pixel checks were nonblank, mobile library/editor drawers started collapsed, planned-mechanic overlays paused input, base gameplay click worked after returning from preview, and there were no console errors or failed HTTP responses.
 
 ### Next Step
 
-Implement mechanisms one at a time behind the lab boundaries, starting with `question-vehicle` and `garage`. Keep each entry `planned` until its rules, focused tests, and desktop/mobile browser QA are complete.
+Complete the approved [`2026-07-10-star-passenger-feedback.md`](../superpowers/plans/2026-07-10-star-passenger-feedback.md) plan before starting another mechanic. The plan covers the 3/2/1 remaining-pass badge, one `-1` per exit crossing, cyclic 0/20 charge, a one-second completion celebration, and desktop/mobile/reduced-motion browser QA.
 
 ## Historical Playable/Advertising Log
 

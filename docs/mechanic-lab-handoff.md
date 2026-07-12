@@ -1,77 +1,73 @@
 # BusLoop 机制实验台：新对话交接文档
 
-> 更新日期：2026-07-10  
+> 更新日期：2026-07-12
 > 当前阶段：机制实验台底座与插件架构已完成；星星乘客反馈优化已完成设计和实施计划，尚未开始编码。  
 > 用途：让新的 Codex 对话或协作者快速恢复上下文并继续机制 Demo 开发。
 
 ## 0. 路径标注规则
 
-- `[Pxx]`：已经存在的具体本地文件或目录，可在“具体路径索引”中打开。
+- All paths are repository-relative unless marked as a URL.
+- `[Pxx]`：已经存在的仓库文件或目录，可在“具体路径索引”中打开。
 - `[Txx]`：新增机制时使用的路径模板，其中包含变量，不对应单个现有文件。
-- 本文正文不单独散落未编号的本地路径；遇到路径先查本节索引。
 - GitHub、localhost 和查询参数属于网络地址，不属于本地文件路径，单独标注为 URL。
 
 ### 具体路径索引
 
-| 编号 | 用途 | 绝对路径 |
+| 编号 | 用途 | 仓库相对路径 |
 | --- | --- | --- |
-| P00 | 当前机制实验台工作树 | [mechanic-lab](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab) |
-| P01 | 主工作树 | [BusLoopPlayable_2.0](</D:/claudework/项目相关/WorkProject/BusLoop/【BusLoop】关卡机制发散/BusLoopPlayable_2.0/BusLoopPlayable_2.0>) |
-| P02 | 本交接文档 | [mechanic-lab-handoff.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/mechanic-lab-handoff.md) |
-| P03 | 工程 README | [README.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/README.md) |
-| P04 | 多人机制协作规范 | [mechanic-collaboration.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/mechanic-collaboration.md) |
-| P05 | 机制实验台设计规格 | [2026-07-09-busloop-mechanic-lab-design.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/superpowers/specs/2026-07-09-busloop-mechanic-lab-design.md) |
-| P06 | 机制插件化实施计划 | [2026-07-10-mechanic-pluginization.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/superpowers/plans/2026-07-10-mechanic-pluginization.md) |
-| P07 | 星星乘客反馈优化设计规格 | [2026-07-10-star-passenger-feedback-design.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/superpowers/specs/2026-07-10-star-passenger-feedback-design.md) |
-| P08 | 星星乘客反馈优化实施计划 | [2026-07-10-star-passenger-feedback.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/superpowers/plans/2026-07-10-star-passenger-feedback.md) |
-| P09 | 核心代码导航 | [code-navigation.md](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/project/code-navigation.md) |
-| P10 | 历史广告平台文档目录 | [docs/platforms](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/platforms) |
-| P11 | 历史试玩广告文档目录 | [docs/playable](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/docs/playable) |
-| P12 | 机制模块根目录 | [src/mechanics](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics) |
-| P13 | 机制模块聚合器 | [src/mechanics/index.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/index.js) |
-| P14 | 机制注册表公共接口 | [src/mechanic-registry.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanic-registry.js) |
-| P15 | 机制 UI controller 聚合器 | [src/mechanics/ui.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/ui.js) |
-| P16 | 基础玩法状态机 | [src/game-model.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/game-model.js) |
-| P17 | 实验台浏览器入口 | [src/main.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/main.js) |
-| P18 | Three.js 场景表现 | [src/scene-view.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/scene-view.js) |
-| P19 | 全局实验台样式 | [src/styles.css](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/styles.css) |
-| P20 | 实验台 HTML 壳层 | [index.html](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/index.html) |
-| P21 | 星星乘客机制目录 | [src/mechanics/star-passenger](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/star-passenger) |
-| P22 | 星星乘客定义与 runtime 导出 | [src/mechanics/star-passenger/index.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/star-passenger/index.js) |
-| P23 | 星星乘客规则模型 | [src/mechanics/star-passenger/model.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/star-passenger/model.js) |
-| P24 | 星星乘客 HUD controller | [src/mechanics/star-passenger/view.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/star-passenger/view.js) |
-| P25 | 星星乘客专属样式 | [src/mechanics/star-passenger/styles.css](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/mechanics/star-passenger/styles.css) |
-| P26 | 星星乘客测试 | [test/star-passenger-mechanic.test.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/test/star-passenger-mechanic.test.js) |
-| P27 | 机制架构测试 | [test/mechanic-architecture.test.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/test/mechanic-architecture.test.js) |
-| P28 | 机制注册表测试 | [test/mechanic-registry.test.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/test/mechanic-registry.test.js) |
-| P29 | 基础玩法综合测试 | [test/game-model.test.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/test/game-model.test.js) |
-| P30 | 中性运行资源目录 | [public/assets/runtime](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/public/assets/runtime) |
-| P31 | Unity 原始资源目录 | [public/assets/unity](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/public/assets/unity) |
-| P32 | 关卡与资源 URL 配置 | [src/level-data.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/level-data.js) |
-| P33 | 场景 authored tuning | [src/scene-tuning.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/scene-tuning.js) |
-| P34 | 场景调参编辑器 | [src/scene-editor.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/scene-editor.js) |
-| P35 | 车辆路径与碰撞运动 | [src/vehicle-motion.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/vehicle-motion.js) |
-| P36 | 音频控制器 | [src/audio-controller.js](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/src/audio-controller.js) |
-| P37 | npm 脚本与依赖 | [package.json](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/package.json) |
-| P38 | 导出的场景调参文件 | [artifacts/scene-tuning.json](/C:/Users/1/.config/superpowers/worktrees/BusLoopPlayable_2.0/mechanic-lab/artifacts/scene-tuning.json) |
+| P00 | 仓库根目录 | [仓库根目录](..) |
+| P02 | 本交接文档 | [mechanic-lab-handoff.md](mechanic-lab-handoff.md) |
+| P03 | 工程 README | [README](../README.md) |
+| P04 | 多人机制协作规范 | [机制协作规范](mechanic-collaboration.md) |
+| P05 | 机制实验台设计规格 | [2026-07-09-busloop-mechanic-lab-design.md](superpowers/specs/2026-07-09-busloop-mechanic-lab-design.md) |
+| P06 | 机制插件化实施计划 | [2026-07-10-mechanic-pluginization.md](superpowers/plans/2026-07-10-mechanic-pluginization.md) |
+| P07 | 星星乘客反馈优化设计规格 | [2026-07-10-star-passenger-feedback-design.md](superpowers/specs/2026-07-10-star-passenger-feedback-design.md) |
+| P08 | 星星乘客反馈优化实施计划 | [2026-07-10-star-passenger-feedback.md](superpowers/plans/2026-07-10-star-passenger-feedback.md) |
+| P09 | 核心代码导航 | [代码导航](project/code-navigation.md) |
+| P10 | 历史广告平台文档目录 | [docs/platforms](platforms) |
+| P11 | 历史试玩广告文档目录 | [docs/playable](playable) |
+| P12 | 机制模块根目录 | [src/mechanics](../src/mechanics) |
+| P13 | 机制模块聚合器 | [src/mechanics/index.js](../src/mechanics/index.js) |
+| P14 | 机制注册表公共接口 | [src/mechanic-registry.js](../src/mechanic-registry.js) |
+| P15 | 机制 UI controller 聚合器 | [src/mechanics/ui.js](../src/mechanics/ui.js) |
+| P16 | 基础玩法状态机 | [src/game-model.js](../src/game-model.js) |
+| P17 | 实验台浏览器入口 | [src/main.js](../src/main.js) |
+| P18 | Three.js 场景表现 | [src/scene-view.js](../src/scene-view.js) |
+| P19 | 全局实验台样式 | [src/styles.css](../src/styles.css) |
+| P20 | 实验台 HTML 壳层 | [index.html](../index.html) |
+| P21 | 星星乘客机制目录 | [星星乘客目录](../src/mechanics/star-passenger) |
+| P22 | 星星乘客定义与 runtime 导出 | [src/mechanics/star-passenger/index.js](../src/mechanics/star-passenger/index.js) |
+| P23 | 星星乘客规则模型 | [src/mechanics/star-passenger/model.js](../src/mechanics/star-passenger/model.js) |
+| P24 | 星星乘客 HUD controller | [src/mechanics/star-passenger/view.js](../src/mechanics/star-passenger/view.js) |
+| P25 | 星星乘客专属样式 | [src/mechanics/star-passenger/styles.css](../src/mechanics/star-passenger/styles.css) |
+| P26 | 星星乘客测试 | [星星乘客测试](../test/star-passenger-mechanic.test.js) |
+| P27 | 机制架构测试 | [test/mechanic-architecture.test.js](../test/mechanic-architecture.test.js) |
+| P28 | 机制注册表测试 | [test/mechanic-registry.test.js](../test/mechanic-registry.test.js) |
+| P29 | 基础玩法综合测试 | [test/game-model.test.js](../test/game-model.test.js) |
+| P30 | 中性运行资源目录 | [public/assets/runtime](../public/assets/runtime) |
+| P31 | Unity 原始资源目录 | [public/assets/unity](../public/assets/unity) |
+| P32 | 关卡与资源 URL 配置 | [src/level-data.js](../src/level-data.js) |
+| P33 | 场景 authored tuning | [src/scene-tuning.js](../src/scene-tuning.js) |
+| P34 | 场景调参编辑器 | [src/scene-editor.js](../src/scene-editor.js) |
+| P35 | 车辆路径与碰撞运动 | [src/vehicle-motion.js](../src/vehicle-motion.js) |
+| P36 | 音频控制器 | [src/audio-controller.js](../src/audio-controller.js) |
+| P37 | npm 脚本与依赖 | [package.json](../package.json) |
+| P38 | 导出的场景调参文件 | [artifacts/scene-tuning.json](../artifacts/scene-tuning.json) |
 
 ### 路径模板索引
 
 | 编号 | 模板 | 用途 |
 | --- | --- | --- |
-| T01 | `工作树\src\mechanics\<mechanic-id>\` | 每个机制的独立所有权目录。 |
-| T02 | `工作树\test\<mechanic-id>.test.js` | 每个机制的规则与接线测试。 |
+| T01 | `src/mechanics/<mechanic-id>/` | 每个机制的独立所有权目录。 |
+| T02 | `test/<mechanic-id>.test.js` | 每个机制的规则与接线测试。 |
 | T03 | `feature/mechanic-<mechanic-id>` | 每个机制的 Git 功能分支命名。 |
 
 ## 1. 新对话建议首条消息
 
 ```text
-请进入路径 [P00]，先阅读 [P02]、[P03]、[P04]、[P07] 和 [P08]，再继续 BusLoop 机制实验台开发。
+请在仓库根目录 [P00] 中先阅读 [P02]、[P03]、[P04]、[P07] 和 [P08]，再继续 BusLoop 机制实验台开发。
 
-当前分支：feature/mechanic-lab
-当前 HEAD：e2cebf0 docs: design star passenger feedback
-
-先执行 git status 和 git log -6 --oneline。保留现有未提交文件，不要重做试玩广告剥离、机制实验台壳层、机制插件化和星星乘客初版。
+先执行 git status 和 git log -6 --oneline。不要重做试玩广告剥离、机制实验台壳层、机制插件化和星星乘客初版。
 
 当前最近任务是实现星星乘客反馈优化：[P07] 为已确认设计，[P08] 为待执行计划。目标是星星显示 3/2/1 剩余出口次数、经过出口弹出 -1、金币充能改为循环 0/20，并在 20/20 时播放约 1 秒的华丽庆祝。该优化尚未编码，请按 [P08] 使用 TDD 开始执行。
 ```
@@ -87,24 +83,12 @@
 
 当前工程不再以投放广告为目标，不包含商店跳转、安装引导、MRAID 或广告平台打包流程。历史广告文档只保留在 [P10] 和 [P11] 供追溯。
 
-## 3. 当前工作区与 Git 状态
+## 3. 仓库与协作基线
 
-- 当前开发工作树：[P00]。
-- 主工作树：[P01]。
+- 仓库根目录：[P00]。
 - GitHub：[caoyunw/BusLoopPlayable_2.0](https://github.com/caoyunw/BusLoopPlayable_2.0.git)。
-- 当前分支：`feature/mechanic-lab`。
-- 当前 HEAD：`e2cebf0 docs: design star passenger feedback`。
-- 当前未提交文件：[P02] 和 [P08]。
-- `feature/mechanic-lab` 尚未设置远端上游。
-- 本地主分支 `main` 相对 `origin/main` 仍为 `ahead 3`。
-
-多人分工前，应先发布机制实验台共同基线：
-
-```bash
-git push -u origin feature/mechanic-lab
-```
-
-其他协作者必须从包含插件架构的最新共同分支创建机制分支，不要直接从旧的 `origin/main` 开始。
+- 开始前运行 `git status` 和 `git log -6 --oneline`，以当前仓库状态为准。
+- 多人分工时，从团队当前共享基线创建机制分支；不要从过时基线开始。
 
 ## 4. 已完成工作
 
@@ -154,7 +138,7 @@ git push -u origin feature/mechanic-lab
 
 ## 5. 星星乘客反馈优化：已确认但尚未实现
 
-设计规格已经提交，见 [P07]；实施计划已经写好但尚未提交，见 [P08]。
+设计规格见 [P07]；已批准的实施计划见 [P08]。
 
 ### 已确认设计
 
@@ -183,8 +167,8 @@ git push -u origin feature/mechanic-lab
 
 1. 设计讨论：已完成。
 2. 视觉方案选择：已完成，选择数字徽章 A。
-3. 设计规格：[P07] 已提交，提交为 `e2cebf0`。
-4. 实施计划：[P08] 已完成并自审。
+3. 设计规格：[P07] 已完成。
+4. 实施计划：[P08] 已批准并完成自审。
 5. 规则、场景和 HUD 编码：未开始。
 6. 自动化测试、构建与浏览器验收：未开始。
 
@@ -322,25 +306,12 @@ node --test test/game-model.test.js                   # [P29]
 
 ## 12. 当前验证基线
 
-实现基线提交为 `50db3bc`，其后只新增设计文档提交 `e2cebf0`，运行代码尚未变化：
-
-- [P27]：3/3 通过。
-- [P26]：5/5 通过。
-- [P28]：23/23 通过。
-- `npm run build`：通过，有 chunk 大于 500 kB 的非阻塞警告。
-- [P29]：24 项通过、7 项历史失败。
-
-历史失败名称：
-
-1. Unity visual assets and tunable camera configuration are complete
-2. editor sizing, source background ratio, and passenger shadow anchor stay wired
-3. dispatch reserves the first spot and unlocks cars behind it
-4. blocked click uses Unity collision advance, contact hit, and return phases
-5. station approach follows the Unity parking-area rectangle before entering the spot
-6. vehicle path preview and shape controls are wired to scene tuning
-7. level12 initial movable cars reserve the first parking spots
-
-如果数量、名称或断言改变，应先调查，不要把新失败归入历史债务。
+- 注册表共有 17 个机制定义：2 个可试玩（`base`、`star-passenger`），15 个为 `planned`。
+- `pnpm test`：83/83 通过。
+- `pnpm run build`：通过，有既有的非阻塞 chunk-size 警告。
+- 依赖缓存、意外系统文件和临时日志不是项目源文件，已被忽略。
+- [P33] 是 authored runtime 真值；[P38] 是其精确导出副本。
+- 运行资源保留在 [P30]；Unity 来源资源保留在 [P31]。
 
 ## 13. 注意事项与风险
 
@@ -349,11 +320,8 @@ node --test test/game-model.test.js                   # [P29]
 3. 星星乘客优化尚未实现；不要把 [P07] 中的设计描述误认为当前代码行为。
 4. 修改 [P18] 时要保持场景表现通用，充能规则只能存在于 [P23]。
 5. [P24] 的定时器、粒子和 class 必须在 reset、hide 和机制切换时清理。
-6. 修改阻挡、停车位或车辆路径时，运行 [P29] 并对比历史 7 项失败。
+6. 修改阻挡、停车位或车辆路径时，运行 [P29] 和全量测试。
 7. 场景调参源文件和导出文件分别为 [P33] 与 [P38]；机制状态不能污染调参存储。
-8. [P09] 的机制数量描述可能仍停留在插件化前，应以 [P13] 和本交接文档为准。
-9. 当前协作底座尚未推送为远端上游。
-10. [P02] 和 [P08] 当前是未提交文件；新对话不得删除或覆盖。
 
 ## 14. 相关文档阅读顺序
 

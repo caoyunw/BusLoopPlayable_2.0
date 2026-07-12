@@ -55,13 +55,13 @@ The current base runtime is composed from `game-model`, `level-data`, `scene-vie
 
 ## Testing And Visual QA
 
-Known baseline on 2026-07-09:
+Verified baseline on 2026-07-12:
 
-- `test/mechanic-registry.test.js`: 23/23 passing.
-- Full `npm test`: 67/74 passing with 7 existing failures recorded in `task_plan.md`.
-- `npm run build`: passing with the existing large-chunk warning.
+- The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
+- Full `pnpm test`: 83/83 passing.
+- `pnpm run build`: passing with the existing non-blocking chunk-size warning.
 
-Do not report the full suite as passing until the seven recorded debts are resolved. Use the narrowest relevant tests while implementing, then run the full suite and build for cross-module or release-facing changes.
+Use the narrowest relevant tests while implementing, then run the full suite and build for cross-module or release-facing changes.
 
 Browser QA is required for layout or interaction work. Check desktop three-column layout, mobile drawers, nonblank canvas, mechanism selection, search/empty states, frozen planned-mechanic overlay, reset/end states, editor controls, and console errors. Record viewport and remaining gaps.
 

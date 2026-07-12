@@ -1,10 +1,10 @@
 # Findings
 
-## Current Durable Findings - 2026-07-09
+## Current Durable Findings - 2026-07-12
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. `base` is playable; sixteen additional definitions are discoverable but remain `planned`.
+- The active product is a mechanic design and experience lab. The registry contains 17 definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
 - `src/mechanic-registry.js` is the source of truth for mechanism identity, metadata, state, lookup, fallback, and search.
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
@@ -13,8 +13,8 @@
 
 ### Runtime Asset Naming
 
-- Web-optimized assets used by the lab live under `public/assets/runtime/` and are referenced as `/assets/runtime/...`.
-- Unity models, source textures, effects, fonts, and audio remain under `public/assets/unity/`.
+- Dependency caches, accidental system files, and transient logs are not project sources and are ignored.
+- Runtime assets remain under `public/assets/runtime/`; Unity provenance assets remain under `public/assets/unity/`.
 - Runtime asset paths must use neutral names. Advertising platform names are not runtime ownership boundaries.
 - `src/level-data.js` is the primary asset URL inventory; `src/scene-view.js` directly owns the runtime guide-hand URL.
 
@@ -22,7 +22,7 @@
 
 - The scene editor is a permanent lab tool and defaults to collapsed; it is no longer stripped from a production-oriented runtime path.
 - `src/main.js` clones `SCENE_TUNING` before any saved override is merged. Reset therefore returns to authored source values instead of values already mutated during the session.
-- Exported `artifacts/scene-tuning.json` is a handoff for `npm run apply:tuning`; browser storage alone is not an authored source change.
+- `src/scene-tuning.js` is the authored runtime truth; `artifacts/scene-tuning.json` is its exact export counterpart.
 
 ### Safe Storage
 

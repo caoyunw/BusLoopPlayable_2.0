@@ -1,8 +1,8 @@
 # Progress
 
-## Handoff - 2026-07-09
+## Handoff - 2026-07-12
 
-The repository has been converted from an advertising-oriented playable into the BusLoop mechanic lab. The base game remains playable, while sixteen proposed mechanisms are available as searchable `planned` entries with descriptions and frozen preview states.
+The BusLoop mechanic lab now has a clean, verified baseline. The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
 
 ## Main Implementation Commits
 
@@ -18,7 +18,8 @@ The repository has been converted from an advertising-oriented playable into the
 ## Current Runtime State
 
 - `base` is playable against the imported level12-style layout.
-- Sixteen proposed mechanisms remain `planned`; they display complete metadata but do not receive gameplay input.
+- `star-passenger` is playable; its approved feedback refinement is the next implementation task.
+- Fifteen proposed mechanisms remain `planned`; they display complete metadata but do not receive gameplay input.
 - Desktop uses a three-column lab layout. Narrow screens use mechanism and editor drawers.
 - `?mechanic=<id>` selects a mechanism and safely falls back to `base`.
 - The scene editor is always available, defaults to collapsed, and stores local overrides separately from mechanism selection.
@@ -26,19 +27,17 @@ The repository has been converted from an advertising-oriented playable into the
 
 ## Verification
 
-- `node --test test/mechanic-registry.test.js`: 23/23 passed.
-- `npm run build`: passed with the existing Vite large-chunk warning.
-- `npm test`: 67/74 passed. The seven existing `test/game-model.test.js` failures are listed in `task_plan.md`.
-- Active-rule phrase scan found no active advertising markers in `src`, `index.html`, `package.json`, `scripts`, or `public`; `git diff --check` passed.
-- Browser QA passed on desktop 1440x1000 and mobile 390x844 using Playwright with system Edge. Checked nonblank canvas pixels, desktop lab columns, mobile collapsed drawers, garage/question-vehicle preview overlays, frozen planned-mechanic input, base gameplay click after returning from preview, and console/network cleanliness.
+- `pnpm test`: 83/83 passed.
+- `pnpm run build`: passed with the existing non-blocking chunk-size warning.
+- Repository hygiene excludes dependency caches, accidental system files, and transient logs from project sources.
 
 ## Next Work
 
-Start mechanism implementation with `question-vehicle`, then `garage`, using the registry/lab/library boundaries documented in `docs/project/code-navigation.md`. Keep each preset `planned` until its focused tests and real browser interaction are complete.
+Execute the approved [`docs/superpowers/plans/2026-07-10-star-passenger-feedback.md`](docs/superpowers/plans/2026-07-10-star-passenger-feedback.md) before starting another mechanic. It covers the 3/2/1 badge, one `-1` per exit crossing, cyclic 0/20 charge, a one-second completion celebration, and desktop/mobile/reduced-motion browser QA.
 
 ## Browser QA Notes
 
-The latest pass used the running Vite dev server at `http://127.0.0.1:4173/`. Future UI or mechanism-rule changes should rerun desktop/mobile browser QA instead of relying only on the current pass.
+The star-passenger feedback plan requires fresh desktop, mobile, and reduced-motion browser QA. Do not rely on earlier shell QA for this behavior change.
 
 ## Historical Note
 
