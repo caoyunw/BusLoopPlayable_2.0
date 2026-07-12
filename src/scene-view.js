@@ -598,6 +598,9 @@ export class SceneView {
     this.canvas = canvas;
     this.onVehicleClick = onVehicleClick;
     this.hooks = hooks;
+    this.reducedMotionQuery = typeof globalThis.matchMedia === 'function'
+      ? globalThis.matchMedia('(prefers-reduced-motion: reduce)')
+      : null;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1490,6 +1493,7 @@ export class SceneView {
     const rewardVisible = Boolean(reward.active && !reward.expired && remainingPasses > 0);
     const decrementElapsed = time - badge.userData.starBadgeDecrementStartedAt;
     const showDecrement = decrementElapsed >= 0 && decrementElapsed < 0.65;
+    const reduceMotion = Boolean(this.reducedMotionQuery?.matches);
 
     badge.visible = rewardVisible || showDecrement;
     if (starMesh) starMesh.visible = rewardVisible;
@@ -1503,7 +1507,7 @@ export class SceneView {
       if (countLabel?.canvas) drawStarBadgeCount(countLabel, remainingPasses);
     }
 
-    if (rewardVisible) {
+    if (rewardVisible && !reduceMotion) {
       const pulse = 1 + Math.sin(time * 6) * 0.08;
       badge.scale.setScalar(pulse);
     } else {
@@ -1512,7 +1516,7 @@ export class SceneView {
 
     if (showDecrement && decrementSprite) {
       const progress = decrementElapsed / 0.65;
-      decrementSprite.position.y = 0.63 + progress * 0.2;
+      decrementSprite.position.y = reduceMotion ? 0.63 : 0.63 + progress * 0.2;
       if (decrementSprite.material) decrementSprite.material.opacity = 1 - progress;
     } else if (decrementSprite) {
       decrementSprite.position.y = 0.63;

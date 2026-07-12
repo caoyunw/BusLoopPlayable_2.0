@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { BusLoopGame } from '../src/game-model.js';
 import { getMechanicById } from '../src/mechanic-registry.js';
 import { createStarPassengerRuntime } from '../src/mechanics/star-passenger/model.js';
+import { SceneView } from '../src/scene-view.js';
 
 const makeRandom = (values) => {
   let index = 0;
@@ -197,6 +198,65 @@ test('star passenger reward disappears after passing the exit three times withou
   assert.equal(state.slots[0].starReward.active, false);
   assert.equal(state.slots[0].starReward.expired, true);
   assert.equal(state.lastEvent.type, 'star-passenger-expired');
+});
+
+test('scene captures a live reduced motion query for star badges', () => {
+  const sceneSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
+
+  assert.match(sceneSource, /typeof globalThis\.matchMedia === 'function'/);
+  assert.match(sceneSource, /\(prefers-reduced-motion: reduce\)/);
+  assert.match(sceneSource, /reducedMotionQuery\?\.matches/);
+});
+
+test('star badge respects live reduced motion while keeping decrement feedback visible', () => {
+  const reducedMotionQuery = { matches: true };
+  const decrementSprite = {
+    visible: false,
+    position: { y: 0.63 },
+    material: { opacity: 1 }
+  };
+  const badge = {
+    visible: false,
+    scale: {
+      value: null,
+      setScalar(value) {
+        this.value = value;
+      }
+    },
+    userData: {
+      starMesh: { visible: false },
+      haloMesh: { visible: false },
+      starBadgeCountSprite: { visible: false },
+      starBadgeDecrementSprite: decrementSprite,
+      starBadgePassengerId: 7,
+      starBadgeRemainingPasses: 2,
+      starBadgeDecrementVersion: 0,
+      starBadgeDecrementStartedAt: -Infinity
+    }
+  };
+  const view = { userData: { starBadge: badge } };
+  const reward = {
+    active: true,
+    expired: false,
+    remainingPasses: 2,
+    decrementVersion: 1
+  };
+  const scene = { reducedMotionQuery };
+
+  SceneView.prototype.updateStarPassengerBadge.call(scene, view, reward, 10, 7);
+  SceneView.prototype.updateStarPassengerBadge.call(scene, view, reward, 10.325, 7);
+
+  assert.equal(badge.scale.value, 1);
+  assert.equal(decrementSprite.visible, true);
+  assert.equal(decrementSprite.position.y, 0.63);
+  assert.ok(Math.abs(decrementSprite.material.opacity - 0.5) < 1e-9);
+
+  reducedMotionQuery.matches = false;
+  SceneView.prototype.updateStarPassengerBadge.call(scene, view, reward, 10.325, 7);
+
+  assert.notEqual(badge.scale.value, 1);
+  assert.ok(decrementSprite.position.y > 0.63);
+  assert.ok(Math.abs(decrementSprite.material.opacity - 0.5) < 1e-9);
 });
 
 test('star passenger UI shell exposes coin progress and collection effects', () => {
