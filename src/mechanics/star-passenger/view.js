@@ -10,6 +10,7 @@ export function createStarPassengerHud({ stage } = {}) {
   let latestReward = null;
   let celebrationTimer = null;
   let celebrating = false;
+  const rewardFlyEffects = new Map();
 
   function ensureRoot() {
     if (root || !stage) return root;
@@ -100,19 +101,34 @@ export function createStarPassengerHud({ stage } = {}) {
     celebrationTimer = timerId;
   }
 
+  function removeStarRewardFlyEffect(effect) {
+    const timerId = rewardFlyEffects.get(effect);
+    if (timerId !== undefined) {
+      window.clearTimeout(timerId);
+      rewardFlyEffects.delete(effect);
+    }
+    effect.remove();
+  }
+
+  function clearStarRewardFlyEffects() {
+    [...rewardFlyEffects.keys()].forEach((effect) => removeStarRewardFlyEffect(effect));
+  }
+
   function spawnStarRewardFlyEffect() {
     if (!stage || !root || root.hidden) return;
     const effect = document.createElement('span');
     effect.className = 'star-reward-fly';
     effect.textContent = '★';
     effect.setAttribute('aria-hidden', 'true');
+    const timerId = window.setTimeout(() => removeStarRewardFlyEffect(effect), 900);
+    rewardFlyEffects.set(effect, timerId);
+    effect.addEventListener('animationend', () => removeStarRewardFlyEffect(effect), { once: true });
     stage.append(effect);
-    effect.addEventListener('animationend', () => effect.remove(), { once: true });
-    window.setTimeout(() => effect.remove(), 900);
   }
 
   function hide() {
     clearChargeCompleteEffect();
+    clearStarRewardFlyEffects();
     if (root) root.hidden = true;
     lastCoins = 0;
     lastCompletedCharges = 0;
@@ -122,11 +138,13 @@ export function createStarPassengerHud({ stage } = {}) {
   return {
     reset() {
       clearChargeCompleteEffect();
+      clearStarRewardFlyEffects();
       lastCoins = 0;
       lastCompletedCharges = 0;
       latestReward = null;
       if (count) count.textContent = '0/20';
       if (progressBar) progressBar.style.width = '0%';
+      if (progress) progress.setAttribute('aria-valuemax', '20');
       if (progress) progress.setAttribute('aria-valuenow', '0');
     },
 

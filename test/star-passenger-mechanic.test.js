@@ -217,6 +217,12 @@ test('star passenger UI shell exposes coin progress and collection effects', () 
   assert.match(viewSource, /Math\.max\(lastCompletedCharges, completedCharges\)/);
   assert.match(viewSource, /celebrationTimer !== timerId/);
   assert.match(viewSource, /spawnStarRewardFlyEffect/);
+  assert.match(viewSource, /rewardFlyEffects/);
+  assert.match(viewSource, /removeStarRewardFlyEffect/);
+  assert.match(viewSource, /clearStarRewardFlyEffects/);
+  assert.match(viewSource, /function hide\(\)\s*\{[\s\S]*?clearStarRewardFlyEffects\(\)/);
+  assert.match(viewSource, /reset\(\)\s*\{[\s\S]*?clearStarRewardFlyEffects\(\)/);
+  assert.match(viewSource, /reset\(\)\s*\{[\s\S]*?progress\) progress\.setAttribute\('aria-valuemax', '20'\)/);
   assert.match(sceneSource, /updateStarPassengerBadge/);
   assert.match(sceneSource, /remainingPasses/);
   assert.match(sceneSource, /decrementVersion/);
@@ -228,4 +234,5 @@ test('star passenger UI shell exposes coin progress and collection effects', () 
   assert.match(styles, /\.star-charge-celebration\s*\{[^}]*pointer-events:\s*none/s);
   assert.match(styles, /\.star-reward-hud\.is-charge-complete/);
   assert.match(styles, /prefers-reduced-motion/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.star-reward-progress-bar\s*\{[^}]*transition:\s*none/);
 });

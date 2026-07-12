@@ -167,6 +167,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .star-reward-progress-bar {
+    transition: none;
+  }
+
   .star-reward-hud.is-charge-complete,
   .star-reward-hud.is-charge-complete .star-reward-progress-bar,
   .star-charge-ring,
