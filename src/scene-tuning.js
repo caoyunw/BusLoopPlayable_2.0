@@ -86,41 +86,7 @@ export const SCENE_TUNING = {
         "x": 101.5,
         "y": -9.5,
         "z": -99
-      },
-      "shadowType": 2,
-      "shadowStrength": 0.46
-    },
-    "realtimeShadows": {
-      "enabled": 0,
-      "mapSize": 1024,
-      "cameraSize": 18,
-      "cameraNear": 0.1,
-      "cameraFar": 40,
-      "shadowLightDistance": 21,
-      "bias": -0.0044,
-      "normalBias": 0.057,
-      "radius": 3.7,
-      "shadowColor": 0,
-      "receiverEnabled": 1,
-      "receiverX": -3.9,
-      "receiverY": -0.1,
-      "receiverZ": -1.05,
-      "receiverWidth": 40,
-      "receiverDepth": 50,
-      "receiverOpacity": 0.66,
-      "receiverDepthTest": 1,
-      "receiverDebugEnabled": 0,
-      "receiverDebugColor": 3528703,
-      "receiverDebugOpacity": 0.24,
-      "debugCasterEnabled": 0,
-      "debugCasterX": -2.45,
-      "debugCasterY": 0.6,
-      "debugCasterZ": 1.6,
-      "debugCasterSize": 0.6,
-      "debugCasterHeight": 1.2,
-      "vehiclesCast": 0,
-      "passengersCast": 0,
-      "parkingSpotsReceive": 1
+      }
     }
   },
   "conveyorArt": {
