@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BusLoopGame } from '../src/game-model.js';
 import { getMechanicById } from '../src/mechanic-registry.js';
+import { createStarPassengerRuntime } from '../src/mechanics/star-passenger/model.js';
 
 const makeRandom = (values) => {
   let index = 0;
@@ -40,7 +41,7 @@ function makeStarGame(randomValues = [0]) {
   return new BusLoopGame(TEST_LEVEL, {
     mechanicId: 'star-passenger',
     random: makeRandom(randomValues),
-    starPassenger: { chance: 0.5, expireExitPasses: 3, progressTarget: 3 }
+    starPassenger: { chance: 0.5, expireExitPasses: 3, progressTarget: 20 }
   });
 }
 
@@ -61,9 +62,97 @@ test('star passenger mechanic randomly marks only some passengers with collectib
 
   assert.equal(state.starReward.enabled, true);
   assert.equal(state.starReward.coins, 0);
-  assert.equal(state.starReward.target, 3);
+  assert.equal(state.starReward.target, 20);
+  assert.equal(state.starReward.charge, 0);
+  assert.equal(state.starReward.completedCharges, 0);
   assert.equal(state.queueItems[0][0].starReward.active, true);
   assert.equal(state.queueItems[0][1].starReward, null);
+});
+
+test('star passenger starts with three visible exit passes', () => {
+  const game = makeStarGame([0.1, 0.8]);
+  const reward = game.snapshot().queueItems[0][0].starReward;
+
+  assert.equal(game.snapshot().starReward.target, 20);
+  assert.equal(reward.active, true);
+  assert.equal(reward.exitPasses, 0);
+  assert.equal(reward.remainingPasses, 3);
+  assert.equal(reward.decrementVersion, 0);
+});
+
+test('each exit crossing decrements the visible star lifetime once', () => {
+  const game = makeStarGame([0.1, 0.8]);
+  const slot = game.slots[0];
+  Object.assign(slot, {
+    colorIndex: 0,
+    passengerId: 1,
+    progress: 0.24,
+    previousProgress: 0.24,
+    starReward: {
+      active: true,
+      exitPasses: 0,
+      remainingPasses: 3,
+      decrementVersion: 0,
+      expired: false
+    }
+  });
+
+  game.update(0.02);
+  assert.equal(game.snapshot().slots[0].starReward.remainingPasses, 2);
+  assert.equal(game.snapshot().slots[0].starReward.decrementVersion, 1);
+
+  Object.assign(slot, { progress: 0.24, previousProgress: 0.24 });
+  game.update(0.02);
+  assert.equal(game.snapshot().slots[0].starReward.remainingPasses, 1);
+  assert.equal(game.snapshot().slots[0].starReward.decrementVersion, 2);
+
+  Object.assign(slot, { progress: 0.24, previousProgress: 0.24 });
+  game.update(0.02);
+  const expired = game.snapshot().slots[0].starReward;
+  assert.equal(expired.remainingPasses, 0);
+  assert.equal(expired.decrementVersion, 3);
+  assert.equal(expired.active, false);
+  assert.equal(expired.expired, true);
+});
+
+test('star charge completes at twenty and starts a new repeatable cycle', () => {
+  const runtime = createStarPassengerRuntime({
+    random: () => 0,
+    options: { progressTarget: 20 }
+  });
+  const game = { mechanicState: runtime.createState(), lastEvent: {} };
+
+  const collect = () => runtime.onPassengerBoarded({
+    game,
+    slot: {
+      passengerId: game.mechanicState.starReward.collected + 1,
+      starReward: {
+        active: true,
+        exitPasses: 0,
+        remainingPasses: 3,
+        decrementVersion: 0,
+        expired: false
+      }
+    }
+  });
+
+  for (let index = 0; index < 19; index += 1) collect();
+  assert.equal(game.mechanicState.starReward.coins, 19);
+  assert.equal(game.mechanicState.starReward.charge, 19);
+  assert.equal(game.mechanicState.starReward.completedCharges, 0);
+
+  const twentieth = collect();
+  assert.equal(twentieth.starChargeCompleted, true);
+  assert.equal(twentieth.starChargeRound, 1);
+  assert.equal(game.mechanicState.starReward.coins, 20);
+  assert.equal(game.mechanicState.starReward.charge, 0);
+  assert.equal(game.mechanicState.starReward.completedCharges, 1);
+
+  const twentyFirst = collect();
+  assert.equal(twentyFirst.starChargeCompleted, false);
+  assert.equal(game.mechanicState.starReward.coins, 21);
+  assert.equal(game.mechanicState.starReward.charge, 1);
+  assert.equal(game.mechanicState.starReward.completedCharges, 1);
 });
 
 test('star passenger gains one coin when boarding before the reward expires', () => {
