@@ -788,15 +788,16 @@ npm run build
 
 Expected: `git diff --check` exits 0; all focused tests pass; Vite build exits 0. The existing chunk-size warning is allowed.
 
-- [ ] **Step 3: Compare the historical game-model baseline**
+- [ ] **Step 3: Verify the repaired full-suite baseline**
 
 Run:
 
 ```bash
 node --test test/game-model.test.js
+pnpm test
 ```
 
-Expected baseline: 24 pass and the same 7 known failures documented in `docs/mechanic-lab-handoff.md`. Stop and investigate if the failure count or names change.
+Expected baseline: all 32 game-model tests pass. Then run `pnpm test` and require the full suite to remain at 83/83 or better. Stop and investigate any regression.
 
 - [ ] **Step 4: Perform desktop visual QA at the current preview URL**
 
@@ -873,4 +874,4 @@ git commit -m "docs: update star passenger feedback"
 - Every completed charge increments `completedCharges` and can trigger a new celebration.
 - Reset and mechanic switching clear timers, particles and classes.
 - Reduced-motion users still receive complete numeric and color feedback.
-- Focused tests and Vite build pass; the historical seven game-model failures do not change.
+- Focused tests, the 83/83 full-suite baseline, and the Vite build all pass.
