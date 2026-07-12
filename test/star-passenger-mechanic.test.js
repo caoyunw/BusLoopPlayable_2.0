@@ -209,6 +209,13 @@ test('star passenger UI shell exposes coin progress and collection effects', () 
   assert.doesNotMatch(html, /id="star-reward-hud"/);
   assert.match(mainSource, /createMechanicUiControllers/);
   assert.match(viewSource, /id = 'star-reward-hud'/);
+  assert.match(viewSource, /0\/20/);
+  assert.match(viewSource, /completedCharges/);
+  assert.match(viewSource, /spawnChargeCompleteEffect/);
+  assert.match(viewSource, /star-charge-celebration/);
+  assert.match(viewSource, /renderProgress\(reward\.charge/);
+  assert.match(viewSource, /Math\.max\(lastCompletedCharges, completedCharges\)/);
+  assert.match(viewSource, /celebrationTimer !== timerId/);
   assert.match(viewSource, /spawnStarRewardFlyEffect/);
   assert.match(sceneSource, /updateStarPassengerBadge/);
   assert.match(sceneSource, /remainingPasses/);
@@ -217,4 +224,8 @@ test('star passenger UI shell exposes coin progress and collection effects', () 
   assert.match(sceneSource, /starBadgeCountSprite/);
   assert.match(sceneSource, /starBadgeDecrementSprite/);
   assert.match(styles, /\.star-reward-fly/);
+  assert.match(styles, /\.star-charge-celebration/);
+  assert.match(styles, /\.star-charge-celebration\s*\{[^}]*pointer-events:\s*none/s);
+  assert.match(styles, /\.star-reward-hud\.is-charge-complete/);
+  assert.match(styles, /prefers-reduced-motion/);
 });
