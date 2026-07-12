@@ -5,16 +5,16 @@ BusLoop 机制实验台用于设计、接入和直接体验 BusLoop 玩法机制
 ## 启动与验证
 
 ```bash
-npm install
-npm run dev
-npm test
-npm run build
+pnpm install
+pnpm run dev
+pnpm test
+pnpm run build
 ```
 
-- `npm run dev`：启动 Vite 本地开发服务器。
-- `npm test`：运行 Node 测试。当前基线是 83/83 通过。
-- `npm run build`：生成生产构建到 `dist/`；当前构建通过，但有既有的非阻塞 chunk-size 警告。
-- `npm run apply:tuning`：将 `artifacts/scene-tuning.json` 合并到 authored scene tuning；仅在确认要固化调参时使用。
+- `pnpm run dev`：启动 Vite 本地开发服务器。
+- `pnpm test`：运行 Node 测试。当前基线是 86/86 通过。
+- `pnpm run build`：生成生产构建到 `dist/`；当前构建通过，但有既有的非阻塞 chunk-size 警告。
+- `pnpm run apply:tuning`：将 `artifacts/scene-tuning.json` 合并到 authored scene tuning；仅在确认要固化调参时使用。
 
 ## 界面
 
@@ -32,7 +32,7 @@ npm run build
 
 `base` 基础规则已经可试玩：点击无阻挡车辆进入停车位，同色乘客依次上车，满载车辆离场并释放停车位。
 
-`star-passenger` 星星乘客也已可试玩：随机乘客带星星标记，成功上车时获得金币充能；若该乘客在传送带上经过出口 3 次仍未上车，星星奖励消失但乘客保留。
+`star-passenger` 星星乘客也已可试玩：随机乘客带星星标记，星星上的 `3/2/1` 数字表示还可经过出口的次数，每次经过出口会显示 `-1`；成功上车时获得金币并推进 `0/20` 充能，充满后播放庆祝并开始下一轮。若第 3 次经过出口仍未上车，星星奖励消失但乘客保留。
 
 以下 15 个机制已登记为 `planned`，目前只提供说明入口，不会接收游戏输入：
 
@@ -93,7 +93,7 @@ npm run build
 
 场景编辑器常驻实验台运行时并默认折叠。调参覆盖保存在浏览器 `localStorage` 的 `bus-loop-scene-tuning-v3`；旧的 `v2` 数据会安全迁移。存储读取、写入和清除失败只会记录警告，不应阻止基础玩法启动。
 
-`src/main.js` 会在读取本地覆盖前克隆 `src/scene-tuning.js` 的 authored defaults，因此“恢复默认”始终回到源码配置，而不是当前会话已变更的对象。需要固化一组调参时，先导出到 `artifacts/scene-tuning.json`，再运行 `npm run apply:tuning` 并检查 diff。
+`src/main.js` 会在读取本地覆盖前克隆 `src/scene-tuning.js` 的 authored defaults，因此“恢复默认”始终回到源码配置，而不是当前会话已变更的对象。需要固化一组调参时，先导出到 `artifacts/scene-tuning.json`，再运行 `pnpm run apply:tuning` 并检查 diff。
 
 ## 范围说明
 
