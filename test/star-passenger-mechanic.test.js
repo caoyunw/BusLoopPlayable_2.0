@@ -211,5 +211,10 @@ test('star passenger UI shell exposes coin progress and collection effects', () 
   assert.match(viewSource, /id = 'star-reward-hud'/);
   assert.match(viewSource, /spawnStarRewardFlyEffect/);
   assert.match(sceneSource, /updateStarPassengerBadge/);
+  assert.match(sceneSource, /remainingPasses/);
+  assert.match(sceneSource, /decrementVersion/);
+  assert.match(sceneSource, /passengerId/);
+  assert.match(sceneSource, /starBadgeCountSprite/);
+  assert.match(sceneSource, /starBadgeDecrementSprite/);
   assert.match(styles, /\.star-reward-fly/);
 });

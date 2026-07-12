@@ -450,6 +450,61 @@ function makeVehiclePlaceholder(vehicle) {
   return root;
 }
 
+function makeStarBadgeLabel({ width = 96, height = 96, scaleX = 0.18, scaleY = 0.18 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(scaleX, scaleY, 1);
+  sprite.renderOrder = 84;
+  return { canvas, texture, sprite };
+}
+
+function drawStarBadgeCount(label, value) {
+  const context = label.canvas.getContext('2d');
+  if (!context) return;
+  const centerX = label.canvas.width / 2;
+  const centerY = label.canvas.height / 2;
+  context.clearRect(0, 0, label.canvas.width, label.canvas.height);
+  context.beginPath();
+  context.arc(centerX, centerY, 32, 0, Math.PI * 2);
+  context.fillStyle = '#e45139';
+  context.fill();
+  context.lineWidth = 9;
+  context.strokeStyle = '#ffffff';
+  context.stroke();
+  context.fillStyle = '#ffffff';
+  context.font = '900 48px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(String(value), centerX, centerY + 2);
+  if (label.texture) label.texture.needsUpdate = true;
+}
+
+function drawStarBadgeDecrement(label) {
+  const context = label.canvas.getContext('2d');
+  if (!context) return;
+  context.clearRect(0, 0, label.canvas.width, label.canvas.height);
+  context.font = '900 52px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.lineWidth = 10;
+  context.strokeStyle = '#ffffff';
+  context.strokeText('-1', label.canvas.width / 2, label.canvas.height / 2);
+  context.fillStyle = '#ef653e';
+  context.fillText('-1', label.canvas.width / 2, label.canvas.height / 2);
+  if (label.texture) label.texture.needsUpdate = true;
+}
+
 function makeStarBadge() {
   const shape = new THREE.Shape();
   const outerRadius = 0.15;
@@ -491,7 +546,25 @@ function makeStarBadge() {
   halo.rotation.x = -Math.PI / 2;
   halo.position.set(0, 0.575, -0.02);
   halo.renderOrder = 79;
-  root.add(halo, badge);
+  const countLabel = makeStarBadgeLabel();
+  countLabel.sprite.position.set(0.12, 0.66, 0.02);
+  countLabel.sprite.visible = false;
+
+  const decrementLabel = makeStarBadgeLabel({ width: 128, height: 96, scaleX: 0.24, scaleY: 0.18 });
+  drawStarBadgeDecrement(decrementLabel);
+  decrementLabel.sprite.position.set(0.28, 0.63, 0.02);
+  decrementLabel.sprite.visible = false;
+
+  root.add(halo, badge, countLabel.sprite, decrementLabel.sprite);
+  root.userData.starMesh = badge;
+  root.userData.haloMesh = halo;
+  root.userData.starBadgeCountSprite = countLabel.sprite;
+  root.userData.starBadgeCountLabel = countLabel;
+  root.userData.starBadgeDecrementSprite = decrementLabel.sprite;
+  root.userData.starBadgePassengerId = null;
+  root.userData.starBadgeRemainingPasses = null;
+  root.userData.starBadgeDecrementVersion = null;
+  root.userData.starBadgeDecrementStartedAt = -Infinity;
   root.visible = false;
   return root;
 }
@@ -1370,14 +1443,81 @@ export class SceneView {
     }
   }
 
-  updateStarPassengerBadge(view, reward, time = 0) {
+  updateStarPassengerBadge(view, reward, time = 0, passengerId = null) {
     const badge = view.userData.starBadge;
     if (!badge) return;
-    const visible = Boolean(reward?.active && !reward.expired);
-    badge.visible = visible;
-    if (!visible) return;
-    const pulse = 1 + Math.sin(time * 6) * 0.08;
-    badge.scale.setScalar(pulse);
+
+    const starMesh = badge.userData.starMesh;
+    const haloMesh = badge.userData.haloMesh;
+    const countSprite = badge.userData.starBadgeCountSprite;
+    const decrementSprite = badge.userData.starBadgeDecrementSprite;
+
+    if (!reward) {
+      badge.visible = false;
+      badge.scale.setScalar(1);
+      if (starMesh) starMesh.visible = false;
+      if (haloMesh) haloMesh.visible = false;
+      if (countSprite) countSprite.visible = false;
+      if (decrementSprite) {
+        decrementSprite.visible = false;
+        decrementSprite.position.y = 0.63;
+        if (decrementSprite.material) decrementSprite.material.opacity = 1;
+      }
+      badge.userData.starBadgePassengerId = null;
+      badge.userData.starBadgeRemainingPasses = null;
+      badge.userData.starBadgeDecrementVersion = null;
+      badge.userData.starBadgeDecrementStartedAt = -Infinity;
+      return;
+    }
+
+    const changedPassenger = badge.userData.starBadgePassengerId !== passengerId;
+    if (changedPassenger) {
+      badge.userData.starBadgePassengerId = passengerId;
+      badge.userData.starBadgeRemainingPasses = null;
+      badge.userData.starBadgeDecrementVersion = reward.decrementVersion ?? 0;
+      badge.userData.starBadgeDecrementStartedAt = -Infinity;
+      if (decrementSprite) {
+        decrementSprite.visible = false;
+        decrementSprite.position.y = 0.63;
+        if (decrementSprite.material) decrementSprite.material.opacity = 1;
+      }
+    } else if ((reward.decrementVersion ?? 0) > (badge.userData.starBadgeDecrementVersion ?? 0)) {
+      badge.userData.starBadgeDecrementVersion = reward.decrementVersion;
+      badge.userData.starBadgeDecrementStartedAt = time;
+    }
+
+    const remainingPasses = Math.max(0, reward.remainingPasses ?? 0);
+    const rewardVisible = Boolean(reward.active && !reward.expired && remainingPasses > 0);
+    const decrementElapsed = time - badge.userData.starBadgeDecrementStartedAt;
+    const showDecrement = decrementElapsed >= 0 && decrementElapsed < 0.65;
+
+    badge.visible = rewardVisible || showDecrement;
+    if (starMesh) starMesh.visible = rewardVisible;
+    if (haloMesh) haloMesh.visible = rewardVisible;
+    if (countSprite) countSprite.visible = rewardVisible;
+    if (decrementSprite) decrementSprite.visible = showDecrement;
+
+    if (rewardVisible && badge.userData.starBadgeRemainingPasses !== remainingPasses) {
+      badge.userData.starBadgeRemainingPasses = remainingPasses;
+      const countLabel = badge.userData.starBadgeCountLabel;
+      if (countLabel?.canvas) drawStarBadgeCount(countLabel, remainingPasses);
+    }
+
+    if (rewardVisible) {
+      const pulse = 1 + Math.sin(time * 6) * 0.08;
+      badge.scale.setScalar(pulse);
+    } else {
+      badge.scale.setScalar(1);
+    }
+
+    if (showDecrement && decrementSprite) {
+      const progress = decrementElapsed / 0.65;
+      decrementSprite.position.y = 0.63 + progress * 0.2;
+      if (decrementSprite.material) decrementSprite.material.opacity = 1 - progress;
+    } else if (decrementSprite) {
+      decrementSprite.position.y = 0.63;
+      if (decrementSprite.material) decrementSprite.material.opacity = 1;
+    }
   }
 
   applyTuning() {
@@ -1575,7 +1715,7 @@ export class SceneView {
       }
       this.setPassengerColor(view, slot.colorIndex);
       this.setPassengerAnimation(view, 'move', slot.index > 0 && slot.index % 2 === 0 ? 0.3 : 0);
-      this.updateStarPassengerBadge(view, slot.starReward, snapshot.time);
+      this.updateStarPassengerBadge(view, slot.starReward, snapshot.time, slot.passengerId);
     }
     this.pruneInitialEntryPathStates(activeInitialEntryKeys);
 
@@ -1614,7 +1754,7 @@ export class SceneView {
         view.rotation.y = Math.atan2(-queueVisual.tangent.x, -queueVisual.tangent.z) + passengerYaw;
         this.setPassengerColor(view, colorIndex);
         this.setPassengerAnimation(view, 'idle', (i % 4) * 0.17);
-        this.updateStarPassengerBadge(view, item.starReward, snapshot.time);
+        this.updateStarPassengerBadge(view, item.starReward, snapshot.time, item.id);
       }
     });
     this.pruneQueueEntryPathStates(queueSnapshots);
