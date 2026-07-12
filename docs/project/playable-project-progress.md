@@ -11,6 +11,12 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 - The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
 
+### Star-Passenger Feedback
+
+- Star badges show `3/2/1` remaining exit passes and one `-1` per crossing; the third crossing expires only the reward.
+- Boarding advances a repeatable `0/20` charge. Completion holds `20/20` during the celebration, resets to `0/20`, and continues at `1/20` on the next reward.
+- The feedback supports reduced motion. The design and implementation plans remain completed references.
+
 ### Advertising Cleanup And Runtime Assets
 
 - CTA/store routing, install gates, MRAID startup, advertising package scripts/checkers, generated package artifacts, and platform-specific runtime ownership were removed.
@@ -19,13 +25,13 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Full suite: `pnpm test` passed 83/83.
+- Full suite: `pnpm test` passed 88/88.
 - Production build: `pnpm run build` passed with the existing non-blocking chunk-size warning.
-- Browser visual QA passed on desktop 1440x1000 and mobile 390x844 using Playwright with system Edge: canvas pixel checks were nonblank, mobile library/editor drawers started collapsed, planned-mechanic overlays paused input, base gameplay click worked after returning from preview, and there were no console errors or failed HTTP responses.
+- Browser visual QA passed with system Edge on desktop and 390x844 mobile, including reduced-motion emulation. Star feedback remained readable, `20/20 -> 0/20 -> 1/20` completed correctly, celebration preserved pointer input and layout, and no console, page, or network errors occurred.
 
 ### Next Step
 
-Complete the approved [`2026-07-10-star-passenger-feedback.md`](../superpowers/plans/2026-07-10-star-passenger-feedback.md) plan before starting another mechanic. The plan covers the 3/2/1 remaining-pass badge, one `-1` per exit crossing, cyclic 0/20 charge, a one-second completion celebration, and desktop/mobile/reduced-motion browser QA.
+Plan and implement `question-passenger` next. Define the hidden-color and reveal rules, keep the registry entry `planned` during implementation, add focused coverage, preserve the 88/88 baseline, and complete desktop, 390x844 mobile, and reduced-motion QA before marking it `playable`. The [star-passenger design](../superpowers/specs/2026-07-10-star-passenger-feedback-design.md) and [implementation plan](../superpowers/plans/2026-07-10-star-passenger-feedback.md) remain completed references.
 
 ## Historical Playable/Advertising Log
 

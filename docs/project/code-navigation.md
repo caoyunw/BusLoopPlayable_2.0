@@ -9,6 +9,8 @@ Use this file before code changes. Pick the closest change area, then read only 
 | Mechanic identity, metadata, status, lookup, filtering | `src/mechanic-registry.js` | `test/mechanic-registry.test.js`, `src/mechanic-library.js` |
 | `?mechanic=` parsing/sync and safe storage removal | `src/mechanic-lab.js` | `test/mechanic-registry.test.js`, `src/main.js` |
 | Mechanic search, grouping, detail, selection, mobile drawer | `src/mechanic-library.js` | `test/mechanic-registry.test.js`, `src/styles.css`, `index.html` |
+| Star-passenger lifetime, cyclic charge, and boarding/expiration rules | `src/mechanics/star-passenger/model.js` | `src/mechanics/star-passenger/index.js`, `test/star-passenger-mechanic.test.js` |
+| Star-passenger HUD, celebration, and reduced-motion feedback | `src/mechanics/star-passenger/view.js` | `src/mechanics/star-passenger/styles.css`, `src/scene-view.js`, `test/star-passenger-mechanic.test.js` |
 | Lab bootstrap, base runtime assembly, mechanic pause/select, tuning storage, QA API | `src/main.js` | `src/mechanic-lab.js`, `src/mechanic-registry.js`, `index.html`, `test/game-model.test.js` |
 | Core gameplay rules, blockers, spots, queues, boarding, win/fail | `src/game-model.js` | `src/level-data.js`, `src/vehicle-motion.js`, `test/game-model.test.js` |
 | Level constants, fixed passenger sequence, vehicles, spots, runtime asset URLs | `src/level-data.js` | `src/game-model.js`, `src/scene-view.js`, `test/game-model.test.js` |
@@ -31,11 +33,11 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 - `index.html`: semantic lab shell. Owns `#mechanic-library`, `#stage`, `#game-canvas`, loading state, planned-mechanic overlay, end panel, and `#scene-editor` mount.
 - `package.json`: package identity and the active commands:
-  - `npm run dev`: Vite development server on localhost.
-  - `npm run build`: production Vite build.
-  - `npm run preview`: preview the production build.
-  - `npm test`: run all Node tests.
-  - `npm run apply:tuning`: apply exported editor tuning to authored source.
+  - `pnpm run dev`: Vite development server on localhost.
+  - `pnpm run build`: production Vite build.
+  - `pnpm run preview`: preview the production build.
+  - `pnpm test`: run all Node tests.
+  - `pnpm run apply:tuning`: apply exported editor tuning to authored source.
 - `scripts/apply-scene-tuning.mjs`: merges `artifacts/scene-tuning.json` or `--input` into `src/scene-tuning.js`.
 - `scripts/extract-unity-vat.mjs`: reads Unity VAT texture data and writes runtime texture bytes.
 - `tools/unity-vat-export/`: Unity helper project used to export VAT-compatible assets.
@@ -46,6 +48,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 - `src/mechanic-lab.js`: pure lab helpers. Owns query parsing, same-origin query replacement/sync, unknown-ID fallback through the registry, and exception-safe storage removal.
 - `src/mechanic-library.js`: mechanism browser UI. Owns search, unique primary-category grouping, status labels, detail rendering with `textContent`, active state, mobile collapse/focus behavior, viewport synchronization, and listener cleanup.
 - `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
+- `src/mechanics/star-passenger/`: completed star-passenger mechanic. `model.js` owns lifetime and charge state; `view.js` and `styles.css` own HUD, celebration, and reduced-motion feedback.
 
 ### Base Runtime
 
@@ -70,13 +73,14 @@ Use this file before code changes. Pick the closest change area, then read only 
 ### Tests
 
 - `test/mechanic-registry.test.js`: lab shell, CSS breakpoint contracts, library rendering/interactions/cleanup, registry completeness/freezing/filtering, URL helpers, and safe storage removal.
+- `test/star-passenger-mechanic.test.js`: star-passenger registry status, reward lifetime, cyclic charge, boarding/expiration behavior, UI wiring, and reduced-motion contracts.
 - `test/game-model.test.js`: base gameplay plus source/runtime contracts, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
 - `test/vehicle-effects.test.js`: ribbon, smoke, hit effects, particle motion, and editor-driven effect tuning.
 
 ## Known Test Baseline
 
-As of 2026-07-12, the full suite passes 83/83. `pnpm run build` passes with the existing non-blocking chunk-size warning.
+As of 2026-07-12, the full suite passes 88/88. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
 ## Historical Material
 

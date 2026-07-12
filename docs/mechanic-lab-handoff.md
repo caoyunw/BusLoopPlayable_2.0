@@ -209,6 +209,7 @@
 
 | 提交 | 内容 |
 | --- | --- |
+| `fe47753` | 让星星徽章与 `-1` 反馈遵循 reduced-motion，并补充测试。 |
 | `5ce51da` | 清理星星奖励反馈的边界行为与残留状态。 |
 | `2219daf` | 实现循环 `0/20` 充能与 `20/20` 庆祝。 |
 | `b8c913e` | 实现星星乘客 `3/2/1` 数字倒计时与每次 `-1` 反馈。 |
@@ -307,7 +308,7 @@ node --test test/game-model.test.js                   # [P29]
 ## 12. 当前验证基线
 
 - 注册表共有 17 个机制定义：2 个可试玩（`base`、`star-passenger`），15 个为 `planned`。
-- `pnpm test`：86/86 通过。
+- `pnpm test`：88/88 通过。
 - `pnpm run build`：通过，有既有的非阻塞 chunk-size 警告。
 - Edge 浏览器 QA：桌面、390×844 与 reduced-motion 均通过；已验证 `20/20 → 0/20 → 1/20`、车辆 pointer 命中、布局稳定，且无 console、page 或 network 错误。
 - 依赖缓存、意外系统文件和临时日志不是项目源文件，已被忽略。

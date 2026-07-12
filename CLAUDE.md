@@ -41,15 +41,17 @@ Web 运行优化资源放在 `public/assets/runtime/`；Unity 原始导出放在
 - 场景编辑器是实验台常驻能力，默认折叠。
 - 应先克隆 authored defaults，再合并浏览器本地覆盖，保证“恢复默认”可靠。
 - `localStorage` 是可选增强；读取、迁移、写入、清除失败不能阻塞启动。
-- 需要把调参固化到源码时，先检查导出 JSON，再使用 `npm run apply:tuning` 并审阅 diff。
+- 需要把调参固化到源码时，先检查导出 JSON，再使用 `pnpm run apply:tuning` 并审阅 diff。
 
 ## 测试基线
 
 2026-07-12 已确认：
 
 - 注册表共有 17 个机制定义：2 个可试玩（`base`、`star-passenger`），15 个为 `planned`。
-- 全量测试：83/83 通过。
+- 星星乘客反馈已完成，并通过桌面、390×844 手机和 reduced-motion 浏览器 QA。
+- 全量测试：88/88 通过。
 - 构建：通过，但有既有的非阻塞 chunk-size 警告。
+- 下一优先级是 `question-passenger`；星星乘客设计与实施计划仅作为已完成参考。
 
 修改机制时先跑最窄相关测试；涉及共享运行时、布局、配置或交付状态时，再跑全量测试和构建。
 

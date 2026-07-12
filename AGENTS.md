@@ -58,8 +58,10 @@ The current base runtime is composed from `game-model`, `level-data`, `scene-vie
 Verified baseline on 2026-07-12:
 
 - The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
-- Full `pnpm test`: 83/83 passing.
+- Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
+- Full `pnpm test`: 88/88 passing.
 - `pnpm run build`: passing with the existing non-blocking chunk-size warning.
+- The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
 Use the narrowest relevant tests while implementing, then run the full suite and build for cross-module or release-facing changes.
 
