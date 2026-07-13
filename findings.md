@@ -26,7 +26,7 @@
 - Runtime assets remain under `public/assets/runtime/`; Unity provenance assets remain under `public/assets/unity/`.
 - Runtime asset paths must use neutral names. Advertising platform names are not runtime ownership boundaries.
 - `src/level-data.js` is the primary asset URL inventory; `src/scene-view.js` directly owns the runtime guide-hand URL.
-- Existing FBXLoader material warnings remain. Four Unity texture references currently resolve to the HTML fallback rather than image bytes: `Idle_girl01_pink.png`, `img_v3_...fdg.png`, `Idle_boy02_blue.png`, and `Car_P2.png`; do not invent replacements without source assets.
+- Existing FBXLoader material warnings remain. Four Unity texture references currently resolve to the HTML fallback rather than image bytes: `Idle_girl01_pink.png`, `img_v3_0212c_69706fc5-c18e-4959-86cf-3f9625ee0fdg.png`, `Idle_boy02_blue.png`, and `Car_P2.png`; do not invent replacements without source assets.
 
 ### Persistent Editor And Authored Defaults
 

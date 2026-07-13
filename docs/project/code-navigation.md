@@ -48,11 +48,11 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ### Mechanic Lab
 
-- `src/mechanics/*/index.js`: owns each mechanic's identity, metadata, and status. `src/mechanics/index.js` assembles and freezes the 17 modules (3 playable and 14 planned), resolves playable runtimes, and delegates optional detail views.
+- `src/mechanics/*/index.js`: owns each mechanic's identity, metadata, status, and exported runtime/detail hooks.
 - `src/mechanic-registry.js`: derives an immutable metadata collection from `src/mechanics/index.js` and owns exact lookup, fallback to `base`, and text filtering; it does not own mechanic definitions.
 - `src/mechanic-lab.js`: pure lab helpers. Owns query parsing, same-origin query replacement/sync, unknown-ID fallback through the registry, and exception-safe storage removal.
 - `src/mechanic-library.js`: mechanism browser UI. Owns search, unique primary-category grouping, status labels, detail rendering with `textContent`, generic detail-extension mounting/cleanup, host-first selection with an idempotent active-state fallback, mobile collapse/focus behavior, viewport synchronization, and listener cleanup.
-- `src/mechanics/index.js`: immutable mechanic-module catalog plus exact module lookup, playable-runtime resolution, and optional generic detail-view factory delegation.
+- `src/mechanics/index.js`: assembles and freezes the 17-module catalog (3 playable and 14 planned), then owns exact module lookup, playable-runtime resolution, and optional generic detail-view factory delegation.
 - `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; owns page-local mechanic option defaults, generic detail-view commits from the current runtime snapshot, active-mechanic reset/queue reinitialization, and inactive-option HUD synchronization; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
 - `src/mechanics/star-passenger/`: completed star-passenger mechanic. `model.js` owns lifetime and charge state; `view.js` and `styles.css` own HUD, celebration, and reduced-motion feedback.
 - `src/mechanics/question-passenger/`: playable question-passenger module. `index.js` owns its definition/status and runtime/detail exports; `model.js` owns chance/authored assignment normalization and state metadata; `view.js` and `styles.css` own persistence-free detail mode/chance controls, normalized commit payloads, and authored-count summary.

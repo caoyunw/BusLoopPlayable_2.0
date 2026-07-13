@@ -36,7 +36,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 - `pnpm run build` passed with the existing non-blocking chunk-size warning.
 - In-app browser QA passed at 1280x720 and exactly 390x844: no planned overlay or horizontal overflow, chance 0/30/100%, rerolls, authored 132/438 fixed positions, session-only options, reset/switch/refresh behavior, mobile drawer controls, one-shot belt reveals, and scene-editor usability were exercised through real controls.
 - The in-app browser could not emulate native `prefers-reduced-motion`. A temporary exact source substitution forced the live reduced-motion branch; color/brightness/fade remained clear, transforms stayed fixed, and controls remained interactive. The source was immediately reverted and verified clean.
-- Error-level browser logs and page errors were absent. Existing FBXLoader material warnings remain, and four Unity texture references currently return the HTML fallback (`Idle_girl01_pink.png`, `img_v3_...fdg.png`, `Idle_boy02_blue.png`, `Car_P2.png`); the scene continues through existing fallback/material paths.
+- Error-level browser logs and page errors were absent. Existing FBXLoader material warnings remain, and four Unity texture references currently return the HTML fallback (`Idle_girl01_pink.png`, `img_v3_0212c_69706fc5-c18e-4959-86cf-3f9625ee0fdg.png`, `Idle_boy02_blue.png`, `Car_P2.png`); the scene continues through existing fallback/material paths.
 
 ### Next Step
 
