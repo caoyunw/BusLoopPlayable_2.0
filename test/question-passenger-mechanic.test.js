@@ -66,6 +66,10 @@ function assertClose(actual, expected, epsilon = 1e-9) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} to be within ${epsilon} of ${expected}`);
 }
 
+function advance(game, seconds, step = 0.05) {
+  for (let time = 0; time < seconds; time += step) game.update(step);
+}
+
 function makeVatView(material, colorIndex, hidden = null) {
   return {
     userData: {
@@ -193,6 +197,27 @@ test('authored mode uses only strict true masks and never calls random', () => {
   assert.equal(runtime.createQueueItemData({ queueIndex: 2, sourceIndex: 0 }).questionPassenger.hidden, false);
   assert.equal(runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 99 }).questionPassenger.hidden, false);
   assert.equal(randomCalls, 0);
+});
+
+test('authored summaries ignore mask entries beyond the actual passenger queues', () => {
+  const runtime = createQuestionPassengerRuntime({
+    level: {
+      passengerQueues: [[5]],
+      mechanics: {
+        'question-passenger': {
+          authoredMasks: [[true, true, false], [true]]
+        }
+      }
+    },
+    options: { mode: 'authored' }
+  });
+
+  assert.deepEqual(runtime.createState().questionPassenger, {
+    mode: 'authored',
+    chance: 0.3,
+    authoredMarked: 1,
+    authoredTotal: 1
+  });
 });
 
 test('authored masks require array rows from the exact configuration path', () => {
@@ -918,4 +943,91 @@ test('question-passenger runtime flows hidden queue metadata through game belt e
     wasHidden: true,
     revealVersion: 1
   });
+});
+
+test('chance mode rerolls hidden positions on reset without changing true queue colors', () => {
+  const drawsPerReset = LEVEL_1.queueCapacity * LEVEL_1.passengerQueues.length;
+  let randomCalls = 0;
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'question-passenger',
+    random: () => (randomCalls++ < drawsPerReset ? 0 : 1),
+    mechanics: {
+      'question-passenger': { mode: 'chance', chance: 0.5 }
+    }
+  });
+  const first = game.snapshot();
+
+  assert.equal(first.queueItems.flat().every((item) => item.questionPassenger.hidden), true);
+  const trueColors = first.queues;
+
+  game.reset();
+  const second = game.snapshot();
+
+  assert.equal(second.queueItems.flat().every((item) => !item.questionPassenger.hidden), true);
+  assert.deepEqual(second.queues, trueColors);
+  assert.equal(randomCalls, drawsPerReset * 2);
+});
+
+test('question passenger preserves matching, boarding, and vehicle departure rules', () => {
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'question-passenger',
+    random: () => 0,
+    mechanics: {
+      'question-passenger': { mode: 'chance', chance: 1 }
+    }
+  });
+
+  assert.equal(game.clickVehicle(1).ok, true);
+  advance(game, 0.8);
+  const vehicle = game.getVehicle(1);
+  assert.equal(vehicle.state, 'at-spot');
+
+  const before = vehicle.boardedGroups;
+  for (let index = 0; index < 300 && vehicle.boardedGroups === before; index += 1) {
+    game.update(0.05);
+  }
+
+  assert.ok(vehicle.boardedGroups > before);
+  assert.equal(game.snapshot().boardingEvents.at(-1).vehicleId, 1);
+  assert.equal(
+    game.snapshot().slots
+      .filter((slot) => slot.colorIndex !== null)
+      .every((slot) => slot.questionPassenger.hidden === false),
+    true
+  );
+
+  vehicle.boardedGroups = vehicle.seats - 1;
+  const slot = game.slots[0];
+  slot.colorIndex = vehicle.colorIndex;
+  slot.progress = LEVEL_1.exitStart;
+  game.update(0.01);
+  assert.equal(vehicle.state, 'boarding-final');
+
+  advance(game, SCENE_TUNING.vehicleDeparturePath.fullLoadDelay + 0.1);
+  assert.equal(vehicle.state, 'departing');
+  assert.equal(game.spots[0].vehicleId, null);
+});
+
+test('question passenger preserves base win and deadlock failure rules', () => {
+  const createGame = () => new BusLoopGame(LEVEL_1, {
+    mechanicId: 'question-passenger',
+    random: () => 0,
+    mechanics: {
+      'question-passenger': { mode: 'chance', chance: 1 }
+    }
+  });
+  const wonGame = createGame();
+  for (const vehicle of wonGame.vehicles) vehicle.state = 'done';
+  wonGame.checkEndState();
+  assert.equal(wonGame.status, 'won');
+
+  const lostGame = createGame();
+  for (let index = 0; index < lostGame.spots.length; index += 1) {
+    lostGame.spots[index].vehicleId = 1000 + index;
+  }
+  for (const queue of lostGame.sourceQueues) queue.length = 0;
+  for (const queue of lostGame.queues) queue.length = 0;
+  for (const slot of lostGame.slots) slot.colorIndex = 0;
+  lostGame.checkEndState();
+  assert.equal(lostGame.status, 'lost');
 });

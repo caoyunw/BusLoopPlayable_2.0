@@ -80,7 +80,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 ### Tests
 
 - `test/mechanic-registry.test.js`: lab shell, CSS breakpoint contracts, library rendering/interactions, host-first selection/fallback ordering, detail-extension state and cleanup, mechanic detail-view factory and question settings controls, playable-resolution/status totals, registry completeness/freezing/filtering, URL helpers, and safe storage removal.
-- `test/question-passenger-mechanic.test.js`: question-passenger assignment/state plus hidden material transitions, badge/cache reuse, one-shot reveal timing and reduced-motion behavior, tuning, and scene-wiring contracts.
+- `test/question-passenger-mechanic.test.js`: question-passenger assignment/state, authored-mask bounds, reset rerolls, base gameplay invariance, hidden material transitions, badge/cache reuse, one-shot reveal timing and reduced-motion behavior, tuning, and scene-wiring contracts.
 - `test/star-passenger-mechanic.test.js`: star-passenger registry status, reward lifetime, cyclic charge, boarding/expiration behavior, UI wiring, and reduced-motion contracts.
 - `test/game-model.test.js`: base gameplay plus reset-version behavior, active question-passenger startup/reconfiguration, source/runtime contracts, page-session mechanic detail/apply wiring, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
@@ -88,7 +88,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ## Known Test Baseline
 
-As of 2026-07-13, the full suite passes 138/138. `pnpm run build` passes with the existing non-blocking chunk-size warning. Question-passenger has passed desktop 1280x720 and mobile 390x844 browser QA; its live forced reduced-motion branch also passed, while native reduced-motion emulation was unavailable in the in-app browser. The next mechanic requires user selection from the 14 planned definitions.
+As of 2026-07-13, the full suite passes 142/142. `pnpm run build` passes with the existing non-blocking chunk-size warning. Question-passenger has passed desktop 1280x720 and mobile 390x844 browser QA; its live forced reduced-motion branch also passed, while native reduced-motion emulation was unavailable in the in-app browser. The next mechanic requires user selection from the 14 planned definitions.
 
 ## Historical Material
 

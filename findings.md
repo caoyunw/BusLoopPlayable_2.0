@@ -15,6 +15,7 @@
 
 - Question state changes waiting-stage visibility only. Real `colorIndex`, queue order, matching, boarding, vehicle departure, and win/fail rules remain unchanged.
 - `chance` mode assigns each new queue group independently and defaults to 0.3; reset rerolls question positions. `authored` mode reads only `level.mechanics['question-passenger'].authoredMasks`, does not call random, and the level12 mask marks 132/438 groups.
+- Authored summaries and assignments ignore mask rows/items beyond the actual `passengerQueues`; missing entries remain non-question groups.
 - Mode/chance controls are page-session state only: switching away and back retains them, while refresh restores chance/30%. They are not stored or added to the URL.
 - Active `setMechanicOptions` rebuilds the runtime and resets exactly once. Scene reveal de-duplication uses passenger ID plus `revealVersion`; `resetVersion` clears transient state when passenger IDs are reused.
 - Hidden waiting groups use a neutral-gray material and four question badges. Belt groups always show real color and receive one non-blocking reveal. The reduced-motion branch keeps color/brightness/fade while removing scale/pop/expanding-flash transforms.

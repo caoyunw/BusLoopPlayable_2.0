@@ -32,7 +32,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Focused question-passenger suite: 32/32 passed. Full `pnpm test`: 138/138 passed.
+- Focused question-passenger suite: 36/36 passed; focused question/registry gate: 69/69 passed. Full `pnpm test`: 142/142 passed.
 - `pnpm run build` passed with the existing non-blocking chunk-size warning.
 - In-app browser QA passed at 1280x720 and exactly 390x844: no planned overlay or horizontal overflow, chance 0/30/100%, rerolls, authored 132/438 fixed positions, session-only options, reset/switch/refresh behavior, mobile drawer controls, one-shot belt reveals, and scene-editor usability were exercised through real controls.
 - The in-app browser could not emulate native `prefers-reduced-motion`. A temporary exact source substitution forced the live reduced-motion branch; color/brightness/fade remained clear, transforms stayed fixed, and controls remained interactive. The source was immediately reverted and verified clean.

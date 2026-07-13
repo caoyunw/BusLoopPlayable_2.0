@@ -15,17 +15,21 @@ function getAuthoredMasks(level) {
   return Array.isArray(authoredMasks) ? authoredMasks : [];
 }
 
-function summarizeAuthoredMasks(authoredMasks) {
+function summarizeAuthoredMasks(authoredMasks, passengerQueues) {
   let authoredMarked = 0;
   let authoredTotal = 0;
 
-  for (const row of authoredMasks) {
+  for (const [queueIndex, row] of authoredMasks.entries()) {
     if (!Array.isArray(row)) {
       continue;
     }
 
-    authoredTotal += row.length;
-    authoredMarked += row.filter((value) => value === true).length;
+    const passengerQueue = Array.isArray(passengerQueues) ? passengerQueues[queueIndex] : null;
+    const relevantRow = Array.isArray(passengerQueues)
+      ? row.slice(0, Array.isArray(passengerQueue) ? passengerQueue.length : 0)
+      : row;
+    authoredTotal += relevantRow.length;
+    authoredMarked += relevantRow.filter((value) => value === true).length;
   }
 
   return { authoredMarked, authoredTotal };
@@ -35,7 +39,7 @@ export function createQuestionPassengerRuntime({ random = Math.random, level, op
   const mode = options.mode === 'authored' ? 'authored' : 'chance';
   const chance = normalizeChance(options.chance);
   const authoredMasks = getAuthoredMasks(level);
-  const authoredSummary = summarizeAuthoredMasks(authoredMasks);
+  const authoredSummary = summarizeAuthoredMasks(authoredMasks, level?.passengerQueues);
 
   return {
     id: 'question-passenger',

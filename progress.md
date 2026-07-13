@@ -14,7 +14,8 @@
 
 - Preactivation gate while planned: question 32/32, focused game/registry 11/11, and five syntax checks passed.
 - Activation tests were observed RED for planned-status fallback, then GREEN after the status-only production change.
-- Final focused question/registry gate, full `pnpm test` 138/138, `pnpm run build`, and `git diff --check` passed; build emitted only the known chunk-size warning.
+- Post-review focused question/registry gate passed 69/69 and full `pnpm test` passed 142/142; `pnpm run build` and `git diff --check` passed with only the known chunk-size warning.
+- Final review added regression coverage for reset rerolls, true-color preservation, boarding/departure, win/fail invariance, and authored-mask overflow; overflow is now ignored by both assignment and summary counts.
 - Browser QA passed at 1280x720 and 390x844 with real mode/range/reset/library/editor/drawer controls, no horizontal overflow, readable gray/badged queues, real-color belt passengers, rerolls, authored fixed positions, and more than five one-shot reveals.
 - Native reduced-motion emulation was unavailable in the in-app browser. A temporary exact substitution forced the live branch; color/brightness/fade remained clear, transforms stayed fixed, inputs worked, and the source was reverted cleanly.
 - Error-level logs and page errors were absent. Existing FBXLoader warnings and four Unity texture HTML-fallback references remain documented rather than treated as network-clean.
