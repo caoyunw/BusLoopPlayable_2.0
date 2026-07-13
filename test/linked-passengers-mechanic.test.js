@@ -9,6 +9,8 @@ import { createLinkedPassengerRuntime } from '../src/mechanics/linked-passengers
 import { LEVEL_1 } from '../src/level-data.js';
 import { BusLoopGame } from '../src/game-model.js';
 import * as mechanics from '../src/mechanics/index.js';
+import * as THREE from 'three';
+import { SceneView } from '../src/scene-view.js';
 
 function makeLevel(passengerQueues, authoredStarts = []) {
   return {
@@ -789,4 +791,92 @@ test('composite batch boarding preserves scalar runtime behavior and prefers bat
     batchCount: 2
   });
   assert.deepEqual(calls, ['scalar-7', 'batch-2']);
+});
+
+test('scene owns linked connector lifecycle and keeps reduced-motion visuals static', () => {
+  const sceneSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
+
+  assert.match(sceneSource, /linkedPassengerConnectors = new Map/);
+  assert.match(sceneSource, /makeLinkedPassengerBadgeTexture/);
+  assert.match(sceneSource, /syncLinkedPassengerConnectors/);
+  assert.match(sceneSource, /linkedPassenger\?\.chainId/);
+  assert.match(sceneSource, /reducedMotionQuery\?\.matches/);
+});
+
+test('connector segment spans the midpoint and distance between passenger rows', () => {
+  const segment = {
+    position: new THREE.Vector3(),
+    scale: new THREE.Vector3(1, 1, 1),
+    quaternion: new THREE.Quaternion()
+  };
+  const startRoot = { position: new THREE.Vector3(1, 0, 2) };
+  const endRoot = { position: new THREE.Vector3(4, 0, 6) };
+
+  const length = SceneView.prototype.positionLinkedConnectorSegment(
+    segment,
+    startRoot,
+    endRoot
+  );
+
+  assert.equal(length, 5);
+  assert.deepEqual(segment.position.toArray(), [2.5, 0.58, 4]);
+  assert.equal(segment.scale.y, 5);
+});
+
+test('connector sync renders only complete chains in one location and disposes stale records', () => {
+  const view = Object.create(SceneView.prototype);
+  const queueRoots = [0, 1, 2].map((x) => ({
+    visible: true,
+    position: new THREE.Vector3(x, 0, 0)
+  }));
+  const beltRoots = Array.from({ length: 3 }, (_, index) => ({
+    visible: index === 2,
+    position: new THREE.Vector3(index, 0, 1)
+  }));
+  const disposed = [];
+  const removed = [];
+  view.scene = { remove: (root) => removed.push(root) };
+  view.queuePassengerViews = [queueRoots];
+  view.passengerViews = beltRoots;
+  view.linkedPassengerConnectors = new Map();
+  view.reducedMotionQuery = { matches: true };
+  view.makeLinkedPassengerConnector = (length) => ({
+    length,
+    root: { visible: false, scale: new THREE.Vector3(4, 4, 4) },
+    segments: Array.from({ length: length - 1 }, () => ({
+      position: new THREE.Vector3(),
+      scale: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+      geometry: { dispose: () => disposed.push('geometry') },
+      material: { dispose: () => disposed.push('material') }
+    })),
+    badge: {
+      position: new THREE.Vector3(),
+      material: { opacity: 0, dispose: () => disposed.push('badge') }
+    }
+  });
+  const metadata = [0, 1, 2].map((memberIndex) => ({
+    chainId: 'linked-0-0',
+    length: 3,
+    memberIndex,
+    isHead: memberIndex === 0
+  }));
+  const completeQueue = metadata.map((linkedPassenger) => ({ linkedPassenger }));
+
+  view.syncLinkedPassengerConnectors({ slots: [] }, [completeQueue]);
+
+  const record = view.linkedPassengerConnectors.get('linked-0-0');
+  assert.ok(record);
+  assert.equal(record.root.visible, true);
+  assert.deepEqual(record.root.scale.toArray(), [1, 1, 1]);
+  assert.equal(record.badge.material.opacity, 1);
+  assert.deepEqual(record.badge.position.toArray(), [0, 0.88, 0]);
+
+  view.syncLinkedPassengerConnectors({
+    slots: [{ index: 2, linkedPassenger: metadata[2] }]
+  }, [[completeQueue[0], completeQueue[1]]]);
+
+  assert.equal(view.linkedPassengerConnectors.size, 0);
+  assert.deepEqual(disposed, ['geometry', 'material', 'geometry', 'material', 'badge']);
+  assert.deepEqual(removed, [record.root]);
 });

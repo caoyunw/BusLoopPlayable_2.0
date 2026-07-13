@@ -29,6 +29,9 @@ const deg = (value) => THREE.MathUtils.degToRad(value);
 const ARROW_OUTLINE_SCALE = 1.28;
 const GUIDE_HAND_TEXTURE_URL = '/assets/runtime/main-guide-hand_q80.webp';
 const QUESTION_PASSENGER_REVEAL_DURATION = 0.25;
+const LINKED_CONNECTOR_Y_OFFSET = 0.58;
+const LINKED_BADGE_Y_OFFSET = 0.88;
+const linkedPassengerBadgeTextures = new Map();
 const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
   { baseColor: 0xffffff, emissionColor: 0x36a6ff },
   { baseColor: 0xffffff, emissionColor: 0xadd98a },
@@ -44,6 +47,34 @@ const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
 ]);
 const scratchPassengerBaseColor = new THREE.Color();
 const scratchPassengerEmissionColor = new THREE.Color();
+
+function makeLinkedPassengerBadgeTexture(length) {
+  if (linkedPassengerBadgeTextures.has(length)) return linkedPassengerBadgeTextures.get(length);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#18352d';
+  context.strokeStyle = '#f6d967';
+  context.lineWidth = 10;
+  context.beginPath();
+  if (typeof context.roundRect === 'function') {
+    context.roundRect(12, 12, 232, 104, 28);
+  } else {
+    context.rect(12, 12, 232, 104);
+  }
+  context.fill();
+  context.stroke();
+  context.fillStyle = '#ffffff';
+  context.font = '800 66px Arial, sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(`×${length}`, 128, 67);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  linkedPassengerBadgeTextures.set(length, texture);
+  return texture;
+}
 
 function setPassengerMaterialMaps(material, map, emissiveMap) {
   const nextMap = map ?? null;
@@ -779,6 +810,7 @@ export class SceneView {
     this.vehicleColorTextures = [];
     this.vatTimeUniform = { value: 0 };
     this.boardingViews = [];
+    this.linkedPassengerConnectors = new Map();
     this.vehicleBoardingPulses = new Map();
     this.initialEntryPathStates = new Map();
     this.queueEntryPathStates = new Map();
@@ -2205,6 +2237,7 @@ export class SceneView {
       }
     });
     this.pruneQueueEntryPathStates(queueSnapshots);
+    this.syncLinkedPassengerConnectors(snapshot, queueSnapshots);
     this.processBoardingEvents(snapshot);
     this.updateBoardingViews(snapshot.time);
     this.vehicleEffects?.update(snapshot);
@@ -2421,7 +2454,152 @@ export class SceneView {
     }
   }
 
+  positionLinkedConnectorSegment(segment, startRoot, endRoot) {
+    const start = startRoot.position.clone();
+    const end = endRoot.position.clone();
+    start.y += LINKED_CONNECTOR_Y_OFFSET;
+    end.y += LINKED_CONNECTOR_Y_OFFSET;
+    const direction = end.clone().sub(start);
+    const length = direction.length();
+    segment.position.copy(start).add(end).multiplyScalar(0.5);
+    segment.scale.set(1, Math.max(0.001, length), 1);
+    if (length > 0) {
+      segment.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+    } else {
+      segment.quaternion.identity();
+    }
+    return length;
+  }
+
+  makeLinkedPassengerConnector(length) {
+    const root = new THREE.Group();
+    const segments = Array.from({ length: length - 1 }, () => {
+      const segment = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 1, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0xf6d967,
+          emissive: 0x5d4a08,
+          emissiveIntensity: 0.35,
+          roughness: 0.45
+        })
+      );
+      segment.renderOrder = 20;
+      root.add(segment);
+      return segment;
+    });
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeLinkedPassengerBadgeTexture(length),
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
+    }));
+    badge.scale.set(0.52, 0.26, 1);
+    badge.renderOrder = 21;
+    root.add(badge);
+    this.scene.add(root);
+    return { root, segments, badge, length };
+  }
+
+  disposeLinkedPassengerConnector(record) {
+    if (!record) return;
+    this.scene.remove(record.root);
+    for (const segment of record.segments ?? []) {
+      segment.geometry?.dispose();
+      segment.material?.dispose();
+    }
+    record.badge?.material?.dispose();
+  }
+
+  clearLinkedPassengerConnectors() {
+    for (const record of this.linkedPassengerConnectors.values()) {
+      this.disposeLinkedPassengerConnector(record);
+    }
+    this.linkedPassengerConnectors.clear();
+  }
+
+  syncLinkedPassengerConnectors(snapshot, queueSnapshots) {
+    const chains = new Map();
+    const collectMember = (linkedPassenger, root, location) => {
+      const chainId = linkedPassenger?.chainId;
+      if (!chainId || !root?.visible) return;
+      const chain = chains.get(chainId) ?? { members: [], location, mixedLocations: false };
+      if (chain.location !== location) chain.mixedLocations = true;
+      chain.members.push({ linkedPassenger, root });
+      chains.set(chainId, chain);
+    };
+
+    (queueSnapshots ?? []).forEach((queue, queueIndex) => {
+      queue.forEach((item, itemIndex) => {
+        collectMember(
+          item?.linkedPassenger,
+          this.queuePassengerViews[queueIndex]?.[itemIndex],
+          `queue-${queueIndex}`
+        );
+      });
+    });
+    for (const slot of snapshot.slots ?? []) {
+      collectMember(slot.linkedPassenger, this.passengerViews[slot.index], 'belt');
+    }
+
+    const activeChainIds = new Set();
+    for (const [chainId, chain] of chains) {
+      const expectedLength = chain.members[0]?.linkedPassenger.length;
+      chain.members.sort((left, right) => (
+        left.linkedPassenger.memberIndex - right.linkedPassenger.memberIndex
+      ));
+      const isComplete = !chain.mixedLocations
+        && Number.isInteger(expectedLength)
+        && expectedLength >= 2
+        && chain.members.length === expectedLength
+        && chain.members.every(({ linkedPassenger }, memberIndex) => (
+          linkedPassenger.chainId === chainId
+          && linkedPassenger.length === expectedLength
+          && linkedPassenger.memberIndex === memberIndex
+          && linkedPassenger.isHead === (memberIndex === 0)
+        ));
+      if (!isComplete) continue;
+
+      let record = this.linkedPassengerConnectors.get(chainId);
+      if (record && record.length !== expectedLength) {
+        this.disposeLinkedPassengerConnector(record);
+        this.linkedPassengerConnectors.delete(chainId);
+        record = null;
+      }
+      if (!record) {
+        record = this.makeLinkedPassengerConnector(expectedLength);
+        this.linkedPassengerConnectors.set(chainId, record);
+      }
+      for (let index = 0; index < record.segments.length; index += 1) {
+        this.positionLinkedConnectorSegment(
+          record.segments[index],
+          chain.members[index].root,
+          chain.members[index + 1].root
+        );
+      }
+      const headPosition = chain.members[0].root.position;
+      record.badge.position.set(
+        headPosition.x,
+        headPosition.y + LINKED_BADGE_Y_OFFSET,
+        headPosition.z
+      );
+      record.root.visible = true;
+      record.root.scale.set(1, 1, 1);
+      if (record.badge.material) record.badge.material.opacity = 1;
+      activeChainIds.add(chainId);
+    }
+
+    for (const [chainId, record] of this.linkedPassengerConnectors) {
+      if (activeChainIds.has(chainId)) continue;
+      this.disposeLinkedPassengerConnector(record);
+      this.linkedPassengerConnectors.delete(chainId);
+    }
+  }
+
   clearBoardingViews() {
+    this.clearLinkedPassengerConnectors();
     for (const entry of this.boardingViews) {
       this.scene.remove(entry.root);
       entry.material.dispose();
