@@ -154,7 +154,18 @@ export function createCompositeRuntime(runtimes) {
     },
 
     onPassengerBatchBoarded(context) {
-      return mergeObjects(runtimes, 'onPassengerBatchBoarded', [context]);
+      return Object.assign(
+        {},
+        ...runtimes.map((runtime) => {
+          if (typeof runtime.onPassengerBatchBoarded === 'function') {
+            return runtime.onPassengerBatchBoarded(context) ?? {};
+          }
+          return runtime.onPassengerBoarded?.({
+            ...context,
+            slot: context.slots?.[0]
+          }) ?? {};
+        })
+      );
     },
 
     clearSlotData(context) {

@@ -43,6 +43,41 @@ function isDenseQueuePrefix(queue, batch) {
   return true;
 }
 
+function isDenseSlotBatch(slots, batch, headSlot) {
+  if (!Array.isArray(batch) || batch.length === 0 || batch[0] !== headSlot) return false;
+  const seen = new Set();
+  for (let index = 0; index < batch.length; index += 1) {
+    if (!Object.hasOwn(batch, index)) return false;
+    const candidate = batch[index];
+    if (
+      !candidate
+      || !Number.isInteger(candidate.index)
+      || slots[candidate.index] !== candidate
+      || seen.has(candidate)
+    ) return false;
+    seen.add(candidate);
+  }
+  const chain = headSlot.linkedPassenger;
+  if (!chain) return batch.every((candidate) => !candidate.linkedPassenger);
+  if (
+    !chain.isHead
+    || chain.memberIndex !== 0
+    || !Number.isInteger(chain.length)
+    || chain.length !== batch.length
+  ) return false;
+  for (let memberIndex = 0; memberIndex < batch.length; memberIndex += 1) {
+    const member = batch[memberIndex].linkedPassenger;
+    if (
+      !member
+      || member.chainId !== chain.chainId
+      || member.length !== chain.length
+      || member.memberIndex !== memberIndex
+      || member.isHead !== (memberIndex === 0)
+    ) return false;
+  }
+  return true;
+}
+
 function visualToVehicleAreaPoint(x, z) {
   const area = SCENE_TUNING.vehicleArea;
   const unitScale = area.positionUnitScale ?? LEVEL_1.mapScale;
@@ -275,7 +310,13 @@ export class BusLoopGame {
         entryMotion: slot.entryMotion ? { ...slot.entryMotion } : null,
         ...this.cloneMechanicSlotSnapshot(slot)
       })),
-      boardingEvents: this.boardingEvents.map((event) => ({ ...event })),
+      boardingEvents: this.boardingEvents.map((event) => ({
+        ...event,
+        passengerIds: event.passengerIds ? [...event.passengerIds] : undefined,
+        slotIndices: event.slotIndices ? [...event.slotIndices] : undefined,
+        progresses: event.progresses ? [...event.progresses] : undefined,
+        linkedPassenger: event.linkedPassenger ? { ...event.linkedPassenger } : undefined
+      })),
       ...this.decorateMechanicSnapshot(),
       lastEvent: { ...this.lastEvent },
       remainingGroups: this.getRemainingGroups(),
@@ -520,48 +561,12 @@ export class BusLoopGame {
       if (slot.colorIndex === null) continue;
       const crossedExit = this.crossedPoint(slot.previousProgress, slot.progress, this.level.exitStart);
       const inExit = this.inExitRange(slot.progress);
-      const vehicle = inExit ? this.findBoardableVehicle(slot.colorIndex) : null;
-      if (!vehicle) {
-        if (crossedExit) {
-          changed = Boolean(this.mechanicRuntime.onPassengerExitPassed?.({ game: this, slot })) || changed;
-        }
+      if (inExit && this.tryBoardPassengerBatch(slot)) {
+        changed = true;
         continue;
       }
-      const colorIndex = slot.colorIndex;
-      const passengerId = slot.passengerId;
-      const mechanicBoardingEvent = this.mechanicRuntime.onPassengerBoarded?.({
-        game: this,
-        slot,
-        vehicle
-      }) ?? {};
-      this.boardingEvents.push({
-        id: ++this.boardingEventId,
-        vehicleId: vehicle.id,
-        spotIndex: vehicle.spotIndex,
-        colorIndex,
-        passengerId,
-        ...mechanicBoardingEvent,
-        slotIndex: slot.index,
-        progress: slot.progress,
-        startedAt: this.time
-      });
-      if (this.boardingEvents.length > 24) this.boardingEvents.shift();
-      slot.colorIndex = null;
-      slot.passengerId = null;
-      slot.entryIndex = null;
-      slot.entryMotion = null;
-      this.mechanicRuntime.clearSlotData?.({ game: this, slot });
-      vehicle.boardedGroups += 1;
-      this.lastEvent = {
-        type: 'group-boarded', vehicleId: vehicle.id, colorIndex,
-        boardedGroups: vehicle.boardedGroups,
-        passengerId,
-        ...mechanicBoardingEvent
-      };
-      changed = true;
-      if (vehicle.boardedGroups >= vehicle.seats) {
-        Object.assign(vehicle, { state: 'boarding-final', motion: 0 });
-        this.lastEvent = { type: 'vehicle-boarding-final', vehicleId: vehicle.id };
+      if (crossedExit) {
+        changed = Boolean(this.mechanicRuntime.onPassengerExitPassed?.({ game: this, slot })) || changed;
       }
     }
 
@@ -837,23 +842,103 @@ export class BusLoopGame {
       : progress >= exitStart || progress <= exitEnd;
   }
 
-  findBoardableVehicle(colorIndex) {
+  getBoardingBatch(slot) {
+    const batch = this.mechanicRuntime.getBoardingBatch?.({
+      game: this,
+      slot,
+      slots: this.slots
+    }) ?? [slot];
+    return isDenseSlotBatch(this.slots, batch, slot) ? batch : [];
+  }
+
+  tryBoardPassengerBatch(slot) {
+    const batch = this.getBoardingBatch(slot);
+    if (batch.length === 0) return false;
+    const colorIndex = batch[0].colorIndex;
+    if (
+      colorIndex === null
+      || batch.some((candidate) => candidate.colorIndex !== colorIndex)
+    ) return false;
+    const vehicle = this.findBoardableVehicle(colorIndex, batch.length);
+    if (!vehicle) return false;
+
+    const passengerIds = batch.map((candidate) => candidate.passengerId);
+    const slotIndices = batch.map((candidate) => candidate.index);
+    const progresses = batch.map((candidate) => candidate.progress);
+    const mechanicBoardingEvent = this.mechanicRuntime.onPassengerBatchBoarded?.({
+      game: this,
+      slots: batch,
+      vehicle
+    }) ?? this.mechanicRuntime.onPassengerBoarded?.({
+      game: this,
+      slot: batch[0],
+      vehicle
+    }) ?? {};
+    this.boardingEvents.push({
+      id: ++this.boardingEventId,
+      vehicleId: vehicle.id,
+      spotIndex: vehicle.spotIndex,
+      colorIndex,
+      passengerId: passengerIds[0],
+      passengerIds,
+      ...mechanicBoardingEvent,
+      slotIndex: slotIndices[0],
+      slotIndices,
+      progress: progresses[0],
+      progresses,
+      groupCount: batch.length,
+      startedAt: this.time
+    });
+    if (this.boardingEvents.length > 24) this.boardingEvents.shift();
+
+    for (const candidate of batch) {
+      candidate.colorIndex = null;
+      candidate.passengerId = null;
+      candidate.entryIndex = null;
+      candidate.entryMotion = null;
+      this.mechanicRuntime.clearSlotData?.({ game: this, slot: candidate });
+    }
+    vehicle.boardedGroups += batch.length;
+    this.lastEvent = {
+      type: 'group-boarded',
+      vehicleId: vehicle.id,
+      colorIndex,
+      boardedGroups: vehicle.boardedGroups,
+      passengerId: passengerIds[0],
+      passengerIds,
+      groupCount: batch.length,
+      ...mechanicBoardingEvent
+    };
+    if (vehicle.boardedGroups >= vehicle.seats) {
+      Object.assign(vehicle, { state: 'boarding-final', motion: 0 });
+      this.lastEvent = { type: 'vehicle-boarding-final', vehicleId: vehicle.id };
+    }
+    return true;
+  }
+
+  findBoardableVehicle(colorIndex, requiredGroups = 1) {
     for (const spot of this.spots) {
       if (spot.vehicleId === null) continue;
       const vehicle = this.getVehicle(spot.vehicleId);
+      const freeGroups = vehicle ? vehicle.seats - vehicle.boardedGroups : 0;
       if (
         vehicle?.state === 'at-spot' &&
         vehicle.colorIndex === colorIndex &&
-        vehicle.boardedGroups < vehicle.seats
+        freeGroups >= requiredGroups
       ) return vehicle;
     }
     return null;
   }
 
   hasBoardablePassenger() {
-    return this.slots.some((slot) => (
-      slot.colorIndex !== null && this.findBoardableVehicle(slot.colorIndex) !== null
-    ));
+    return this.slots.some((slot) => {
+      if (slot.colorIndex === null) return false;
+      const batch = this.getBoardingBatch(slot);
+      if (batch.length === 0) return false;
+      const colorIndex = batch[0].colorIndex;
+      if (batch.some((candidate) => candidate.colorIndex !== colorIndex)) return false;
+      return this.findBoardableVehicle(colorIndex, batch.length) !== null;
+    });
   }
 
   checkEndState() {

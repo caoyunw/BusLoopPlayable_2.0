@@ -448,3 +448,150 @@ test('update keeps a blocked chain queued and emits the end of fast initial fill
   assert.equal(game.slots[3].colorIndex, null);
   assert.equal(game.slots[4].colorIndex, 9);
 });
+
+function prepareVehicle(game, boardedGroups) {
+  const vehicle = game.getVehicle(1);
+  Object.assign(vehicle, { state: 'at-spot', spotIndex: 0, boardedGroups });
+  game.spots[0].vehicleId = vehicle.id;
+  return vehicle;
+}
+
+test('linked passengers loop as a whole when the matching vehicle lacks group capacity', () => {
+  const game = makeLinkedGame(makeGameLevel({ seats: 4 }));
+  game.initializeQueues([3], 0.5, [2], 1);
+  game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 });
+  const vehicle = prepareVehicle(game, 2);
+  for (const slotIndex of [0, 4, 3]) {
+    game.slots[slotIndex].progress = 0.6;
+    game.slots[slotIndex].previousProgress = 0.6;
+  }
+  assert.equal(game.hasBoardablePassenger(), false);
+
+  game.update(0);
+
+  assert.equal(vehicle.boardedGroups, 2);
+  assert.deepEqual([0, 4, 3].map((index) => game.slots[index].colorIndex), [0, 0, 0]);
+  assert.equal(game.snapshot().boardingEvents.length, 0);
+});
+
+test('linked passengers board atomically and emit one deeply cloned aggregate event', () => {
+  const game = makeLinkedGame(makeGameLevel({ seats: 4 }));
+  game.initializeQueues([3], 0.5, [2], 1);
+  const expectedPassengerIds = game.snapshot().queueItems[0].map((item) => item.id);
+  game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 });
+  const vehicle = prepareVehicle(game, 1);
+  for (const slotIndex of [0, 4, 3]) {
+    game.slots[slotIndex].progress = 0.6;
+    game.slots[slotIndex].previousProgress = 0.6;
+  }
+  assert.equal(game.hasBoardablePassenger(), true);
+
+  game.update(0);
+
+  const event = game.snapshot().boardingEvents.at(-1);
+  assert.equal(vehicle.boardedGroups, 4);
+  assert.equal(vehicle.state, 'boarding-final');
+  assert.equal(event.groupCount, 3);
+  assert.deepEqual(event.passengerIds, expectedPassengerIds);
+  assert.deepEqual(event.slotIndices, [0, 4, 3]);
+  assert.deepEqual(event.progresses.map((value) => Number(value.toFixed(6))), [0.6, 0.6, 0.6]);
+  assert.equal(event.linkedPassenger.length, 3);
+  assert.deepEqual([0, 4, 3].map((index) => game.slots[index].colorIndex), [null, null, null]);
+
+  event.passengerIds.push(99);
+  event.slotIndices.push(2);
+  event.progresses[0] = 0;
+  event.linkedPassenger.length = 99;
+  const freshEvent = game.snapshot().boardingEvents.at(-1);
+  assert.deepEqual(freshEvent.passengerIds, expectedPassengerIds);
+  assert.deepEqual(freshEvent.slotIndices, [0, 4, 3]);
+  assert.deepEqual(freshEvent.progresses.map((value) => Number(value.toFixed(6))), [0.6, 0.6, 0.6]);
+  assert.equal(freshEvent.linkedPassenger.length, 3);
+});
+
+test('invalid runtime boarding batches leave slots vehicles and events unchanged', () => {
+  const cases = [
+    {
+      name: 'sparse',
+      getBatch(slots) {
+        const batch = Array(2);
+        batch[0] = slots[0];
+        return batch;
+      }
+    },
+    { name: 'foreign', getBatch: () => [{ index: 0, colorIndex: 0, passengerId: 999 }] },
+    { name: 'duplicate', getBatch: (slots) => [slots[0], slots[0]] },
+    { name: 'partial-chain', getBatch: (slots) => [slots[0]] }
+  ];
+
+  for (const fixture of cases) {
+    const game = makeLinkedGame(makeGameLevel({ seats: 4 }));
+    game.initializeQueues([3], 0.5, [2], 1);
+    game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 });
+    const vehicle = prepareVehicle(game, 0);
+    for (const slotIndex of [0, 4, 3]) {
+      game.slots[slotIndex].progress = 0.6;
+      game.slots[slotIndex].previousProgress = 0.6;
+    }
+    const beforeColors = game.slots.map((slot) => slot.colorIndex);
+    const beforePassengerIds = game.slots.map((slot) => slot.passengerId);
+    game.mechanicRuntime.getBoardingBatch = ({ slots }) => fixture.getBatch(slots);
+
+    game.update(0);
+
+    assert.deepEqual(game.slots.map((slot) => slot.colorIndex), beforeColors, fixture.name);
+    assert.deepEqual(game.slots.map((slot) => slot.passengerId), beforePassengerIds, fixture.name);
+    assert.equal(vehicle.boardedGroups, 0, fixture.name);
+    assert.equal(game.snapshot().boardingEvents.length, 0, fixture.name);
+  }
+});
+
+test('an incomplete linked chain cannot board or mutate its remaining members', () => {
+  const game = makeLinkedGame(makeGameLevel({ seats: 4 }));
+  game.initializeQueues([3], 0.5, [2], 1);
+  game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 });
+  const vehicle = prepareVehicle(game, 0);
+  for (const slotIndex of [0, 4, 3]) {
+    game.slots[slotIndex].progress = 0.6;
+    game.slots[slotIndex].previousProgress = 0.6;
+  }
+  game.slots[3].linkedPassenger.chainId = 'broken-chain';
+  const beforeColors = game.slots.map((slot) => slot.colorIndex);
+
+  game.update(0);
+
+  assert.deepEqual(game.slots.map((slot) => slot.colorIndex), beforeColors);
+  assert.equal(vehicle.boardedGroups, 0);
+  assert.equal(game.snapshot().boardingEvents.length, 0);
+});
+
+test('composite batch boarding preserves scalar runtime behavior and prefers batch hooks', () => {
+  const calls = [];
+  const composite = mechanics.createCompositeRuntime([
+    {
+      id: 'scalar',
+      onPassengerBoarded({ slot }) {
+        calls.push(`scalar-${slot.passengerId}`);
+        return { scalarPassengerId: slot.passengerId };
+      }
+    },
+    {
+      id: 'batch',
+      onPassengerBoarded() {
+        calls.push('unexpected-scalar');
+        return { wrong: true };
+      },
+      onPassengerBatchBoarded({ slots }) {
+        calls.push(`batch-${slots.length}`);
+        return { batchCount: slots.length };
+      }
+    }
+  ]);
+  const slots = [{ passengerId: 7 }, { passengerId: 8 }];
+
+  assert.deepEqual(composite.onPassengerBatchBoarded({ slots }), {
+    scalarPassengerId: 7,
+    batchCount: 2
+  });
+  assert.deepEqual(calls, ['scalar-7', 'batch-2']);
+});
