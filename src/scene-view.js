@@ -751,6 +751,7 @@ export class SceneView {
     this.vehiclePathLines = [];
     this.vehicleDeparturePathLines = [];
     this.lastSnapshot = null;
+    this.lastSeenResetVersion = null;
     this.lastGame = null;
     this.buildWorld();
     this.applyTuning();
@@ -1675,6 +1676,15 @@ export class SceneView {
     this.setQuestionPassengerBadgesVisible(view, false);
   }
 
+  syncQuestionPassengerRevealResetVersion(resetVersion) {
+    if (this.lastSeenResetVersion === resetVersion) return false;
+    this.lastSeenResetVersion = resetVersion;
+    for (const view of this.passengerViews ?? []) {
+      this.resetQuestionPassengerReveal(view);
+    }
+    return true;
+  }
+
   resetPassengerAppearance(view) {
     this.resetQuestionPassengerReveal(view);
     view.userData.colorIndex = null;
@@ -1833,6 +1843,7 @@ export class SceneView {
   }
 
   update(snapshot, game) {
+    this.syncQuestionPassengerRevealResetVersion(snapshot.resetVersion);
     const previousUpdateTime = this.lastSnapshot?.time ?? snapshot.time;
     const visualDelta = Math.max(0, Math.min(snapshot.time - previousUpdateTime, 0.1));
     this.lastSnapshot = snapshot;

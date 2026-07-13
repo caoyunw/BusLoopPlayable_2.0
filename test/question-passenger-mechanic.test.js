@@ -469,6 +469,34 @@ test('resetQuestionPassengerReveal clears all transient state and badge opacity'
   assert.equal(badges.every((badge) => !badge.visible && badge.material.opacity === 1), true);
 });
 
+test('reset generation clears reveal deduplication before reused passenger ids render', () => {
+  const { view, flash } = makeRevealView();
+  const scene = {
+    ...makeRevealScene(),
+    passengerViews: [view],
+    lastSeenResetVersion: null,
+    resetQuestionPassengerReveal: SceneView.prototype.resetQuestionPassengerReveal
+  };
+  const state = { wasHidden: true, revealVersion: 1 };
+
+  SceneView.prototype.syncQuestionPassengerRevealResetVersion.call(scene, 1);
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 7, 1);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 7);
+
+  SceneView.prototype.syncQuestionPassengerRevealResetVersion.call(scene, 1);
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 7.1, 1);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 7);
+
+  SceneView.prototype.syncQuestionPassengerRevealResetVersion.call(scene, 2);
+  assert.equal(view.userData.questionPassengerId, null);
+  assert.equal(view.userData.questionPassengerRevealVersion, null);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, -Infinity);
+  assert.equal(flash.visible, false);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 0.2, 1);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 0.2);
+});
+
 test('scene caches hidden appearance and restores fallback or Unity colors without leaking badges', () => {
   const appearance = getSourceSection(
     '  setPassengerAppearance(view, colorIndex, hidden = false)',
@@ -498,6 +526,19 @@ test('scene keeps queue questions hidden, belt colors real, and clears reused in
   assert.match(update, /this\.setPassengerAppearance\(view, colorIndex, Boolean\(item\.questionPassenger\?\.hidden\)\)/);
   assert.doesNotMatch(queueUpdate, /updateQuestionPassengerReveal/);
   assert.equal((update.match(/this\.resetPassengerAppearance\(view\)/g) ?? []).length, 2);
+});
+
+test('scene synchronizes reset generations before processing snapshot time or slots', () => {
+  const update = getSourceSection('  update(snapshot, game)', '  updateGuideHandTuning()');
+  const syncIndex = update.indexOf(
+    'this.syncQuestionPassengerRevealResetVersion(snapshot.resetVersion)'
+  );
+  const timeIndex = update.indexOf('const previousUpdateTime');
+  const slotsIndex = update.indexOf('for (const slot of snapshot.slots)');
+
+  assert.ok(syncIndex >= 0);
+  assert.ok(syncIndex < timeIndex);
+  assert.ok(syncIndex < slotsIndex);
 });
 
 test('question reveal scene contract uses one shared radial texture and exact duration', () => {

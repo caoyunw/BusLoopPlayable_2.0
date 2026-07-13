@@ -109,6 +109,7 @@ export class BusLoopGame {
       ...(options.mechanics ?? {}),
       ...(options.starPassenger ? { 'star-passenger': options.starPassenger } : {})
     };
+    this.resetVersion = 0;
     this.configureMechanic(options.mechanicId);
     this.reset();
   }
@@ -146,6 +147,7 @@ export class BusLoopGame {
   }
 
   reset() {
+    this.resetVersion += 1;
     this.time = 0;
     this.status = 'playing';
     this.speedMultiplier = 1;
@@ -221,6 +223,7 @@ export class BusLoopGame {
   snapshot() {
     return {
       time: this.time,
+      resetVersion: this.resetVersion,
       status: this.status,
       speedMultiplier: this.speedMultiplier,
       initialFillActive: this.initialFillActive,

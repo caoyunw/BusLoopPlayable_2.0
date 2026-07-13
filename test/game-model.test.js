@@ -237,6 +237,25 @@ test('active mechanic options reconfigure and inactive options are retained with
   assert.equal(game.mechanicState.starReward.charge, 2);
 });
 
+test('resetVersion advances exactly once for explicit and active mechanic resets', () => {
+  const game = new BusLoopGame(LEVEL_1);
+  const initialVersion = game.snapshot().resetVersion;
+
+  assert.equal(initialVersion, 1);
+  game.reset();
+  assert.equal(game.snapshot().resetVersion, initialVersion + 1);
+
+  assert.equal(game.setMechanic('star-passenger'), true);
+  assert.equal(game.snapshot().resetVersion, initialVersion + 2);
+
+  assert.equal(game.setMechanicOptions('star-passenger', { progressTarget: 7 }), true);
+  assert.equal(game.snapshot().resetVersion, initialVersion + 3);
+
+  assert.equal(game.setMechanicOptions('question-passenger', { chance: 0.75 }), false);
+  assert.equal(game.setMechanic('star-passenger'), false);
+  assert.equal(game.snapshot().resetVersion, initialVersion + 3);
+});
+
 test('both DualQueue2 entrances feed the shared conveyor', () => {
   const game = new BusLoopGame();
   advance(game, 1);
