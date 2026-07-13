@@ -56,6 +56,51 @@ const LEVEL12_PASSENGER_QUEUES = Object.freeze([
   ])
 ]);
 
+const LEVEL12_QUESTION_PASSENGER_MASKS = Object.freeze([
+  Object.freeze([
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true, false, false, true, false, false, false, true, false, false,
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true, false, false, true, false, false, false, true, false, false,
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true, false, false, true, false, false, false, true, false, false,
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false
+  ]),
+  Object.freeze([
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true, false, false, true, false, false, false, true, false, false,
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true, false, false, true, false, false, false, true, false, false,
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true, false, false, true, false, false, false, true, false, false,
+    true, false, false, true, false, false, false, true, false, false, true, false,
+    false, true, false, false, false, true, false, false, true, false, false, true,
+    false, false, false, true, false, false, true, false, false, true, false, false,
+    false, true, false, false, true, false, false, true, false, false, false, true,
+    false, false, true
+  ])
+]);
+
 function decodeUnityInt32Hex(hex) {
   const values = [];
   for (let offset = 0; offset < hex.length; offset += 8) {
@@ -297,6 +342,11 @@ export const LEVEL_1 = Object.freeze({
   passengerSequence: PASSENGER_SEQUENCE,
   // level12.asset provides fixed passenger entries for both DualQueue2 queues.
   passengerQueues: LEVEL12_PASSENGER_QUEUES,
+  mechanics: Object.freeze({
+    'question-passenger': Object.freeze({
+      authoredMasks: LEVEL12_QUESTION_PASSENGER_MASKS
+    })
+  }),
   assets: {
     loopScene: '/assets/runtime/Loop_02_q80.webp',
     loopSpriteRect: { x: 0, y: 57, width: 2100, height: 1243, imageWidth: 2100, imageHeight: 1300 },

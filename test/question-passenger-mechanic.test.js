@@ -14,6 +14,47 @@ function makeLevel(authoredMasks = [[true, false], [false, true]]) {
   };
 }
 
+test('level12 provides frozen authored question-passenger masks', () => {
+  const questionConfig = LEVEL_1.mechanics['question-passenger'];
+  const authoredMasks = questionConfig.authoredMasks;
+
+  assert.equal(authoredMasks.length, 2);
+  assert.deepEqual(
+    authoredMasks.map((row) => row.length),
+    LEVEL_1.passengerQueues.map((row) => row.length)
+  );
+  assert.equal(authoredMasks.every((row) => row.every((value) => typeof value === 'boolean')), true);
+  assert.equal(authoredMasks.flat().filter(Boolean).length, 132);
+  assert.equal(authoredMasks.flat().length, 438);
+  assert.equal(Object.isFrozen(authoredMasks), true);
+  assert.equal(authoredMasks.every(Object.isFrozen), true);
+  assert.equal(Object.isFrozen(questionConfig), true);
+  assert.equal(Object.isFrozen(LEVEL_1.mechanics), true);
+});
+
+test('level12 authored mode follows fixed masks without calling random', () => {
+  const runtime = createQuestionPassengerRuntime({
+    level: LEVEL_1,
+    options: { mode: 'authored' },
+    random() {
+      throw new Error('authored mode must not call random');
+    }
+  });
+
+  assert.deepEqual(runtime.createState(), {
+    questionPassenger: {
+      mode: 'authored',
+      chance: 0.3,
+      authoredMarked: 132,
+      authoredTotal: 438
+    }
+  });
+  assert.equal(runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 }).questionPassenger.hidden, true);
+  assert.equal(runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 1 }).questionPassenger.hidden, false);
+  assert.equal(runtime.createQueueItemData({ queueIndex: 1, sourceIndex: 0 }).questionPassenger.hidden, false);
+  assert.equal(runtime.createQueueItemData({ queueIndex: 1, sourceIndex: 1 }).questionPassenger.hidden, true);
+});
+
 test('chance mode defaults to 30% and uses a strict lower bound', () => {
   const randomValues = [0.2999, 0.3];
   const runtime = questionPassengerMechanic.createRuntime({
