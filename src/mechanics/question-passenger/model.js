@@ -49,8 +49,9 @@ export function createQuestionPassengerRuntime({ random = Math.random, level, op
       };
     },
     createQueueItemData({ queueIndex, sourceIndex }) {
+      const authoredRow = authoredMasks[queueIndex];
       const hidden = mode === 'authored'
-        ? authoredMasks[queueIndex]?.[sourceIndex] === true
+        ? Array.isArray(authoredRow) && authoredRow[sourceIndex] === true
         : random() < chance;
 
       return {

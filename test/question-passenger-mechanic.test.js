@@ -69,7 +69,7 @@ test('authored mode uses only strict true masks and never calls random', () => {
   assert.equal(randomCalls, 0);
 });
 
-test('authored mask statistics use only array rows from the exact configuration path', () => {
+test('authored masks require array rows from the exact configuration path', () => {
   const missingLevelState = questionPassengerMechanic.createRuntime().createState().questionPassenger;
   assert.equal(missingLevelState.authoredMarked, 0);
   assert.equal(missingLevelState.authoredTotal, 0);
@@ -86,11 +86,17 @@ test('authored mask statistics use only array rows from the exact configuration 
   assert.equal(nonArrayMasksState.authoredMarked, 0);
   assert.equal(nonArrayMasksState.authoredTotal, 0);
 
-  const mixedRowsState = questionPassengerMechanic.createRuntime({
-    level: makeLevel([[true, false], 'bad', [true, 1]])
-  }).createState().questionPassenger;
+  const mixedRowsRuntime = questionPassengerMechanic.createRuntime({
+    level: makeLevel([[true, false], { 0: true }, [true, 1]]),
+    options: { mode: 'authored' }
+  });
+  const mixedRowsState = mixedRowsRuntime.createState().questionPassenger;
   assert.equal(mixedRowsState.authoredMarked, 2);
   assert.equal(mixedRowsState.authoredTotal, 4);
+  assert.equal(
+    mixedRowsRuntime.createQueueItemData({ queueIndex: 1, sourceIndex: 0 }).questionPassenger.hidden,
+    false
+  );
 
   const wrongPathState = questionPassengerMechanic.createRuntime({
     level: {
