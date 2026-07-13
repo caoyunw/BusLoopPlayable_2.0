@@ -4,6 +4,7 @@ import linkedPassengerMechanic, {
   createRuntime
 } from '../src/mechanics/linked-passengers/index.js';
 import { createLinkedPassengerRuntime } from '../src/mechanics/linked-passengers/model.js';
+import { LEVEL_1 } from '../src/level-data.js';
 
 function makeLevel(passengerQueues, authoredStarts = []) {
   return {
@@ -170,4 +171,27 @@ test('authored mode safely ignores missing and non-array start rows', () => {
     invalidAuthoredCount: 0
   });
   assert.equal(warnings.length, 0);
+});
+
+test('level18 authored starts contain balanced 2 3 4 6 8 and 10 row chains on both queues', () => {
+  const rows = LEVEL_1.mechanics['linked-passengers'].authoredStarts;
+  assert.deepEqual(rows.map((row) => row.filter((value) => value > 0)), [
+    [10, 4, 8, 3, 6, 2],
+    [8, 6, 10, 4, 3, 2]
+  ]);
+  assert.deepEqual(rows.map((row) => row.reduce((sum, value) => sum + value, 0)), [33, 33]);
+  assert.equal(rows.every((row, index) => row.length === LEVEL_1.passengerQueues[index].length), true);
+  assert.equal(Object.isFrozen(rows), true);
+  assert.equal(rows.every(Object.isFrozen), true);
+
+  const runtime = createLinkedPassengerRuntime({
+    level: LEVEL_1,
+    options: { mode: 'authored' },
+    random() {
+      throw new Error('authored mode must not call random');
+    }
+  });
+  assert.equal(runtime.createState().linkedPassenger.chainCount, 12);
+  assert.equal(runtime.createState().linkedPassenger.linkedGroupCount, 66);
+  assert.equal(runtime.createState().linkedPassenger.invalidAuthoredCount, 0);
 });

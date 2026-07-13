@@ -49,6 +49,21 @@ const LEVEL18_PASSENGER_QUEUES = Object.freeze([
   ])
 ]);
 
+function makeLinkedPassengerStarts(queue, entries) {
+  const starts = Array(queue.length).fill(0);
+  for (const [sourceIndex, length] of entries) starts[sourceIndex] = length;
+  return Object.freeze(starts);
+}
+
+const LEVEL18_LINKED_PASSENGER_STARTS = Object.freeze([
+  makeLinkedPassengerStarts(LEVEL18_PASSENGER_QUEUES[0], [
+    [0, 10], [14, 4], [29, 8], [47, 3], [78, 6], [107, 2]
+  ]),
+  makeLinkedPassengerStarts(LEVEL18_PASSENGER_QUEUES[1], [
+    [0, 8], [21, 6], [44, 10], [84, 4], [126, 3], [173, 2]
+  ])
+]);
+
 const LEVEL18_VEHICLE_DEPTHES = Object.freeze({
   28: Object.freeze([31]),
   29: Object.freeze([30, 33, 56]),
@@ -182,6 +197,11 @@ export const LEVEL_1 = Object.freeze({
   passengerSequence: PASSENGER_SEQUENCE,
   // level18.asset provides fixed passenger entries for both DualQueue2 queues.
   passengerQueues: LEVEL18_PASSENGER_QUEUES,
+  mechanics: Object.freeze({
+    'linked-passengers': Object.freeze({
+      authoredStarts: LEVEL18_LINKED_PASSENGER_STARTS
+    })
+  }),
   assets: {
     loopScene: '/assets/runtime/Loop_02_q80.webp',
     loopSpriteRect: { x: 0, y: 57, width: 2100, height: 1243, imageWidth: 2100, imageHeight: 1300 },
