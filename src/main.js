@@ -6,6 +6,7 @@ import { SCENE_TUNING } from './scene-tuning.js';
 import { createGameAudioController } from './audio-controller.js';
 import { MECHANICS, getMechanicById, resolveMechanicId } from './mechanic-registry.js';
 import { createMechanicLibrary } from './mechanic-library.js';
+import { createMechanicDetailView } from './mechanics/index.js';
 import { createMechanicUiControllers } from './mechanics/ui.js';
 import {
   getMechanicIdFromSearch,
@@ -127,7 +128,13 @@ function startRuntime() {
   applyPreviewFrame();
 
   const initialMechanicId = getMechanicIdFromSearch(location.search);
-  const game = new BusLoopGame(LEVEL_1, { mechanicId: initialMechanicId });
+  const mechanicSessionOptions = {
+    'question-passenger': { mode: 'chance', chance: 0.3 }
+  };
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: initialMechanicId,
+    mechanics: mechanicSessionOptions
+  });
   const audio = createGameAudioController(LEVEL_1.assets.audio);
   const endPanel = $('#end-panel');
   let pressTimer = 0;
@@ -219,6 +226,27 @@ function startRuntime() {
 
   game.subscribe(syncHud);
 
+  function applyMechanicOptions(id, options = {}) {
+    mechanicSessionOptions[id] = {
+      ...(mechanicSessionOptions[id] ?? {}),
+      ...options
+    };
+    resetMechanicUi();
+    if (game.setMechanicOptions(id, mechanicSessionOptions[id])) {
+      game.initializeQueues(view.getQueueCapacities(), view.getQueueSpacing(), view.getQueueLengths(), view.getConveyorPathLength());
+    }
+    syncHud(game.snapshot());
+  }
+
+  function renderDetailExtension({ mechanic, document }) {
+    return createMechanicDetailView(mechanic.id, {
+      document,
+      options: mechanicSessionOptions[mechanic.id],
+      state: game.snapshot(),
+      onCommit: (options) => applyMechanicOptions(mechanic.id, options)
+    });
+  }
+
   function selectMechanic(id, { syncUrl = true } = {}) {
     const resolvedId = resolveMechanicId(id);
     activeMechanic = getMechanicById(resolvedId);
@@ -247,7 +275,8 @@ function startRuntime() {
   mechanicLibrary = createMechanicLibrary(mechanicLibraryRoot, {
     mechanics: MECHANICS,
     activeId: initialMechanicId,
-    onSelect: selectMechanic
+    onSelect: selectMechanic,
+    renderDetailExtension
   });
   selectMechanic(initialMechanicId, { syncUrl: false });
 

@@ -11,10 +11,10 @@ Use this file before code changes. Pick the closest change area, then read only 
 | Mechanic search, grouping, generic detail extensions, selection, mobile drawer | `src/mechanic-library.js` | `src/mechanics/index.js`, `test/mechanic-registry.test.js`, `src/styles.css`, `index.html` |
 | Star-passenger lifetime, cyclic charge, and boarding/expiration rules | `src/mechanics/star-passenger/model.js` | `src/mechanics/star-passenger/index.js`, `test/star-passenger-mechanic.test.js` |
 | Question-passenger assignment modes, chance normalization, authored masks, and state metadata | `src/mechanics/question-passenger/model.js` | `src/mechanics/question-passenger/index.js`, `test/question-passenger-mechanic.test.js` |
-| Question-passenger detail mode/chance controls and authored summary | `src/mechanics/question-passenger/view.js` | `src/mechanics/question-passenger/styles.css`, `src/mechanics/question-passenger/index.js`, `src/mechanic-library.js`, `test/mechanic-registry.test.js` |
+| Question-passenger detail mode/chance controls and authored summary | `src/mechanics/question-passenger/view.js` | `src/mechanics/question-passenger/styles.css`, `src/mechanics/question-passenger/index.js`, `src/mechanic-library.js`, `src/main.js`, `test/mechanic-registry.test.js`, `test/game-model.test.js` |
 | Question-passenger neutral queue appearance, per-person question badges, and one-shot reduced-motion-safe belt reveal feedback | `src/scene-view.js` | `test/question-passenger-mechanic.test.js`, `test/star-passenger-mechanic.test.js` |
 | Star-passenger HUD, celebration, and reduced-motion feedback | `src/mechanics/star-passenger/view.js` | `src/mechanics/star-passenger/styles.css`, `src/scene-view.js`, `test/star-passenger-mechanic.test.js` |
-| Lab bootstrap, base runtime assembly, mechanic pause/select, tuning storage, QA API | `src/main.js` | `src/mechanic-lab.js`, `src/mechanic-registry.js`, `index.html`, `test/game-model.test.js` |
+| Lab bootstrap, base runtime assembly, mechanic pause/select, page-session mechanic options, generic detail wiring, tuning storage, QA API | `src/main.js` | `src/mechanics/index.js`, `src/mechanic-library.js`, `src/mechanic-lab.js`, `src/mechanic-registry.js`, `index.html`, `test/game-model.test.js` |
 | Core gameplay rules, reset-generation snapshots, blockers, spots, queues, boarding, win/fail | `src/game-model.js` | `src/level-data.js`, `src/vehicle-motion.js`, `test/game-model.test.js` |
 | Level constants, fixed passenger sequence, vehicles, spots, runtime asset URLs | `src/level-data.js` | `src/game-model.js`, `src/scene-view.js`, `test/game-model.test.js` |
 | Three.js rendering, picking, assets, vehicles, passengers, shadows | `src/scene-view.js` | `src/scene-tuning.js`, `src/scene-layout.js`, `test/game-model.test.js` |
@@ -51,9 +51,9 @@ Use this file before code changes. Pick the closest change area, then read only 
 - `src/mechanic-lab.js`: pure lab helpers. Owns query parsing, same-origin query replacement/sync, unknown-ID fallback through the registry, and exception-safe storage removal.
 - `src/mechanic-library.js`: mechanism browser UI. Owns search, unique primary-category grouping, status labels, detail rendering with `textContent`, generic detail-extension mounting/cleanup, active state, mobile collapse/focus behavior, viewport synchronization, and listener cleanup.
 - `src/mechanics/index.js`: immutable mechanic-module catalog plus exact module lookup, playable-runtime resolution, and optional generic detail-view factory delegation.
-- `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
+- `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; owns page-local mechanic option defaults, generic detail-view commits, and active-mechanic reset/queue reinitialization; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
 - `src/mechanics/star-passenger/`: completed star-passenger mechanic. `model.js` owns lifetime and charge state; `view.js` and `styles.css` own HUD, celebration, and reduced-motion feedback.
-- `src/mechanics/question-passenger/`: question-passenger module. `model.js` owns chance/authored assignment normalization and state metadata; `view.js` and `styles.css` own the planned mechanic's detail mode/chance controls and authored-count summary.
+- `src/mechanics/question-passenger/`: question-passenger module. `model.js` owns chance/authored assignment normalization and state metadata; `view.js` and `styles.css` own the planned mechanic's persistence-free detail mode/chance controls, normalized commit payloads, and authored-count summary.
 
 ### Base Runtime
 
@@ -80,13 +80,13 @@ Use this file before code changes. Pick the closest change area, then read only 
 - `test/mechanic-registry.test.js`: lab shell, CSS breakpoint contracts, library rendering/interactions/detail-extension cleanup, mechanic detail-view factory and question settings controls, registry completeness/freezing/filtering, URL helpers, and safe storage removal.
 - `test/question-passenger-mechanic.test.js`: question-passenger assignment/state plus hidden material transitions, badge/cache reuse, one-shot reveal timing and reduced-motion behavior, tuning, and scene-wiring contracts.
 - `test/star-passenger-mechanic.test.js`: star-passenger registry status, reward lifetime, cyclic charge, boarding/expiration behavior, UI wiring, and reduced-motion contracts.
-- `test/game-model.test.js`: base gameplay plus reset-version behavior, source/runtime contracts, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
+- `test/game-model.test.js`: base gameplay plus reset-version behavior, source/runtime contracts, page-session mechanic detail/apply wiring, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
 - `test/vehicle-effects.test.js`: ribbon, smoke, hit effects, particle motion, and editor-driven effect tuning.
 
 ## Known Test Baseline
 
-As of 2026-07-13, the full suite passes 131/131. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
+As of 2026-07-13, the full suite passes 134/134. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
 ## Historical Material
 

@@ -1124,7 +1124,7 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.match(mainSource, /if \(syncUrl\) syncMechanicQuery\(resolvedId\)/);
   assert.match(
     mainSource,
-    /createMechanicLibrary\(mechanicLibraryRoot,\s*\{\s*mechanics: MECHANICS,\s*activeId: initialMechanicId,\s*onSelect: selectMechanic\s*\}\)/
+    /createMechanicLibrary\(mechanicLibraryRoot,\s*\{\s*mechanics: MECHANICS,\s*activeId: initialMechanicId,\s*onSelect: selectMechanic,\s*renderDetailExtension\s*\}\)/
   );
   assert.match(mainSource, /selectMechanic\(initialMechanicId, \{ syncUrl: false \}\)/);
   assert.match(mainSource, /const handleVehicleClick = \(vehicleId\) => \{/);
@@ -1148,4 +1148,85 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.equal(mainSource.match(/requestAnimationFrame\(frame\)/g)?.length, 2);
   assert.match(mainSource, /\nstartRuntime\(\);\s*$/);
   assert.doesNotMatch(mainSource, PLAYABLE_AD_SOURCE_MARKERS);
+});
+
+test('main keeps mechanic settings page-local with fresh question-passenger defaults', () => {
+  const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
+  const startRuntimeIndex = mainSource.indexOf('function startRuntime()');
+  const startRuntimeSource = mainSource.slice(startRuntimeIndex);
+  const beforeStartRuntime = mainSource.slice(0, startRuntimeIndex);
+
+  assert.notEqual(startRuntimeIndex, -1);
+  assert.doesNotMatch(beforeStartRuntime, /mechanicSessionOptions/);
+  assert.match(
+    startRuntimeSource,
+    /const mechanicSessionOptions = \{\s*'question-passenger': \{ mode: 'chance', chance: 0\.3 \}\s*\}/
+  );
+  assert.match(
+    startRuntimeSource,
+    /new BusLoopGame\(LEVEL_1,\s*\{\s*mechanicId: initialMechanicId,\s*mechanics: mechanicSessionOptions\s*\}\)/
+  );
+  assert.equal((mainSource.match(/'question-passenger'/g) ?? []).length, 1);
+  assert.equal((mainSource.match(/const \w+_STORAGE_KEY\s*=/g) ?? []).length, 2);
+  assert.doesNotMatch(
+    mainSource,
+    /(?:localStorage\.(?:getItem|setItem)|safeRemoveStorageItem)\([^)]*(?:mechanicSessionOptions|question-passenger)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /(?:URLSearchParams|syncMechanicQuery)\([^)]*(?:mechanicSessionOptions|question-passenger)/
+  );
+});
+
+test('main delegates detail extensions through the generic mechanic factory', () => {
+  const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
+  const renderStart = mainSource.indexOf('  function renderDetailExtension(');
+  const renderEnd = mainSource.indexOf('\n  function selectMechanic(', renderStart);
+  const renderSource = mainSource.slice(renderStart, renderEnd);
+
+  assert.match(
+    mainSource,
+    /import\s+\{\s*createMechanicDetailView\s*\}\s+from\s+'\.\/mechanics\/index\.js'/
+  );
+  assert.notEqual(renderStart, -1);
+  assert.notEqual(renderEnd, -1);
+  assert.match(renderSource, /return createMechanicDetailView\(mechanic\.id, \{/);
+  assert.match(renderSource, /document,/);
+  assert.match(renderSource, /options: mechanicSessionOptions\[mechanic\.id\]/);
+  assert.match(renderSource, /state: game\.snapshot\(\)/);
+  assert.match(
+    renderSource,
+    /onCommit: \(options\) => applyMechanicOptions\(mechanic\.id, options\)/
+  );
+  assert.doesNotMatch(renderSource, /question-passenger|\bif\s*\(|\bswitch\s*\(/);
+  assert.match(
+    mainSource,
+    /createMechanicLibrary\(mechanicLibraryRoot,\s*\{[\s\S]*?renderDetailExtension\s*\}\)/
+  );
+});
+
+test('main applies mechanic options with one model reset before queue reinitialization', () => {
+  const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
+  const applyStart = mainSource.indexOf('  function applyMechanicOptions(');
+  const applyEnd = mainSource.indexOf('\n  function renderDetailExtension(', applyStart);
+  const applySource = mainSource.slice(applyStart, applyEnd);
+
+  assert.notEqual(applyStart, -1);
+  assert.notEqual(applyEnd, -1);
+  assert.match(applySource, /mechanicSessionOptions\[id\] = \{/);
+  assert.match(applySource, /\.\.\.\(mechanicSessionOptions\[id\] \?\? \{\}\)/);
+  assert.match(applySource, /\.\.\.options/);
+  assert.equal((applySource.match(/resetMechanicUi\(\)/g) ?? []).length, 1);
+  assert.match(
+    applySource,
+    /if \(game\.setMechanicOptions\(id, mechanicSessionOptions\[id\]\)\) \{[\s\S]*?game\.initializeQueues\(view\.getQueueCapacities\(\), view\.getQueueSpacing\(\), view\.getQueueLengths\(\), view\.getConveyorPathLength\(\)\);[\s\S]*?\}\s*syncHud\(game\.snapshot\(\)\)/
+  );
+
+  const resetIndex = applySource.indexOf('resetMechanicUi()');
+  const modelIndex = applySource.indexOf('game.setMechanicOptions');
+  const queueIndex = applySource.indexOf('game.initializeQueues');
+  const hudIndex = applySource.lastIndexOf('syncHud(game.snapshot())');
+  assert.ok(resetIndex < modelIndex);
+  assert.ok(modelIndex < queueIndex);
+  assert.ok(queueIndex < hudIndex);
 });
