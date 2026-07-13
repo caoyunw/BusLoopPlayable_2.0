@@ -371,6 +371,23 @@ test('question passenger detail styles stay mechanic-owned and load through the 
   assert.match(questionCss, /@media\s*\(max-width:\s*860px\)/);
 });
 
+test('linked passenger detail styles stay mechanic-owned and load after question settings', () => {
+  const css = readFileSync(join('src', 'styles.css'), 'utf8');
+  const linkedCss = readFileSync(
+    join('src', 'mechanics', 'linked-passengers', 'styles.css'),
+    'utf8'
+  );
+
+  assert.match(
+    css,
+    /^@import ['"]\.\/mechanics\/question-passenger\/styles\.css['"];\s*\n@import ['"]\.\/mechanics\/linked-passengers\/styles\.css['"];/
+  );
+  assert.match(linkedCss, /\[data-linked-passenger-settings\]/);
+  assert.match(linkedCss, /\[hidden\]\s*\{\s*display:\s*none/);
+  assert.match(linkedCss, /:focus-visible/);
+  assert.match(linkedCss, /@media\s*\(max-width:\s*860px\)/);
+});
+
 test('createMechanicLibrary renders unique groups with textContent and rerenders search states', () => {
   const fixture = createLibraryFixture();
   const mechanics = [
@@ -726,9 +743,94 @@ test('detail extension factory delegates optional mechanic views without id bran
 
     assert.ok(extension?.element.matches('[data-question-passenger-settings]'));
     assert.equal(typeof extension.destroy, 'function');
+    const linkedExtension = createMechanicDetailView('linked-passengers', {
+      document: fixture.document
+    });
+    assert.ok(linkedExtension?.element.matches('[data-linked-passenger-settings]'));
+    assert.equal(typeof linkedExtension.destroy, 'function');
     assert.equal(createMechanicDetailView('base', { document: fixture.document }), null);
     assert.equal(createMechanicDetailView('missing', { document: fixture.document }), null);
     extension.destroy();
+    linkedExtension.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('linked passenger detail view keeps chance and authored settings independent', () => {
+  const fixture = createLibraryFixture();
+  const commits = [];
+
+  try {
+    const extension = createMechanicDetailView('linked-passengers', {
+      document: fixture.document,
+      options: { mode: 'chance', chance: 0.3, maxLength: 10 },
+      state: {
+        linkedPassenger: {
+          maxVehicleSeats: 10,
+          chainCount: 12,
+          linkedGroupCount: 66,
+          invalidAuthoredCount: 0
+        }
+      },
+      onCommit: (options) => commits.push(options)
+    });
+    const mode = extension.element.querySelector('[data-linked-mode]');
+    const chance = extension.element.querySelector('[data-linked-chance]');
+    const chanceOutput = extension.element.querySelector('[data-linked-chance-output]');
+    const maxLength = extension.element.querySelector('[data-linked-max-length]');
+    const lengthOutput = extension.element.querySelector('[data-linked-max-length-output]');
+    const chanceRow = extension.element.querySelector('[data-linked-chance-row]');
+    const lengthRow = extension.element.querySelector('[data-linked-length-row]');
+    const authoredSummary = extension.element.querySelector('[data-linked-authored-summary]');
+
+    assert.ok(extension.element.matches('[data-linked-passenger-settings]'));
+    assert.equal(extension.element.querySelector('h3').textContent, '机制设置');
+    assert.deepEqual(
+      mode.querySelectorAll('option').map((option) => [option.value, option.textContent]),
+      [['chance', '概率随机'], ['authored', '关卡标记']]
+    );
+    assert.equal(mode.value, 'chance');
+    assert.equal(chance.value, '30');
+    assert.equal(chance.getAttribute('min'), '0');
+    assert.equal(chance.getAttribute('max'), '100');
+    assert.equal(chance.getAttribute('step'), '1');
+    assert.equal(chanceOutput.textContent, '30%');
+    assert.equal(maxLength.value, '10');
+    assert.equal(maxLength.getAttribute('min'), '2');
+    assert.equal(maxLength.getAttribute('max'), '10');
+    assert.equal(maxLength.getAttribute('step'), '1');
+    assert.equal(lengthOutput.textContent, '10');
+    assert.equal(chanceRow.hidden, false);
+    assert.equal(lengthRow.hidden, false);
+    assert.equal(authoredSummary.hidden, true);
+    assert.match(authoredSummary.textContent, /12/);
+    assert.match(authoredSummary.textContent, /66/);
+
+    chance.value = '45';
+    chance.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    maxLength.value = '6';
+    maxLength.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    mode.value = 'authored';
+    mode.dispatchEvent({ type: 'change', bubbles: false, target: null });
+
+    assert.equal(chanceRow.hidden, true);
+    assert.equal(lengthRow.hidden, true);
+    assert.equal(authoredSummary.hidden, false);
+    assert.deepEqual(commits, [
+      { mode: 'chance', chance: 0.45, maxLength: 10 },
+      { mode: 'chance', chance: 0.45, maxLength: 6 },
+      { mode: 'authored', chance: 0.45, maxLength: 6 }
+    ]);
+
+    extension.destroy();
+    chance.value = '70';
+    chance.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    maxLength.value = '4';
+    maxLength.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    mode.value = 'chance';
+    mode.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    assert.equal(commits.length, 3);
   } finally {
     fixture.restore();
   }

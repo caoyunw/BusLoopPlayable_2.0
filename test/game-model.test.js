@@ -1229,7 +1229,7 @@ test('main thread saves and restores scene tuning from localStorage', () => {
   assert.doesNotMatch(mainSource, PLAYABLE_AD_SOURCE_MARKERS);
 });
 
-test('main keeps mechanic settings page-local with fresh question-passenger defaults', () => {
+test('main keeps mechanic settings page-local with independent fresh mechanic defaults', () => {
   const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
   const startRuntimeIndex = mainSource.indexOf('function startRuntime()');
   const startRuntimeSource = mainSource.slice(startRuntimeIndex);
@@ -1239,21 +1239,22 @@ test('main keeps mechanic settings page-local with fresh question-passenger defa
   assert.doesNotMatch(beforeStartRuntime, /mechanicSessionOptions/);
   assert.match(
     startRuntimeSource,
-    /const mechanicSessionOptions = \{\s*'question-passenger': \{ mode: 'chance', chance: 0\.3 \}\s*\}/
+    /const mechanicSessionOptions = \{\s*'question-passenger': \{ mode: 'chance', chance: 0\.3 \},\s*'linked-passengers': \{ mode: 'chance', chance: 0\.3, maxLength: 10 \}\s*\}/
   );
   assert.match(
     startRuntimeSource,
     /new BusLoopGame\(LEVEL_1,\s*\{\s*mechanicId: initialMechanicId,\s*mechanics: mechanicSessionOptions\s*\}\)/
   );
   assert.equal((mainSource.match(/'question-passenger'/g) ?? []).length, 1);
+  assert.equal((mainSource.match(/'linked-passengers'/g) ?? []).length, 1);
   assert.equal((mainSource.match(/const \w+_STORAGE_KEY\s*=/g) ?? []).length, 2);
   assert.doesNotMatch(
     mainSource,
-    /(?:localStorage\.(?:getItem|setItem)|safeRemoveStorageItem)\([^)]*(?:mechanicSessionOptions|question-passenger)/
+    /(?:localStorage\.(?:getItem|setItem)|safeRemoveStorageItem)\([^)]*(?:mechanicSessionOptions|question-passenger|linked-passengers)/
   );
   assert.doesNotMatch(
     mainSource,
-    /(?:URLSearchParams|syncMechanicQuery)\([^)]*(?:mechanicSessionOptions|question-passenger)/
+    /(?:URLSearchParams|syncMechanicQuery)\([^)]*(?:mechanicSessionOptions|question-passenger|linked-passengers)/
   );
 });
 

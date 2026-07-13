@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import linkedPassengerMechanic, {
   createRuntime
 } from '../src/mechanics/linked-passengers/index.js';
@@ -65,6 +67,131 @@ function makeLinkedGame(level = makeGameLevel()) {
   game.reset();
   return game;
 }
+
+class DetailElement {
+  constructor(tagName) {
+    this.tagName = tagName.toUpperCase();
+    this.children = [];
+    this.attributes = new Map();
+    this.listeners = new Map();
+    this.textContent = '';
+    this.value = '';
+    this.hidden = false;
+  }
+
+  append(...children) {
+    this.children.push(...children);
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
+  matches(selector) {
+    if (selector.startsWith('[') && selector.endsWith(']')) {
+      return this.attributes.has(selector.slice(1, -1));
+    }
+    return this.tagName === selector.toUpperCase();
+  }
+
+  querySelectorAll(selector) {
+    const matches = [];
+    for (const child of this.children) {
+      if (child.matches(selector)) matches.push(child);
+      matches.push(...child.querySelectorAll(selector));
+    }
+    return matches;
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatchEvent(event) {
+    for (const listener of this.listeners.get(event.type) ?? []) listener.call(this, event);
+  }
+}
+
+const detailDocument = {
+  createElement: (tagName) => new DetailElement(tagName)
+};
+
+test('linked detail styles stay mechanic-owned and load after question settings', () => {
+  const css = readFileSync(join('src', 'styles.css'), 'utf8');
+  const linkedCss = readFileSync(
+    join('src', 'mechanics', 'linked-passengers', 'styles.css'),
+    'utf8'
+  );
+
+  assert.match(
+    css,
+    /^@import ['"]\.\/mechanics\/question-passenger\/styles\.css['"];\s*\n@import ['"]\.\/mechanics\/linked-passengers\/styles\.css['"];/
+  );
+  assert.match(linkedCss, /\[data-linked-passenger-settings\]/);
+  assert.match(linkedCss, /\[hidden\]\s*\{\s*display:\s*none/);
+  assert.match(linkedCss, /:focus-visible/);
+  assert.match(linkedCss, /@media\s*\(max-width:\s*860px\)/);
+});
+
+test('linked detail settings render and commit chance max-length and authored modes independently', () => {
+  const commits = [];
+  const view = linkedPassengerMechanic.createDetailView({
+    document: detailDocument,
+    options: { mode: 'chance', chance: 0.3, maxLength: 10 },
+    state: {
+      linkedPassenger: {
+        maxVehicleSeats: 10,
+        chainCount: 12,
+        linkedGroupCount: 66,
+        invalidAuthoredCount: 0
+      }
+    },
+    onCommit: (options) => commits.push(options)
+  });
+  const mode = view.element.querySelector('[data-linked-mode]');
+  const chance = view.element.querySelector('[data-linked-chance]');
+  const maxLength = view.element.querySelector('[data-linked-max-length]');
+  const authoredSummary = view.element.querySelector('[data-linked-authored-summary]');
+
+  assert.ok(view.element.matches('[data-linked-passenger-settings]'));
+  assert.equal(mode.value, 'chance');
+  assert.equal(chance.value, '30');
+  assert.equal(maxLength.value, '10');
+  assert.equal(maxLength.getAttribute('max'), '10');
+  assert.match(authoredSummary.textContent, /12/);
+  assert.match(authoredSummary.textContent, /66/);
+
+  chance.value = '45';
+  chance.dispatchEvent({ type: 'change' });
+  maxLength.value = '6';
+  maxLength.dispatchEvent({ type: 'change' });
+  mode.value = 'authored';
+  mode.dispatchEvent({ type: 'change' });
+
+  assert.deepEqual(commits, [
+    { mode: 'chance', chance: 0.45, maxLength: 10 },
+    { mode: 'chance', chance: 0.45, maxLength: 6 },
+    { mode: 'authored', chance: 0.45, maxLength: 6 }
+  ]);
+  view.destroy();
+  chance.value = '70';
+  chance.dispatchEvent({ type: 'change' });
+  assert.equal(commits.length, 3);
+});
 
 test('chance mode creates multiple non-overlapping same-color chains with uniform bounded lengths', () => {
   const values = [0, 0.999, 0, 0];
@@ -184,6 +311,7 @@ test('linked runtime normalizes options, clones metadata, and implements batch h
   assert.deepEqual(runtime.onPassengerBatchBoarded({ slots: [unlinked] }), {});
   runtime.clearSlotData({ slot: enteredSlot });
   assert.equal(enteredSlot.linkedPassenger, null);
+  assert.equal(typeof linkedPassengerMechanic.createDetailView, 'function');
   assert.equal(linkedPassengerMechanic.definition.status, 'planned');
 });
 
