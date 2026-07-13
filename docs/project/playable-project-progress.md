@@ -6,9 +6,9 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Mechanic Lab Foundation
 
-- The registry contains 17 mechanism definitions: 3 playable (`base`, `star-passenger`, `question-passenger`) and 14 planned.
+- The registry contains 17 mechanism definitions: 5 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`) and 12 planned.
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
-- The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
+- The base runtime, imported level18 data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
 
 ### Star-Passenger Feedback
@@ -19,10 +19,17 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Question-Passenger
 
-- Waiting-queue groups can use independent 30% chance assignment or the fixed authored mask; the authored level12 distribution marks 132/438 groups.
+- Waiting-queue groups can use independent 30% chance assignment or a fixed authored mask. The merged level18 data currently has no question authored marks.
 - Hidden groups keep their models and shadows, use neutral-gray materials with four readable question badges, and reveal their real color once on entering the belt. True color order and base boarding/win/fail rules are unchanged.
 - Chance resets reroll only question positions; authored resets remain fixed. Mode/chance options persist only for the page session, survive switching away and back, and return to chance/30% on refresh.
 - Reveal de-duplication uses passenger identity plus `revealVersion`; reset generations clear transient reveal state. The reduced-motion branch preserves color/brightness/fade feedback without scale or expanding-flash transforms.
+
+### Linked-Passengers
+
+- Same-color passenger rows can form chains of 2 through the configured maximum length in independent 30% chance mode, or use level18-authored start arrays. The authored configuration contains 12 chains covering 66 rows.
+- Chains remain atomic when admitted to a visible queue, entering and wrapping around the belt, and boarding. A matching arrived vehicle must have room for the entire chain; insufficient capacity never splits it.
+- The scene shows segmented top connectors and a head `xN` badge, then uses one aggregate boarding event. Page-session mode/chance/maximum-length settings survive mechanic switching and reset to 30%/10 on refresh.
+- Composite runtimes forward the generic batch hooks and preserve scalar fallback, so linked passengers remain compatible with level18 garage behavior without a linked-specific branch in the game model.
 
 ### Advertising Cleanup And Runtime Assets
 
@@ -32,15 +39,15 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Focused question-passenger suite: 36/36 passed; focused question/registry gate: 69/69 passed. Full `pnpm test`: 142/142 passed.
-- `pnpm run build` passed with the existing non-blocking chunk-size warning.
-- In-app browser QA passed at 1280x720 and exactly 390x844: no planned overlay or horizontal overflow, chance 0/30/100%, rerolls, authored 132/438 fixed positions, session-only options, reset/switch/refresh behavior, mobile drawer controls, one-shot belt reveals, and scene-editor usability were exercised through real controls.
-- The in-app browser could not emulate native `prefers-reduced-motion`. A temporary exact source substitution forced the live reduced-motion branch; color/brightness/fade remained clear, transforms stayed fixed, and controls remained interactive. The source was immediately reverted and verified clean.
-- Error-level browser logs and page errors were absent. Existing FBXLoader material warnings remain, and four Unity texture references currently return the HTML fallback (`Idle_girl01_pink.png`, `img_v3_0212c_69706fc5-c18e-4959-86cf-3f9625ee0fdg.png`, `Idle_boy02_blue.png`, `Car_P2.png`); the scene continues through existing fallback/material paths.
+- Linked-passenger and shared-architecture tests pass 34/34. Full `pnpm test` executes 155 tests: 148 pass and 7 are the user-approved pre-existing question/garage/registry baseline failures; no linked-passenger test fails.
+- Production build, Three.js/Vite packaging, and advertising delivery checks were not run because they are explicitly outside this mechanic-lab completion gate.
+- Desktop 1280x720 QA passed with chance 30%/maximum 10, authored 12-chain/66-row summary, session-only switching, readable connectors/`x10`, and no planned overlay. A 10-row chain stayed intact when only 4 seats remained, then boarded and departed as one chain with a 40-seat vehicle.
+- Mobile 390x844 QA passed with zero document/body/settings horizontal overflow, usable drawer controls, and readable queue/belt connectors and `x10` badge.
+- A temporary exact source override exercised the live reduced-motion branch: the page stayed stable with no error logs and the branch kept in-place fade plus one pulse/smoke/audio event. The source was restored cleanly. Existing FBXLoader warnings remain non-blocking.
 
 ### Next Step
 
-Select the next mechanic from the 14 planned definitions, then begin its design and implementation workflow. No next-mechanic priority has been chosen.
+Select the next mechanic from the 12 planned definitions, then begin its design and implementation workflow. No next-mechanic priority has been chosen.
 
 ## Historical Playable/Advertising Log
 

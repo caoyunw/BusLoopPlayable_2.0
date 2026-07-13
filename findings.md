@@ -4,7 +4,7 @@
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. After the garage merge, the registry contains 17 definitions: 4 playable (`base`, `question-passenger`, `garage`, `star-passenger`) and 13 planned.
+- The active product is a mechanic design and experience lab. After linked-passenger activation, the registry contains 17 definitions: 5 playable (`base`, `question-passenger`, `garage`, `star-passenger`, `linked-passengers`) and 12 planned.
 - Each `src/mechanics/*/index.js` owns its mechanic identity, metadata, and status; `src/mechanics/index.js` is the assembled module source of truth. `src/mechanic-registry.js` derives the frozen metadata collection and provides lookup, fallback, and search.
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
@@ -22,13 +22,17 @@
 - Hidden waiting groups use a neutral-gray material and four question badges. Belt groups always show real color and receive one non-blocking reveal. The reduced-motion branch keeps color/brightness/fade while removing scale/pop/expanding-flash transforms.
 - Browser QA exercised a live forced reduced-motion branch because the in-app browser lacked native media-feature emulation; this is not evidence of native OS preference emulation.
 
-### Linked-Passengers Approved Design
+### Linked-Passengers Released Rules And Architecture
 
-- The next mechanic is `linked-passengers`; it remains `planned` until automated and browser gates pass.
+- `linked-passengers` is playable after focused automated, desktop, mobile, capacity-pressure, and reduced-motion browser gates passed.
 - A chain contains 2–N consecutive same-color passenger rows, capped by the level's largest vehicle capacity. It is atomic at the visible-queue boundary, belt entry, and boarding.
 - Chance mode defaults to 30% with a configurable maximum length; authored mode uses per-queue integer arrays whose nonzero start value is the chain length. Settings are page-session only.
 - Chains occupy N consecutive belt slots, allow ring wrap, and board when the head crosses the exit only if one matching arrived vehicle has N remaining seats.
 - The selected visual is a segmented top connector with a chain-length badge; successful boarding uses one non-blocking synchronized fan-in event, with a no-translation reduced-motion branch.
+- Composite runtimes must forward generic batch hooks and retain scalar fallback; the game model must not branch on the `linked-passengers` ID.
+- Authored-chain summaries derive from authored level data and remain independent of the active chance value.
+- Scene transient connector/boarding state is cleared by `resetVersion` because passenger IDs can be reused after reset.
+- The linked and shared-architecture gate passes 34/34. Full `pnpm test` runs 155 tests with 148 passing; the remaining 7 are the user-approved B baseline from question/garage/registry integration, and none is a linked regression. Production build and advertising packaging are not part of this mechanic-lab gate.
 
 ### Runtime Asset Naming
 

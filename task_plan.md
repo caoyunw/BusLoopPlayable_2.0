@@ -2,43 +2,31 @@
 
 ## Current Goal
 
-Validate the newly implemented `garage` mechanic against the active level18 garage-container configuration, then continue to `question-passenger` while preserving the verified star-passenger baseline.
+`linked-passengers` is complete and playable. The next goal is to select one of the remaining 12 planned mechanics and define its rules and acceptance gate.
 
 ## Completed Gates
 
-- Registry baseline: 17 definitions, 3 playable (`base`, `star-passenger`, `question-passenger`), 14 planned.
-- Focused question-passenger suite: 36/36 passed; focused question/registry gate: 69/69 passed; full `pnpm test`: 142/142 passed.
-- `pnpm run build` passed with only the existing non-blocking chunk-size warning.
-- Browser QA passed at desktop 1280x720 and mobile 390x844 with real controls and no horizontal overflow.
-- A live forced reduced-motion branch passed without transform motion; native in-app browser media emulation was unavailable and is not claimed.
-- Error-level logs and page errors were absent. Existing FBXLoader warnings and four Unity texture fallback gaps remain documented in `findings.md`.
-
-- Mechanic registry and searchable library are present.
-- Desktop three-column and mobile drawer layouts are present.
-- The registry contains 17 mechanism definitions: 3 playable (`base`, `garage`, `star-passenger`) and 14 planned.
-- URL selection, planned-mechanic input freeze, persistent scene editor, safe tuning storage, neutral runtime assets, and advertising cleanup are in place.
-- Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
-- Garage hidden stock, one-at-a-time release, counter timing, Unity model rendering path, and runtime smoke are implemented.
-- The active level has been replaced with level18 data: 47 vehicles, two fixed queues of 115 and 191 groups, 42 blocker entries from the supplied CSV, and two garage containers with 16 stocked garage vehicles.
-- The 2026-07-12 full `pnpm test` and `pnpm run build` baseline passed. Current sandboxed `pnpm test` and `pnpm run build` are blocked by Windows `spawn EPERM`.
-
-The next immediate phase is garage QA on level18. After that, continue to `question-passenger`. The star-passenger design and implementation plans remain completed references.
+- The registry contains 17 definitions: 5 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`) and 12 planned.
+- Linked passengers support independent chance and authored modes, page-session controls, and atomic queue admission, belt entry/wrap, and boarding.
+- Level18 authored data defines 12 chains covering 66 rows; chance defaults to 30% and maximum length 10.
+- Linked and shared-architecture tests pass 34/34. Full `pnpm test` executes 155 tests: 148 pass and the 7 user-approved question/garage/registry baseline failures remain; there are no linked regressions.
+- Desktop 1280x720, mobile 390x844, capacity-pressure gameplay, session settings, visual connector/`xN`, aggregate boarding, and forced live reduced-motion QA passed with no error-level logs.
+- Production build and advertising packaging are not mechanic-lab completion gates and were intentionally not run.
 
 ## Implementation Priority
 
-Advance `question-passenger` through the mechanic workflow:
+After the user selects a remaining mechanic:
 
-1. Define the hidden-color and reveal rules, player-facing feedback, and acceptance criteria.
+1. Define its rules, player-facing feedback, and acceptance criteria.
 2. Keep the registry entry `planned` while implementing the rule in its own mechanic module.
 3. Add focused model, runtime, registry, and UI tests before changing shared hooks.
-4. Verify desktop, 390x844 mobile, and reduced-motion behavior before marking the mechanic `playable`.
+4. Verify desktop, 390x844 mobile, and reduced-motion behavior before marking it `playable`.
 
 ## Verification Gate
 
-- Focused `question-passenger` tests pass.
-- The full suite preserves the 88/88 baseline or increases it with new passing tests.
-- `pnpm run build` passes outside the current sandbox limitation; current sandboxed runs hit Windows `spawn EPERM`.
-- Browser QA covers desktop, 390x844 mobile, and reduced-motion behavior for `question-passenger`.
+- Focused tests for the selected mechanic pass without adding failures beyond the documented 7-test baseline.
+- Browser QA covers desktop, 390x844 mobile, real gameplay behavior, and reduced motion.
+- Do not add production build or advertising-package checks unless the project scope changes explicitly.
 
 ## Context Pointers
 
