@@ -1,3 +1,5 @@
+import { createLinkedPassengerRuntime } from './model.js';
+
 export const definition = {
   id: 'linked-passengers',
   name: '连体乘客',
@@ -9,4 +11,6 @@ export const definition = {
   difficulty: '高'
 };
 
-export default { definition };
+export const createRuntime = createLinkedPassengerRuntime;
+
+export default { definition, createRuntime };
