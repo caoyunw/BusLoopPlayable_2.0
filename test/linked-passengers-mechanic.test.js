@@ -797,10 +797,62 @@ test('scene owns linked connector lifecycle and keeps reduced-motion visuals sta
   const sceneSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
 
   assert.match(sceneSource, /linkedPassengerConnectors = new Map/);
+  assert.match(sceneSource, /linkedBoardingBatches = new Map/);
   assert.match(sceneSource, /makeLinkedPassengerBadgeTexture/);
   assert.match(sceneSource, /syncLinkedPassengerConnectors/);
+  assert.match(sceneSource, /spawnLinkedBoardingBatch/);
+  assert.match(sceneSource, /groupCount\s*\?\?\s*1\)\s*>\s*1/);
+  assert.match(sceneSource, /duration:\s*0\.25/);
   assert.match(sceneSource, /linkedPassenger\?\.chainId/);
   assert.match(sceneSource, /reducedMotionQuery\?\.matches/);
+});
+
+test('linked boarding spawns every row together from its aggregate progress', () => {
+  const view = Object.create(SceneView.prototype);
+  const materialDisposals = [];
+  view.scene = new THREE.Group();
+  view.curve = {
+    getPointAt: (progress) => new THREE.Vector3(progress * 10, 0, progress),
+    getTangentAt: () => new THREE.Vector3(0, 0, 1)
+  };
+  view.spotPositions = [new THREE.Vector3(20, 0, 4)];
+  view.boardingViews = [];
+  view.linkedBoardingBatches = new Map();
+  view.createPassengerVisual = () => {
+    const root = new THREE.Group();
+    root.userData.vatMaterial = { dispose: () => materialDisposals.push('passenger') };
+    return root;
+  };
+  view.setVatAnimation = () => {};
+  view.makeLinkedPassengerConnector = (length) => ({
+    length,
+    root: new THREE.Group(),
+    segments: Array.from({ length: length - 1 }, () => new THREE.Group()),
+    badge: Object.assign(new THREE.Group(), {
+      material: { opacity: 1, dispose: () => materialDisposals.push('badge') }
+    })
+  });
+
+  view.spawnLinkedBoardingBatch({
+    id: 41,
+    vehicleId: 84,
+    spotIndex: 0,
+    colorIndex: 2,
+    groupCount: 2,
+    progresses: [0.2, 0.8],
+    linkedPassenger: { chainId: 'linked-0-0', length: 2 },
+    startedAt: 3
+  });
+
+  assert.equal(view.boardingViews.length, 2 * LEVEL_1.groupSize);
+  assert.deepEqual(
+    [...new Set(view.boardingViews.map(({ start }) => Number(start.z.toFixed(3))))],
+    [0.2, 0.8]
+  );
+  assert.ok(view.boardingViews.every(({ delay }) => delay === 0));
+  assert.ok(view.boardingViews.every(({ duration }) => duration === 0.25));
+  assert.ok(view.boardingViews.every(({ linkedBatchId }) => linkedBatchId === 41));
+  assert.equal(view.linkedBoardingBatches.get(41).remaining, 2 * LEVEL_1.groupSize);
 });
 
 test('connector segment spans the midpoint and distance between passenger rows', () => {

@@ -2,7 +2,67 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LEVEL_1 } from '../src/level-data.js';
+import { SceneView } from '../src/scene-view.js';
 import { UNITY_EFFECTS, VehicleEffects } from '../src/vehicle-effects.js';
+
+function makeLinkedBoardingView({ reducedMotion = false } = {}) {
+  const view = Object.create(SceneView.prototype);
+  const removed = [];
+  const disposed = [];
+  const pulses = [];
+  const smoke = [];
+  const aboard = [];
+  const connectorRoot = new THREE.Group();
+  const connectorMaterial = {
+    opacity: 1,
+    emissiveIntensity: 0.35,
+    dispose: () => disposed.push('connector-material')
+  };
+  const badgeMaterial = {
+    opacity: 1,
+    dispose: () => disposed.push('badge-material')
+  };
+  const makeEntry = (x) => {
+    const root = new THREE.Group();
+    root.position.set(x, 0, 0);
+    return {
+      root,
+      material: {
+        transparent: false,
+        opacity: 1,
+        dispose: () => disposed.push(`passenger-${x}`)
+      },
+      vehicleId: 84,
+      start: new THREE.Vector3(x, 0, 0),
+      target: new THREE.Vector3(10, 0, 0),
+      startedAt: 0,
+      delay: 0,
+      duration: 0.25,
+      linkedBatchId: 17
+    };
+  };
+  const entries = [makeEntry(1), makeEntry(2)];
+  view.scene = { remove: (root) => removed.push(root) };
+  view.boardingViews = entries;
+  view.linkedBoardingBatches = new Map([[
+    17,
+    {
+      remaining: entries.length,
+      vehicleId: 84,
+      connectorRoot,
+      connectorSegments: [{ geometry: { dispose: () => disposed.push('connector-geometry') } }],
+      connectorMaterials: [connectorMaterial],
+      badgeMaterial,
+      startedAt: 0,
+      duration: 0.25
+    }
+  ]]);
+  view.reducedMotionQuery = { matches: reducedMotion };
+  view.triggerVehicleBoardingPulse = (vehicleId, time) => pulses.push([vehicleId, time]);
+  view.vehicleEffects = { spawnAboardSmoke: (vehicleId) => smoke.push(vehicleId) };
+  view.hooks = { onPassengerAboard: (vehicleId) => aboard.push(vehicleId) };
+  return { view, entries, connectorRoot, removed, disposed, pulses, smoke, aboard };
+}
 
 test('Unity vehicle effect assets and prefab parameters stay explicit', () => {
   assert.deepEqual(LEVEL_1.assets.textures.effects, {
@@ -60,6 +120,91 @@ test('each passenger arrival creates the prefab smoke burst on the vehicle', () 
   assert.equal(vehicle.children.length, 20);
   effects.clear();
   assert.equal(vehicle.children.length, 0);
+});
+
+test('linked boarding completion fires one aggregate pulse smoke and aboard hook', () => {
+  const fixture = makeLinkedBoardingView();
+
+  fixture.view.updateBoardingViews(0.25);
+  fixture.view.updateBoardingViews(0.5);
+
+  assert.deepEqual(fixture.pulses, [[84, 0.25]]);
+  assert.deepEqual(fixture.smoke, [84]);
+  assert.deepEqual(fixture.aboard, [84]);
+  assert.equal(fixture.view.boardingViews.length, 0);
+  assert.equal(fixture.view.linkedBoardingBatches.size, 0);
+  assert.ok(fixture.entries.every(({ root }) => fixture.removed.includes(root)));
+  assert.ok(fixture.disposed.includes('passenger-1'));
+  assert.ok(fixture.disposed.includes('passenger-2'));
+  assert.ok(fixture.removed.includes(fixture.connectorRoot));
+  assert.deepEqual(
+    fixture.disposed.filter((name) => name.startsWith('connector') || name.startsWith('badge')),
+    ['connector-geometry', 'connector-material', 'badge-material']
+  );
+});
+
+test('linked boarding waits for cross-frame entries and still completes exactly once', () => {
+  const fixture = makeLinkedBoardingView();
+  fixture.entries[1].startedAt = 0.1;
+
+  fixture.view.updateBoardingViews(0.25);
+
+  assert.equal(fixture.view.boardingViews.length, 1);
+  assert.equal(fixture.view.linkedBoardingBatches.get(17).remaining, 1);
+  assert.deepEqual(fixture.pulses, []);
+  assert.deepEqual(fixture.smoke, []);
+  assert.deepEqual(fixture.aboard, []);
+
+  fixture.view.updateBoardingViews(0.36);
+  fixture.view.updateBoardingViews(0.5);
+
+  assert.deepEqual(fixture.pulses, [[84, 0.36]]);
+  assert.deepEqual(fixture.smoke, [84]);
+  assert.deepEqual(fixture.aboard, [84]);
+  assert.equal(fixture.view.linkedBoardingBatches.size, 0);
+});
+
+test('linked boarding reduced motion keeps start positions and fades before one aggregate completion', () => {
+  const fixture = makeLinkedBoardingView({ reducedMotion: true });
+  const starts = fixture.entries.map(({ start }) => start.clone());
+
+  fixture.view.updateBoardingViews(0.125);
+
+  fixture.entries.forEach((entry, index) => {
+    assert.deepEqual(entry.root.position.toArray(), starts[index].toArray());
+    assert.equal(entry.material.transparent, true);
+    assert.equal(entry.material.opacity, 0.5);
+  });
+  assert.deepEqual(fixture.pulses, []);
+  assert.deepEqual(fixture.smoke, []);
+  assert.deepEqual(fixture.aboard, []);
+
+  fixture.view.updateBoardingViews(0.25);
+
+  assert.deepEqual(fixture.pulses, [[84, 0.25]]);
+  assert.deepEqual(fixture.smoke, [84]);
+  assert.deepEqual(fixture.aboard, [84]);
+  assert.equal(fixture.view.linkedBoardingBatches.size, 0);
+});
+
+test('clearing boarding views disposes in-flight linked passengers and batch feedback', () => {
+  const fixture = makeLinkedBoardingView();
+  fixture.view.clearLinkedPassengerConnectors = () => {};
+  fixture.view.vehicleBoardingPulses = new Map([[84, [0]]]);
+  fixture.view.initialEntryPathStates = new Map([['initial', {}]]);
+  fixture.view.queueEntryPathStates = new Map([['queue', {}]]);
+  fixture.view.lastBoardingEventId = 17;
+
+  fixture.view.clearBoardingViews();
+
+  assert.equal(fixture.view.boardingViews.length, 0);
+  assert.equal(fixture.view.linkedBoardingBatches.size, 0);
+  assert.equal(fixture.view.vehicleBoardingPulses.size, 0);
+  assert.equal(fixture.view.initialEntryPathStates.size, 0);
+  assert.equal(fixture.view.queueEntryPathStates.size, 0);
+  assert.equal(fixture.view.lastBoardingEventId, 0);
+  assert.ok(fixture.removed.includes(fixture.connectorRoot));
+  assert.ok(fixture.entries.every(({ root }) => fixture.removed.includes(root)));
 });
 
 test('ParticleRibbon splits Ribbon_01 into the 3x3 sprite atlas frames', () => {

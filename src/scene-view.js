@@ -811,6 +811,7 @@ export class SceneView {
     this.vatTimeUniform = { value: 0 };
     this.boardingViews = [];
     this.linkedPassengerConnectors = new Map();
+    this.linkedBoardingBatches = new Map();
     this.vehicleBoardingPulses = new Map();
     this.initialEntryPathStates = new Map();
     this.queueEntryPathStates = new Map();
@@ -2600,6 +2601,10 @@ export class SceneView {
 
   clearBoardingViews() {
     this.clearLinkedPassengerConnectors();
+    for (const batch of this.linkedBoardingBatches.values()) {
+      this.disposeLinkedBoardingBatch(batch);
+    }
+    this.linkedBoardingBatches.clear();
     for (const entry of this.boardingViews) {
       this.scene.remove(entry.root);
       entry.material.dispose();
@@ -2649,7 +2654,11 @@ export class SceneView {
     if (!this.personTemplate) return;
     for (const event of snapshot.boardingEvents ?? []) {
       if (event.id <= this.lastBoardingEventId) continue;
-      this.spawnBoardingGroup(event);
+      if ((event.groupCount ?? 1) > 1 && event.linkedPassenger) {
+        this.spawnLinkedBoardingBatch(event);
+      } else {
+        this.spawnBoardingGroup(event);
+      }
       this.lastBoardingEventId = event.id;
     }
   }
@@ -2692,17 +2701,157 @@ export class SceneView {
     }
   }
 
+  spawnLinkedBoardingBatch(event) {
+    const spot = this.spotPositions[event.spotIndex];
+    const groupCount = Math.max(0, Math.trunc(event.groupCount ?? 0));
+    if (!spot || groupCount <= 1 || !event.linkedPassenger) return;
+
+    const target = spot.clone();
+    target.y = SCENE_TUNING.path.groundY + SCENE_TUNING.passengers.heightAbovePath;
+    const rowCenters = [];
+    const entries = [];
+
+    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+      const progress = event.progresses?.[groupIndex] ?? event.progress;
+      if (!Number.isFinite(progress)) continue;
+      const startCenter = this.curve.getPointAt(progress);
+      startCenter.y += SCENE_TUNING.passengers.heightAbovePath;
+      rowCenters.push({ position: startCenter.clone() });
+      const tangent = this.curve.getTangentAt(progress);
+      const pathYaw = Math.atan2(tangent.x, tangent.z)
+        + deg(SCENE_TUNING.facing.passengerYawDegrees);
+
+      for (let personIndex = 0; personIndex < LEVEL_1.groupSize; personIndex += 1) {
+        const visual = this.createPassengerVisual(event.colorIndex);
+        visual.scale.setScalar(SCENE_TUNING.passengers.modelScale);
+        const rowOffset = new THREE.Vector3(
+          (personIndex - 1.5)
+            * SCENE_TUNING.passengers.groupSpacing
+            * SCENE_TUNING.passengers.modelScale,
+          0,
+          0
+        ).applyAxisAngle(new THREE.Vector3(0, 1, 0), pathYaw);
+        const start = startCenter.clone().add(rowOffset);
+        const direction = target.clone().sub(start);
+        visual.position.copy(start);
+        visual.rotation.y = Math.atan2(direction.x, direction.z)
+          + deg(SCENE_TUNING.facing.passengerYawDegrees);
+        this.setVatAnimation(visual.userData.vatMaterial, 'move');
+        this.scene.add(visual);
+        const entry = {
+          root: visual,
+          material: visual.userData.vatMaterial,
+          vehicleId: event.vehicleId,
+          start,
+          target: target.clone(),
+          startedAt: event.startedAt,
+          delay: 0,
+          duration: 0.25,
+          linkedBatchId: event.id
+        };
+        this.boardingViews.push(entry);
+        entries.push(entry);
+      }
+    }
+
+    if (rowCenters.length !== groupCount || entries.length !== groupCount * LEVEL_1.groupSize) {
+      for (const entry of entries) {
+        this.scene.remove(entry.root);
+        entry.material.dispose();
+        const index = this.boardingViews.indexOf(entry);
+        if (index >= 0) this.boardingViews.splice(index, 1);
+      }
+      return;
+    }
+
+    const connector = this.makeLinkedPassengerConnector(groupCount);
+    for (let index = 0; index < connector.segments.length; index += 1) {
+      this.positionLinkedConnectorSegment(
+        connector.segments[index],
+        rowCenters[index],
+        rowCenters[index + 1]
+      );
+    }
+    connector.badge.position.set(
+      rowCenters[0].position.x,
+      rowCenters[0].position.y + LINKED_BADGE_Y_OFFSET,
+      rowCenters[0].position.z
+    );
+    const connectorMaterials = connector.segments
+      .map((segment) => segment.material)
+      .filter(Boolean);
+    for (const material of connectorMaterials) material.transparent = true;
+    const badgeMaterial = connector.badge.material;
+    this.linkedBoardingBatches.set(event.id, {
+      remaining: entries.length,
+      vehicleId: event.vehicleId,
+      connectorRoot: connector.root,
+      connectorSegments: connector.segments,
+      connectorMaterials,
+      badgeMaterial,
+      startedAt: event.startedAt,
+      duration: 0.25
+    });
+  }
+
+  disposeLinkedBoardingBatch(batch) {
+    if (!batch) return;
+    this.scene.remove(batch.connectorRoot);
+    for (const segment of batch.connectorSegments ?? []) segment.geometry?.dispose();
+    for (const material of new Set(batch.connectorMaterials ?? [])) material.dispose?.();
+    batch.badgeMaterial?.dispose?.();
+  }
+
+  finishLinkedBoardingBatch(linkedBatchId, batch, time) {
+    if (this.linkedBoardingBatches.get(linkedBatchId) !== batch) return;
+    this.triggerVehicleBoardingPulse(batch.vehicleId, time);
+    this.vehicleEffects?.spawnAboardSmoke(batch.vehicleId);
+    this.hooks.onPassengerAboard?.(batch.vehicleId);
+    this.disposeLinkedBoardingBatch(batch);
+    this.linkedBoardingBatches.delete(linkedBatchId);
+  }
+
   updateBoardingViews(time) {
+    for (const batch of this.linkedBoardingBatches.values()) {
+      const progress = THREE.MathUtils.clamp(
+        (time - batch.startedAt) / batch.duration,
+        0,
+        1
+      );
+      const opacity = 1 - progress;
+      for (const material of batch.connectorMaterials ?? []) {
+        material.opacity = opacity;
+        material.emissiveIntensity = 0.35 + 1.65 * (1 - progress);
+      }
+      if (batch.badgeMaterial) batch.badgeMaterial.opacity = opacity;
+    }
+
     for (let index = this.boardingViews.length - 1; index >= 0; index -= 1) {
       const entry = this.boardingViews[index];
       const elapsed = time - entry.startedAt - entry.delay;
       if (elapsed < 0) continue;
       const progress = THREE.MathUtils.clamp(elapsed / entry.duration, 0, 1);
-      entry.root.position.lerpVectors(entry.start, entry.target, ease(progress));
+      if (this.reducedMotionQuery?.matches && entry.linkedBatchId != null) {
+        entry.root.position.copy(entry.start);
+        entry.material.transparent = true;
+        entry.material.opacity = 1 - progress;
+      } else {
+        entry.root.position.lerpVectors(entry.start, entry.target, ease(progress));
+      }
       if (progress < 1) continue;
-      this.triggerVehicleBoardingPulse(entry.vehicleId, time);
-      this.vehicleEffects?.spawnAboardSmoke(entry.vehicleId);
-      this.hooks.onPassengerAboard?.(entry.vehicleId);
+      if (entry.linkedBatchId != null) {
+        const batch = this.linkedBoardingBatches.get(entry.linkedBatchId);
+        if (batch) {
+          batch.remaining = Math.max(0, batch.remaining - 1);
+          if (batch.remaining === 0) {
+            this.finishLinkedBoardingBatch(entry.linkedBatchId, batch, time);
+          }
+        }
+      } else {
+        this.triggerVehicleBoardingPulse(entry.vehicleId, time);
+        this.vehicleEffects?.spawnAboardSmoke(entry.vehicleId);
+        this.hooks.onPassengerAboard?.(entry.vehicleId);
+      }
       this.scene.remove(entry.root);
       entry.material.dispose();
       this.boardingViews.splice(index, 1);
