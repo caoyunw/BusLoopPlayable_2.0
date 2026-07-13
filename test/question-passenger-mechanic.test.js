@@ -198,6 +198,47 @@ test('passengers without question-passenger state clear belt slot state', () => 
   assert.equal(slot.questionPassenger, null);
 });
 
+test('passengers with explicit null question-passenger state clear populated belt slots', () => {
+  const runtime = questionPassengerMechanic.createRuntime();
+  const slot = {
+    questionPassenger: {
+      hidden: false,
+      wasHidden: true,
+      revealVersion: 1
+    }
+  };
+
+  runtime.onPassengerEnteredBelt({ slot, passenger: { questionPassenger: null } });
+
+  assert.equal(slot.questionPassenger, null);
+});
+
+test('visible passengers preserve their reveal version when cloned to a belt slot', () => {
+  const runtime = questionPassengerMechanic.createRuntime();
+  const passenger = {
+    questionPassenger: {
+      hidden: false,
+      wasHidden: false,
+      revealVersion: 7
+    }
+  };
+  const slot = runtime.createSlotData();
+
+  runtime.onPassengerEnteredBelt({ slot, passenger });
+
+  assert.deepEqual(slot.questionPassenger, {
+    hidden: false,
+    wasHidden: false,
+    revealVersion: 7
+  });
+  assert.deepEqual(passenger.questionPassenger, {
+    hidden: false,
+    wasHidden: false,
+    revealVersion: 7
+  });
+  assert.notEqual(slot.questionPassenger, passenger.questionPassenger);
+});
+
 test('queue-item and decorated global snapshots isolate nested runtime state', () => {
   const runtime = questionPassengerMechanic.createRuntime({ random: () => 0 });
   const queueItem = runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 });
@@ -233,6 +274,21 @@ test('slot snapshots clone nested question-passenger state', () => {
     revealVersion: 1
   });
   assert.notEqual(snapshot.questionPassenger, slot.questionPassenger);
+});
+
+test('queue-item and slot snapshots normalize missing or null mechanic state to null', () => {
+  const runtime = questionPassengerMechanic.createRuntime();
+
+  assert.deepEqual(runtime.cloneQueueItemSnapshot({}), { questionPassenger: null });
+  assert.deepEqual(
+    runtime.cloneQueueItemSnapshot({ questionPassenger: null }),
+    { questionPassenger: null }
+  );
+  assert.deepEqual(runtime.cloneSlotSnapshot({}), { questionPassenger: null });
+  assert.deepEqual(
+    runtime.cloneSlotSnapshot({ questionPassenger: null }),
+    { questionPassenger: null }
+  );
 });
 
 test('clearing slot data removes question-passenger state', () => {
