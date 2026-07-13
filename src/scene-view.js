@@ -1319,19 +1319,22 @@ export class SceneView {
       ...this.boardingViews.map((entry) => entry.root)
     ];
     for (const root of roots) {
-      if (root.userData.vatMaterial) {
-        const colorIndex = root.userData.vatMaterial.userData.passengerColorIndex ?? root.userData.colorIndex ?? 0;
-        if (!shouldUpdateColor(colorIndex)) continue;
-        const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
-        applyPassengerMaterial(root.userData.vatMaterial, colorIndex, map);
-      }
-      for (const slot of root.userData.personSlots ?? []) {
-        const material = slot.userData.vatMaterial;
+      if (root.userData.questionPassengerHidden === true) continue;
+      const rootColorIndex = root.userData.colorIndex
+        ?? root.userData.vatMaterial?.userData.passengerColorIndex
+        ?? root.userData.personSlots
+          ?.find((slot) => slot.userData.vatMaterial)
+          ?.userData.vatMaterial.userData.passengerColorIndex
+        ?? 0;
+      if (!shouldUpdateColor(rootColorIndex)) continue;
+      const map = this.passengerColorTextures[rootColorIndex] ?? this.passengerColorTextures[0];
+      const materials = [
+        root.userData.vatMaterial,
+        ...(root.userData.personSlots ?? []).map((slot) => slot.userData.vatMaterial)
+      ];
+      for (const material of materials) {
         if (!material) continue;
-        const colorIndex = material.userData.passengerColorIndex ?? root.userData.colorIndex ?? 0;
-        if (!shouldUpdateColor(colorIndex)) continue;
-        const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
-        applyPassengerMaterial(material, colorIndex, map);
+        applyPassengerMaterial(material, rootColorIndex, map);
       }
       root.userData.questionPassengerHidden = null;
     }

@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import * as THREE from 'three';
 
 import { BusLoopGame } from '../src/game-model.js';
-import { LEVEL_1 } from '../src/level-data.js';
+import { COLORS, LEVEL_1 } from '../src/level-data.js';
+import { SceneView } from '../src/scene-view.js';
+import { SCENE_TUNING } from '../src/scene-tuning.js';
 import * as questionPassengerMechanic from '../src/mechanics/question-passenger/index.js';
 import { createQuestionPassengerRuntime } from '../src/mechanics/question-passenger/model.js';
 import { createQuestionPassengerDetailView } from '../src/mechanics/question-passenger/view.js';
@@ -17,6 +20,32 @@ function getSourceSection(startMarker, endMarker) {
   const end = sceneSource.indexOf(endMarker, start + startMarker.length);
   assert.notEqual(end, -1, `missing scene source marker: ${endMarker}`);
   return sceneSource.slice(start, end);
+}
+
+function makeBadges(opacity = 0.25) {
+  return Array.from({ length: 4 }, () => ({
+    visible: false,
+    material: { opacity }
+  }));
+}
+
+function makeAppearanceScene(passengerColorTextures = []) {
+  return {
+    passengerColorTextures,
+    setQuestionPassengerBadgesVisible: SceneView.prototype.setQuestionPassengerBadgesVisible
+  };
+}
+
+function makeVatView(material, colorIndex, hidden = null) {
+  return {
+    userData: {
+      modelReady: true,
+      colorIndex,
+      questionPassengerHidden: hidden,
+      questionBadges: makeBadges(),
+      personSlots: [{ userData: { vatMaterial: material } }]
+    }
+  };
 }
 
 function makeLevel(authoredMasks = [[true, false], [false, true]]) {
@@ -296,7 +325,7 @@ test('scene keeps queue questions hidden, belt colors real, and clears reused in
   assert.equal((update.match(/this\.resetPassengerAppearance\(view\)/g) ?? []).length, 2);
 });
 
-test('scene resynchronizes question badges with spacing and invalidates hidden materials after tuning', () => {
+test('scene resynchronizes question badges and targets material tuning to visible matching roots', () => {
   const visualTuning = getSourceSection(
     '  updatePassengerVisualTuning()',
     '  updatePassengerMaterialTuning'
@@ -307,8 +336,174 @@ test('scene resynchronizes question badges with spacing and invalidates hidden m
   );
 
   assert.match(visualTuning, /root\.userData\.questionBadges\?\.forEach\(\(badge, index\) => \{[\s\S]*?badge\.position\.x = \(index - 1\.5\) \* spacing/);
-  assert.match(materialTuning, /for \(const root of roots\)[\s\S]*?root\.userData\.questionPassengerHidden = null/);
-  assert.match(materialTuning, /applyPassengerMaterial\(material, colorIndex, map\)[\s\S]*?root\.userData\.questionPassengerHidden = null/);
+  assert.match(materialTuning, /if \(root\.userData\.questionPassengerHidden === true\) continue/);
+  assert.match(materialTuning, /const rootColorIndex = [\s\S]*?root\.userData\.colorIndex/);
+  assert.match(materialTuning, /if \(!shouldUpdateColor\(rootColorIndex\)\) continue/);
+  assert.match(materialTuning, /applyPassengerMaterial\(material, rootColorIndex, map\)[\s\S]*?root\.userData\.questionPassengerHidden = null/);
+});
+
+test('setPassengerAppearance restores fallback colors around a hidden neutral transition', () => {
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    emissive: 0xffffff,
+    roughness: 0.1,
+    metalness: 0.8
+  });
+  material.map = new THREE.Texture();
+  material.emissiveMap = new THREE.Texture();
+  const badges = makeBadges();
+  const view = {
+    userData: {
+      modelReady: false,
+      colorIndex: null,
+      questionPassengerHidden: null,
+      questionBadges: badges,
+      personSlots: [{ userData: { fallback: { material } } }]
+    }
+  };
+  const scene = makeAppearanceScene();
+
+  SceneView.prototype.setPassengerAppearance.call(scene, view, 3, false);
+  assert.equal(material.color.getHex(), COLORS[3].hex);
+  assert.equal(material.emissive.getHex(), 0x000000);
+  assert.equal(material.roughness, 0.62);
+  assert.equal(material.userData.passengerColorIndex, 3);
+  assert.equal(badges.every((badge) => !badge.visible && badge.material.opacity === 1), true);
+
+  badges.forEach((badge) => { badge.material.opacity = 0.2; });
+  SceneView.prototype.setPassengerAppearance.call(scene, view, 3, true);
+  assert.equal(material.map, null);
+  assert.equal(material.emissiveMap, null);
+  assert.equal(material.color.getHex(), 0x9da8b8);
+  assert.equal(material.emissive.getHex(), 0x303946);
+  assert.equal(material.emissiveIntensity, 0.18);
+  assert.equal(material.roughness, 0.72);
+  assert.equal(material.metalness, 0);
+  assert.equal(material.userData.passengerColorIndex, null);
+  assert.equal(badges.every((badge) => badge.visible && badge.material.opacity === 1), true);
+
+  badges.forEach((badge) => { badge.material.opacity = 0.4; });
+  SceneView.prototype.setPassengerAppearance.call(scene, view, 3, false);
+  assert.equal(material.color.getHex(), COLORS[3].hex);
+  assert.equal(material.emissive.getHex(), 0x000000);
+  assert.equal(material.userData.passengerColorIndex, 3);
+  assert.equal(badges.every((badge) => !badge.visible && badge.material.opacity === 1), true);
+});
+
+test('setPassengerAppearance removes and restores VAT color maps and tuned material values', () => {
+  const colorIndex = 2;
+  const colorTexture = new THREE.Texture();
+  const material = new THREE.MeshStandardMaterial();
+  const view = makeVatView(material, null, null);
+  const scene = makeAppearanceScene(Array.from({ length: colorIndex + 1 }, (_, index) => (
+    index === colorIndex ? colorTexture : new THREE.Texture()
+  )));
+
+  SceneView.prototype.setPassengerAppearance.call(scene, view, colorIndex, false);
+  assert.equal(material.map, colorTexture);
+  assert.equal(material.emissiveMap, colorTexture);
+  assert.equal(material.emissiveIntensity, SCENE_TUNING.passengerMaterial.emissionStrength);
+  assert.equal(material.roughness, SCENE_TUNING.passengerMaterial.roughness);
+  assert.equal(material.userData.passengerColorIndex, colorIndex);
+
+  SceneView.prototype.setPassengerAppearance.call(scene, view, colorIndex, true);
+  assert.equal(material.map, null);
+  assert.equal(material.emissiveMap, null);
+  assert.equal(material.color.getHex(), 0x9da8b8);
+  assert.equal(material.userData.passengerColorIndex, null);
+
+  SceneView.prototype.setPassengerAppearance.call(scene, view, colorIndex, false);
+  assert.equal(material.map, colorTexture);
+  assert.equal(material.emissiveMap, colorTexture);
+  assert.equal(material.emissiveIntensity, SCENE_TUNING.passengerMaterial.emissionStrength);
+  assert.equal(material.roughness, SCENE_TUNING.passengerMaterial.roughness);
+  assert.equal(material.userData.passengerColorIndex, colorIndex);
+});
+
+test('appearance cache invalidation restores a reused view and resets question badges', () => {
+  const material = new THREE.MeshStandardMaterial();
+  const badges = makeBadges();
+  const view = {
+    userData: {
+      modelReady: false,
+      colorIndex: null,
+      questionPassengerHidden: null,
+      questionBadges: badges,
+      personSlots: [{ userData: { fallback: { material } } }]
+    }
+  };
+  const scene = makeAppearanceScene();
+
+  SceneView.prototype.setPassengerAppearance.call(scene, view, 1, false);
+  material.color.setHex(0x123456);
+  badges.forEach((badge) => {
+    badge.visible = true;
+    badge.material.opacity = 0.1;
+  });
+  SceneView.prototype.setPassengerAppearance.call(scene, view, 1, false);
+  assert.equal(material.color.getHex(), 0x123456);
+  assert.equal(badges.every((badge) => badge.visible && badge.material.opacity === 0.1), true);
+
+  SceneView.prototype.resetPassengerAppearance.call({
+    setQuestionPassengerBadgesVisible: SceneView.prototype.setQuestionPassengerBadgesVisible
+  }, view);
+  assert.equal(view.userData.colorIndex, null);
+  assert.equal(view.userData.questionPassengerHidden, null);
+  assert.equal(badges.every((badge) => !badge.visible && badge.material.opacity === 1), true);
+
+  SceneView.prototype.setPassengerAppearance.call(scene, view, 1, false);
+  assert.equal(material.color.getHex(), COLORS[1].hex);
+  assert.equal(material.userData.passengerColorIndex, 1);
+});
+
+test('material tuning skips hidden and nonmatching roots while full updates keep reveal current', () => {
+  const textures = Array.from({ length: 3 }, () => new THREE.Texture());
+  const scene = makeAppearanceScene(textures);
+  scene.passengerMaterials = [];
+  scene.queuePassengerViews = [[]];
+  scene.boardingViews = [];
+
+  const targetedMaterial = new THREE.MeshStandardMaterial();
+  const otherMaterial = new THREE.MeshStandardMaterial();
+  const hiddenMaterial = new THREE.MeshStandardMaterial();
+  const targeted = makeVatView(targetedMaterial, null, null);
+  const other = makeVatView(otherMaterial, null, null);
+  const hidden = makeVatView(hiddenMaterial, null, null);
+  SceneView.prototype.setPassengerAppearance.call(scene, targeted, 1, false);
+  SceneView.prototype.setPassengerAppearance.call(scene, other, 2, false);
+  SceneView.prototype.setPassengerAppearance.call(scene, hidden, 1, true);
+  targetedMaterial.emissiveIntensity = 9;
+  otherMaterial.emissiveIntensity = 8;
+  scene.passengerViews = [targeted, other];
+  scene.queuePassengerViews[0].push(hidden);
+
+  SceneView.prototype.updatePassengerMaterialTuning.call(scene, { colorIndex: 1 });
+  assert.equal(targetedMaterial.emissiveIntensity, SCENE_TUNING.passengerMaterial.emissionStrength);
+  assert.equal(targeted.userData.questionPassengerHidden, null);
+  assert.equal(otherMaterial.emissiveIntensity, 8);
+  assert.equal(other.userData.questionPassengerHidden, false);
+  assert.equal(hiddenMaterial.emissiveIntensity, 0.18);
+  assert.equal(hiddenMaterial.color.getHex(), 0x9da8b8);
+  assert.equal(hidden.userData.questionPassengerHidden, true);
+
+  SceneView.prototype.updatePassengerMaterialTuning.call(scene);
+  assert.equal(otherMaterial.emissiveIntensity, SCENE_TUNING.passengerMaterial.emissionStrength);
+  assert.equal(other.userData.questionPassengerHidden, null);
+  assert.equal(hiddenMaterial.emissiveIntensity, 0.18);
+  assert.equal(hidden.userData.questionPassengerHidden, true);
+
+  const originalEmissionStrength = SCENE_TUNING.passengerMaterial.emissionStrength;
+  try {
+    SCENE_TUNING.passengerMaterial.emissionStrength = 1.35;
+    SceneView.prototype.updatePassengerMaterialTuning.call(scene);
+    assert.equal(hiddenMaterial.emissiveIntensity, 0.18);
+    assert.equal(hidden.userData.questionPassengerHidden, true);
+    SceneView.prototype.setPassengerAppearance.call(scene, hidden, 1, false);
+    assert.equal(hiddenMaterial.emissiveIntensity, 1.35);
+    assert.equal(hiddenMaterial.userData.passengerColorIndex, 1);
+  } finally {
+    SCENE_TUNING.passengerMaterial.emissionStrength = originalEmissionStrength;
+  }
 });
 
 test('hidden passengers reveal once when entering a belt slot without mutating queue state', () => {

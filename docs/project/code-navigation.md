@@ -78,7 +78,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 ### Tests
 
 - `test/mechanic-registry.test.js`: lab shell, CSS breakpoint contracts, library rendering/interactions/detail-extension cleanup, mechanic detail-view factory and question settings controls, registry completeness/freezing/filtering, URL helpers, and safe storage removal.
-- `test/question-passenger-mechanic.test.js`: question-passenger assignment/state contracts plus hidden queue material, badge, cache, and scene-wiring source contracts.
+- `test/question-passenger-mechanic.test.js`: question-passenger assignment/state plus hidden material transitions, badge/cache reuse, tuning, and scene-wiring contracts.
 - `test/star-passenger-mechanic.test.js`: star-passenger registry status, reward lifetime, cyclic charge, boarding/expiration behavior, UI wiring, and reduced-motion contracts.
 - `test/game-model.test.js`: base gameplay plus source/runtime contracts, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
@@ -86,7 +86,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ## Known Test Baseline
 
-As of 2026-07-13, the full suite passes 119/119. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
+As of 2026-07-13, the full suite passes 123/123. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
 ## Historical Material
 
