@@ -64,6 +64,43 @@ export function createQuestionPassengerRuntime({ random = Math.random, level, op
     },
     createSlotData() {
       return { questionPassenger: null };
+    },
+    cloneQueueItemSnapshot(item) {
+      return {
+        questionPassenger: item?.questionPassenger
+          ? { ...item.questionPassenger }
+          : null
+      };
+    },
+    cloneSlotSnapshot(slot) {
+      return {
+        questionPassenger: slot?.questionPassenger
+          ? { ...slot.questionPassenger }
+          : null
+      };
+    },
+    decorateSnapshot(game) {
+      return {
+        questionPassenger: { ...game.mechanicState.questionPassenger }
+      };
+    },
+    onPassengerEnteredBelt({ slot, passenger }) {
+      if (!passenger.questionPassenger) {
+        slot.questionPassenger = null;
+        return;
+      }
+
+      const questionPassenger = { ...passenger.questionPassenger };
+      questionPassenger.hidden = false;
+
+      if (questionPassenger.wasHidden) {
+        questionPassenger.revealVersion += 1;
+      }
+
+      slot.questionPassenger = questionPassenger;
+    },
+    clearSlotData({ slot }) {
+      slot.questionPassenger = null;
     }
   };
 }

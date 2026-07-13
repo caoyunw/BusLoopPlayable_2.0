@@ -163,3 +163,89 @@ test('runtime exposes mechanic identity and empty slot metadata', () => {
   assert.equal(questionPassengerMechanic.default.definition, questionPassengerMechanic.definition);
   assert.equal(questionPassengerMechanic.default.createRuntime, questionPassengerMechanic.createRuntime);
 });
+
+test('hidden passengers reveal once when entering a belt slot without mutating queue state', () => {
+  const runtime = questionPassengerMechanic.createRuntime({ random: () => 0 });
+  const passenger = runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 });
+  const slot = runtime.createSlotData();
+
+  runtime.onPassengerEnteredBelt({ slot, passenger });
+
+  assert.deepEqual(slot.questionPassenger, {
+    hidden: false,
+    wasHidden: true,
+    revealVersion: 1
+  });
+  assert.deepEqual(passenger.questionPassenger, {
+    hidden: true,
+    wasHidden: true,
+    revealVersion: 0
+  });
+});
+
+test('passengers without question-passenger state clear belt slot state', () => {
+  const runtime = questionPassengerMechanic.createRuntime();
+  const slot = {
+    questionPassenger: {
+      hidden: false,
+      wasHidden: true,
+      revealVersion: 1
+    }
+  };
+
+  runtime.onPassengerEnteredBelt({ slot, passenger: {} });
+
+  assert.equal(slot.questionPassenger, null);
+});
+
+test('queue-item and decorated global snapshots isolate nested runtime state', () => {
+  const runtime = questionPassengerMechanic.createRuntime({ random: () => 0 });
+  const queueItem = runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 });
+  const game = { mechanicState: runtime.createState() };
+
+  const queueSnapshot = runtime.cloneQueueItemSnapshot(queueItem);
+  const globalSnapshot = runtime.decorateSnapshot(game);
+  queueSnapshot.questionPassenger.hidden = false;
+  globalSnapshot.questionPassenger.mode = 'authored';
+
+  assert.equal(queueItem.questionPassenger.hidden, true);
+  assert.equal(game.mechanicState.questionPassenger.mode, 'chance');
+  assert.notEqual(queueSnapshot.questionPassenger, queueItem.questionPassenger);
+  assert.notEqual(globalSnapshot.questionPassenger, game.mechanicState.questionPassenger);
+});
+
+test('slot snapshots clone nested question-passenger state', () => {
+  const runtime = questionPassengerMechanic.createRuntime();
+  const slot = {
+    questionPassenger: {
+      hidden: false,
+      wasHidden: true,
+      revealVersion: 1
+    }
+  };
+
+  const snapshot = runtime.cloneSlotSnapshot(slot);
+  snapshot.questionPassenger.revealVersion = 9;
+
+  assert.deepEqual(slot.questionPassenger, {
+    hidden: false,
+    wasHidden: true,
+    revealVersion: 1
+  });
+  assert.notEqual(snapshot.questionPassenger, slot.questionPassenger);
+});
+
+test('clearing slot data removes question-passenger state', () => {
+  const runtime = questionPassengerMechanic.createRuntime();
+  const slot = {
+    questionPassenger: {
+      hidden: false,
+      wasHidden: true,
+      revealVersion: 1
+    }
+  };
+
+  runtime.clearSlotData({ slot });
+
+  assert.equal(slot.questionPassenger, null);
+});
