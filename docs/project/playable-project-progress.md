@@ -43,7 +43,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 - Production build, Three.js/Vite packaging, and advertising delivery checks were not run because they are explicitly outside this mechanic-lab completion gate.
 - Desktop 1280x720 QA passed with chance 30%/maximum 10, authored 12-chain/66-row summary, session-only switching, readable connectors/`x10`, and no planned overlay. A 10-row chain stayed intact when only 4 seats remained, then boarded and departed as one chain with a 40-seat vehicle.
 - Mobile 390x844 QA passed with zero document/body/settings horizontal overflow, usable drawer controls, and readable queue/belt connectors and `x10` badge.
-- A temporary exact source override exercised the live reduced-motion branch: the page stayed stable with no error logs and the branch kept in-place fade plus one pulse/smoke/audio event. The source was restored cleanly. Existing FBXLoader warnings remain non-blocking.
+- A temporary exact source override exercised the live reduced-motion branch: the branch ran in place, the chain stayed whole, the page reported no errors, and the source was restored without residual changes. The direct-effects automated gate passes 46/46 and proves the single pulse/smoke/audio trigger contract; those effects were not separately accepted as a manual audiovisual check. Existing FBXLoader warnings remain non-blocking.
 
 ### Next Step
 
