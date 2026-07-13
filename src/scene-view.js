@@ -28,6 +28,7 @@ const ease = (t) => 1 - Math.pow(1 - t, 3);
 const deg = (value) => THREE.MathUtils.degToRad(value);
 const ARROW_OUTLINE_SCALE = 1.28;
 const GUIDE_HAND_TEXTURE_URL = '/assets/runtime/main-guide-hand_q80.webp';
+const QUESTION_PASSENGER_REVEAL_DURATION = 0.25;
 const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
   { baseColor: 0xffffff, emissionColor: 0x36a6ff },
   { baseColor: 0xffffff, emissionColor: 0xadd98a },
@@ -461,6 +462,7 @@ function makeVehiclePlaceholder(vehicle) {
 }
 
 let questionPassengerBadgeTexture = null;
+let questionPassengerRevealTexture = null;
 
 function getQuestionPassengerBadgeTexture() {
   if (questionPassengerBadgeTexture) return questionPassengerBadgeTexture;
@@ -507,6 +509,46 @@ function makeQuestionPassengerBadges(spacing) {
     badges.push(sprite);
   }
   return badges;
+}
+
+function getQuestionPassengerRevealTexture() {
+  if (questionPassengerRevealTexture) return questionPassengerRevealTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (context) {
+    const center = canvas.width / 2;
+    const gradient = context.createRadialGradient(center, center, 0, center, center, center);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.72)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  questionPassengerRevealTexture = new THREE.CanvasTexture(canvas);
+  questionPassengerRevealTexture.colorSpace = THREE.SRGBColorSpace;
+  questionPassengerRevealTexture.needsUpdate = true;
+  return questionPassengerRevealTexture;
+}
+
+function makeQuestionPassengerRevealFlash() {
+  const material = new THREE.SpriteMaterial({
+    map: getQuestionPassengerRevealTexture(),
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.position.set(0, 0.36, 0.06);
+  sprite.scale.set(0.72, 0.72, 1);
+  sprite.renderOrder = 89;
+  sprite.visible = false;
+  sprite.userData.questionRevealBaseScale = 0.72;
+  return sprite;
 }
 
 function makeStarBadgeLabel({ width = 96, height = 96, scaleX = 0.18, scaleY = 0.18 } = {}) {
@@ -631,6 +673,7 @@ function makeStarBadge() {
 function makePassengerGroup(groupScale) {
   const group = new THREE.Group();
   group.scale.setScalar(groupScale);
+  group.userData.questionRevealBaseScale = groupScale;
   group.userData.personSlots = [];
   const spacing = SCENE_TUNING.passengers.groupSpacing;
   for (let i = 0; i < 4; i += 1) {
@@ -649,6 +692,12 @@ function makePassengerGroup(groupScale) {
   const questionBadges = makeQuestionPassengerBadges(spacing);
   group.userData.questionBadges = questionBadges;
   group.add(...questionBadges);
+  const questionRevealFlash = makeQuestionPassengerRevealFlash();
+  group.userData.questionRevealFlash = questionRevealFlash;
+  group.add(questionRevealFlash);
+  group.userData.questionPassengerId = null;
+  group.userData.questionPassengerRevealVersion = null;
+  group.userData.questionPassengerRevealStartedAt = -Infinity;
   const starBadge = makeStarBadge();
   group.userData.starBadge = starBadge;
   group.add(starBadge);
@@ -1282,6 +1331,7 @@ export class SceneView {
     const scale = SCENE_TUNING.passengers.modelScale;
     const spacing = SCENE_TUNING.passengers.groupSpacing;
     for (const root of [...this.passengerViews, ...this.queuePassengerViews.flat()]) {
+      root.userData.questionRevealBaseScale = scale;
       root.scale.setScalar(scale);
       root.userData.personSlots?.forEach((slot, index) => {
         slot.position.x = (index - 1.5) * spacing;
@@ -1545,8 +1595,88 @@ export class SceneView {
     }
   }
 
-  resetPassengerAppearance(view) {
+  updateQuestionPassengerReveal(view, state, time = 0, passengerId = null) {
+    const baseScale = view.userData.questionRevealBaseScale ?? SCENE_TUNING.passengers.modelScale;
+    const flash = view.userData.questionRevealFlash;
+    const revealVersion = Math.max(0, Number(state?.revealVersion) || 0);
+    const changedPassenger = view.userData.questionPassengerId !== passengerId;
+    const increasedVersion = !changedPassenger
+      && revealVersion > (view.userData.questionPassengerRevealVersion ?? 0);
+    const eligibleReveal = state?.wasHidden === true && revealVersion > 0;
+
+    if (changedPassenger) {
+      view.userData.questionPassengerId = passengerId;
+      view.userData.questionPassengerRevealVersion = revealVersion;
+      view.userData.questionPassengerRevealStartedAt = -Infinity;
+    } else if (increasedVersion) {
+      view.userData.questionPassengerRevealVersion = revealVersion;
+    }
+
+    if (!eligibleReveal) {
+      view.userData.questionPassengerRevealStartedAt = -Infinity;
+    } else if (changedPassenger || increasedVersion) {
+      view.userData.questionPassengerRevealStartedAt = time;
+    }
+
+    const startedAt = view.userData.questionPassengerRevealStartedAt ?? -Infinity;
+    const elapsed = time - startedAt;
+    const active = eligibleReveal
+      && elapsed >= 0
+      && elapsed < QUESTION_PASSENGER_REVEAL_DURATION;
+    const flashBaseScale = flash?.userData.questionRevealBaseScale ?? flash?.scale.x ?? 0.72;
+    if (flash) flash.userData.questionRevealBaseScale = flashBaseScale;
+
+    if (!active) {
+      view.scale.setScalar(baseScale);
+      if (flash) {
+        flash.visible = false;
+        flash.scale.set(flashBaseScale, flashBaseScale, 1);
+        if (flash.material) flash.material.opacity = 0;
+      }
+      this.setQuestionPassengerBadgesVisible(view, false);
+      return;
+    }
+
+    const progress = THREE.MathUtils.clamp(elapsed / QUESTION_PASSENGER_REVEAL_DURATION, 0, 1);
+    const reduceMotion = Boolean(this.reducedMotionQuery?.matches);
+    const pulseScale = reduceMotion ? 1 : 1 + Math.sin(Math.PI * progress) * 0.08;
+    view.scale.setScalar(baseScale * pulseScale);
+    if (flash) {
+      flash.visible = true;
+      if (!reduceMotion) {
+        const expandingScale = flashBaseScale * (0.7 + progress * 0.8);
+        flash.scale.set(expandingScale, expandingScale, 1);
+      } else {
+        flash.scale.set(flashBaseScale, flashBaseScale, 1);
+      }
+      if (flash.material) flash.material.opacity = 1 - progress;
+    }
+    for (const badge of view.userData.questionBadges ?? []) {
+      badge.visible = true;
+      if (badge.material) badge.material.opacity = 1 - progress;
+    }
+  }
+
+  resetQuestionPassengerReveal(
+    view,
+    baseScale = view.userData.questionRevealBaseScale ?? SCENE_TUNING.passengers.modelScale
+  ) {
+    view.userData.questionPassengerId = null;
+    view.userData.questionPassengerRevealVersion = null;
+    view.userData.questionPassengerRevealStartedAt = -Infinity;
+    view.scale.setScalar(baseScale);
+    const flash = view.userData.questionRevealFlash;
+    if (flash) {
+      const flashBaseScale = flash.userData.questionRevealBaseScale ?? flash.scale.x ?? 0.72;
+      flash.visible = false;
+      flash.scale.set(flashBaseScale, flashBaseScale, 1);
+      if (flash.material) flash.material.opacity = 0;
+    }
     this.setQuestionPassengerBadgesVisible(view, false);
+  }
+
+  resetPassengerAppearance(view) {
+    this.resetQuestionPassengerReveal(view);
     view.userData.colorIndex = null;
     view.userData.questionPassengerHidden = null;
   }
@@ -1824,6 +1954,7 @@ export class SceneView {
         view.rotation.y = Math.atan2(tangent.x, tangent.z) + passengerYaw;
       }
       this.setPassengerAppearance(view, slot.colorIndex, false);
+      this.updateQuestionPassengerReveal(view, slot.questionPassenger, snapshot.time, slot.passengerId);
       this.setPassengerAnimation(view, 'move', slot.index > 0 && slot.index % 2 === 0 ? 0.3 : 0);
       this.updateStarPassengerBadge(view, slot.starReward, snapshot.time, slot.passengerId);
     }

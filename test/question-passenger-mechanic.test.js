@@ -36,6 +36,36 @@ function makeAppearanceScene(passengerColorTextures = []) {
   };
 }
 
+function makeRevealView(baseScale = 1.4) {
+  const view = new THREE.Group();
+  view.scale.setScalar(baseScale);
+  view.userData.questionRevealBaseScale = baseScale;
+  const badges = Array.from({ length: 4 }, () => {
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 1 }));
+    badge.visible = false;
+    view.add(badge);
+    return badge;
+  });
+  const flash = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));
+  flash.scale.set(0.72, 0.72, 1);
+  flash.visible = false;
+  view.add(flash);
+  view.userData.questionBadges = badges;
+  view.userData.questionRevealFlash = flash;
+  return { view, badges, flash, baseScale };
+}
+
+function makeRevealScene(reducedMotion = false) {
+  return {
+    reducedMotionQuery: { matches: reducedMotion },
+    setQuestionPassengerBadgesVisible: SceneView.prototype.setQuestionPassengerBadgesVisible
+  };
+}
+
+function assertClose(actual, expected, epsilon = 1e-9) {
+  assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} to be within ${epsilon} of ${expected}`);
+}
+
 function makeVatView(material, colorIndex, hidden = null) {
   return {
     userData: {
@@ -298,6 +328,147 @@ test('scene builds four independent question sprites over passenger positions fr
   assert.match(passengerGroup, /group\.add\(\.\.\.questionBadges\)/);
 });
 
+test('question reveal starts once, pulses midway, and cleans without restarting', () => {
+  const { view, badges, flash, baseScale } = makeRevealView();
+  const scene = makeRevealScene();
+  const state = { wasHidden: true, revealVersion: 1 };
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 10, 41);
+  assert.equal(view.userData.questionPassengerId, 41);
+  assert.equal(view.userData.questionPassengerRevealVersion, 1);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 10);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 10.125, 41);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 10);
+  assert.ok(view.scale.x > baseScale);
+  assert.equal(flash.visible, true);
+  assert.ok(flash.material.opacity > 0 && flash.material.opacity < 1);
+  assert.equal(badges.every((badge) => badge.visible), true);
+  assert.equal(badges.every((badge) => badge.material.opacity > 0 && badge.material.opacity < 1), true);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 10.25, 41);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 10);
+  assertClose(view.scale.x, baseScale);
+  assert.equal(flash.visible, false);
+  assert.equal(flash.material.opacity, 0);
+  assert.equal(badges.every((badge) => !badge.visible && badge.material.opacity === 1), true);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(scene, view, state, 30, 41);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 10);
+  assertClose(view.scale.x, baseScale);
+  assert.equal(flash.visible, false);
+});
+
+test('question reveal retriggers only for a higher hidden reveal version', () => {
+  const { view, badges, flash, baseScale } = makeRevealView();
+  const scene = makeRevealScene();
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: false, revealVersion: 1 },
+    3,
+    7
+  );
+  assert.equal(view.userData.questionPassengerRevealStartedAt, -Infinity);
+  assertClose(view.scale.x, baseScale);
+  assert.equal(flash.visible, false);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: true, revealVersion: 0 },
+    4,
+    8
+  );
+  assert.equal(view.userData.questionPassengerRevealStartedAt, -Infinity);
+  assert.equal(badges.every((badge) => !badge.visible), true);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: true, revealVersion: 1 },
+    5,
+    8
+  );
+  assert.equal(view.userData.questionPassengerRevealVersion, 1);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 5);
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: true, revealVersion: 1 },
+    5.25,
+    8
+  );
+  assert.equal(flash.visible, false);
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: true, revealVersion: 2 },
+    6,
+    8
+  );
+  assert.equal(view.userData.questionPassengerRevealVersion, 2);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, 6);
+  assert.equal(flash.visible, true);
+});
+
+test('reduced-motion question reveal preserves group and flash transforms while fading', () => {
+  const { view, badges, flash, baseScale } = makeRevealView(1.75);
+  const scene = makeRevealScene(true);
+
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: true, revealVersion: 1 },
+    12,
+    19
+  );
+  const flashScale = flash.scale.clone();
+  SceneView.prototype.updateQuestionPassengerReveal.call(
+    scene,
+    view,
+    { wasHidden: true, revealVersion: 1 },
+    12.125,
+    19
+  );
+
+  assertClose(view.scale.x, baseScale);
+  assert.deepEqual(flash.scale.toArray(), flashScale.toArray());
+  assert.equal(flash.visible, true);
+  assert.ok(flash.material.opacity > 0 && flash.material.opacity < 1);
+  assert.equal(badges.every((badge) => badge.material.opacity > 0 && badge.material.opacity < 1), true);
+});
+
+test('resetQuestionPassengerReveal clears all transient state and badge opacity', () => {
+  const { view, badges, flash, baseScale } = makeRevealView(1.2);
+  view.scale.setScalar(1.8);
+  view.userData.questionPassengerId = 9;
+  view.userData.questionPassengerRevealVersion = 3;
+  view.userData.questionPassengerRevealStartedAt = 15;
+  flash.visible = true;
+  flash.material.opacity = 0.4;
+  flash.scale.set(1.4, 1.4, 1);
+  badges.forEach((badge) => {
+    badge.visible = true;
+    badge.material.opacity = 0.3;
+  });
+
+  SceneView.prototype.resetQuestionPassengerReveal.call(
+    makeRevealScene(),
+    view,
+    baseScale
+  );
+
+  assert.equal(view.userData.questionPassengerId, null);
+  assert.equal(view.userData.questionPassengerRevealVersion, null);
+  assert.equal(view.userData.questionPassengerRevealStartedAt, -Infinity);
+  assertClose(view.scale.x, baseScale);
+  assert.equal(flash.visible, false);
+  assert.equal(flash.material.opacity, 0);
+  assert.equal(badges.every((badge) => !badge.visible && badge.material.opacity === 1), true);
+});
+
 test('scene caches hidden appearance and restores fallback or Unity colors without leaking badges', () => {
   const appearance = getSourceSection(
     '  setPassengerAppearance(view, colorIndex, hidden = false)',
@@ -319,10 +490,28 @@ test('scene caches hidden appearance and restores fallback or Unity colors witho
 
 test('scene keeps queue questions hidden, belt colors real, and clears reused invisible views', () => {
   const update = getSourceSection('  update(snapshot, game)', '  updateGuideHandTuning()');
+  const beltUpdate = update.slice(0, update.indexOf('    const queueSnapshots'));
+  const queueUpdate = update.slice(update.indexOf('    const queueSnapshots'));
 
   assert.match(update, /this\.setPassengerAppearance\(view, slot\.colorIndex, false\)/);
+  assert.match(beltUpdate, /this\.setPassengerAppearance\(view, slot\.colorIndex, false\);[\s\S]*?this\.updateQuestionPassengerReveal\(view, slot\.questionPassenger, snapshot\.time, slot\.passengerId\)/);
   assert.match(update, /this\.setPassengerAppearance\(view, colorIndex, Boolean\(item\.questionPassenger\?\.hidden\)\)/);
+  assert.doesNotMatch(queueUpdate, /updateQuestionPassengerReveal/);
   assert.equal((update.match(/this\.resetPassengerAppearance\(view\)/g) ?? []).length, 2);
+});
+
+test('question reveal scene contract uses one shared radial texture and exact duration', () => {
+  const revealHelpers = getSourceSection(
+    'function getQuestionPassengerRevealTexture()',
+    'function makeStarBadgeLabel'
+  );
+  assert.match(sceneSource, /const QUESTION_PASSENGER_REVEAL_DURATION = 0\.25/);
+  assert.match(sceneSource, /let questionPassengerRevealTexture = null/);
+  assert.match(revealHelpers, /createRadialGradient/);
+  assert.match(revealHelpers, /new THREE\.SpriteMaterial\(\{[\s\S]*?map: getQuestionPassengerRevealTexture\(\)/);
+  assert.match(revealHelpers, /transparent: true,[\s\S]*?depthTest: false,[\s\S]*?depthWrite: false,[\s\S]*?toneMapped: false/);
+  assert.match(revealHelpers, /const sprite = new THREE\.Sprite\(material\)/);
+  assert.match(sceneSource, /group\.userData\.questionRevealFlash = questionRevealFlash/);
 });
 
 test('scene resynchronizes question badges and targets material tuning to visible matching roots', () => {
@@ -424,6 +613,7 @@ test('appearance cache invalidation restores a reused view and resets question b
   const material = new THREE.MeshStandardMaterial();
   const badges = makeBadges();
   const view = {
+    scale: new THREE.Vector3(1, 1, 1),
     userData: {
       modelReady: false,
       colorIndex: null,
@@ -445,7 +635,8 @@ test('appearance cache invalidation restores a reused view and resets question b
   assert.equal(badges.every((badge) => badge.visible && badge.material.opacity === 0.1), true);
 
   SceneView.prototype.resetPassengerAppearance.call({
-    setQuestionPassengerBadgesVisible: SceneView.prototype.setQuestionPassengerBadgesVisible
+    setQuestionPassengerBadgesVisible: SceneView.prototype.setQuestionPassengerBadgesVisible,
+    resetQuestionPassengerReveal: SceneView.prototype.resetQuestionPassengerReveal
   }, view);
   assert.equal(view.userData.colorIndex, null);
   assert.equal(view.userData.questionPassengerHidden, null);
