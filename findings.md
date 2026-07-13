@@ -21,6 +21,14 @@
 - Hidden waiting groups use a neutral-gray material and four question badges. Belt groups always show real color and receive one non-blocking reveal. The reduced-motion branch keeps color/brightness/fade while removing scale/pop/expanding-flash transforms.
 - Browser QA exercised a live forced reduced-motion branch because the in-app browser lacked native media-feature emulation; this is not evidence of native OS preference emulation.
 
+### Linked-Passengers Approved Design
+
+- The next mechanic is `linked-passengers`; it remains `planned` until automated and browser gates pass.
+- A chain contains 2–N consecutive same-color passenger rows, capped by the level's largest vehicle capacity. It is atomic at the visible-queue boundary, belt entry, and boarding.
+- Chance mode defaults to 30% with a configurable maximum length; authored mode uses per-queue integer arrays whose nonzero start value is the chain length. Settings are page-session only.
+- Chains occupy N consecutive belt slots, allow ring wrap, and board when the head crosses the exit only if one matching arrived vehicle has N remaining seats.
+- The selected visual is a segmented top connector with a chain-length badge; successful boarding uses one non-blocking synchronized fan-in event, with a no-translation reduced-motion branch.
+
 ### Runtime Asset Naming
 
 - Dependency caches, accidental system files, and transient logs are not project sources and are ignored.

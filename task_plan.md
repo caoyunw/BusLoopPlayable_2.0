@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Complete. `question-passenger` is implemented and activated as the third playable mechanic.
+Design and plan `linked-passengers` as the next mechanic. The design is approved; the written spec is awaiting final user review before implementation planning.
 
 ## Completed Gates
 
@@ -13,9 +13,11 @@ Complete. `question-passenger` is implemented and activated as the third playabl
 - A live forced reduced-motion branch passed without transform motion; native in-app browser media emulation was unavailable and is not claimed.
 - Error-level logs and page errors were absent. Existing FBXLoader warnings and four Unity texture fallback gaps remain documented in `findings.md`.
 
-## Next Goal
+## Next Steps
 
-The user must select one of the 14 planned mechanics before the next design/implementation cycle begins. No priority is currently assigned.
+1. User reviews `docs/superpowers/specs/2026-07-13-linked-passengers-design.md`.
+2. Write and commit the detailed implementation plan.
+3. Execute with TDD while the registry entry remains `planned`.
 
 ## Context Pointers
 
