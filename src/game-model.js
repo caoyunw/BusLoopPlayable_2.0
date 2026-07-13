@@ -23,6 +23,16 @@ const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 const INITIAL_ENTRY_OFFSET_PERCENT = 0.0001;
 const PASSENGER_READY_DISTANCE_THRESHOLD = 0.02;
 
+function normalizeQueueCapacity(value, maximum) {
+  const fallback = Number.isFinite(maximum) ? Math.max(0, Math.floor(maximum)) : 0;
+  const numeric = Number(value);
+  return clampNumber(
+    Number.isFinite(numeric) ? Math.floor(numeric) : fallback,
+    0,
+    fallback
+  );
+}
+
 function visualToVehicleAreaPoint(x, z) {
   const area = SCENE_TUNING.vehicleArea;
   const unitScale = area.positionUnitScale ?? LEVEL_1.mapScale;
@@ -164,10 +174,9 @@ export class BusLoopGame {
     this.queueSpacing = this.level.passengerQueue?.spacing ?? 0.4;
     this.queueAvailableLengths = authoredQueues.map(() => Math.max(0, (this.level.queueCapacity - 1) * this.queueSpacing));
     const queueCapacities = authoredQueues.map(() => this.level.queueCapacity);
-    this.queueCapacities = queueCapacities.map((capacity) => Math.max(0, Math.min(
-      this.level.queueCapacity,
-      Math.floor(capacity)
-    )));
+    this.queueCapacities = queueCapacities.map((capacity) => (
+      normalizeQueueCapacity(capacity, this.level.queueCapacity)
+    ));
     this.queues = authoredQueues.map(() => []);
     this.sourceQueues = authoredQueues.map((queue) => queue.slice());
     this.sourceQueueIndices = authoredQueues.map(() => 0);
@@ -205,10 +214,10 @@ export class BusLoopGame {
       0,
       queueLengths[index] ?? ((this.level.queueCapacity - 1) * this.queueSpacing)
     ));
-    this.queueCapacities = authoredQueues.map((_, index) => Math.max(0, Math.min(
-      this.level.queueCapacity,
-      Math.floor(queueCapacities?.[index] ?? this.level.queueCapacity)
-    )));
+    this.queueCapacities = authoredQueues.map((_, index) => normalizeQueueCapacity(
+      queueCapacities?.[index] ?? this.level.queueCapacity,
+      this.level.queueCapacity
+    ));
     this.queues = authoredQueues.map(() => []);
     this.sourceQueues = authoredQueues.map((queue) => queue.slice());
     this.sourceQueueIndices = authoredQueues.map(() => 0);

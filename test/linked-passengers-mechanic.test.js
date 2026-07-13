@@ -302,3 +302,25 @@ test('linked passenger batch hooks remain reachable through a linked-passengers 
     garageBatch: true
   });
 });
+
+test('queue capacity normalization rejects non-finite values and preserves bounded numeric inputs', () => {
+  const level = makeGameLevel({
+    queue: [0, 1, 2, 3, 4, 5],
+    authoredStarts: [0, 0, 0, 0, 0, 0]
+  });
+  const game = new BusLoopGame(level);
+
+  for (const value of [Number.NaN, Number.POSITIVE_INFINITY]) {
+    game.initializeQueues([value], 0.5, [2], 1);
+    assert.equal(game.snapshot().queues[0].length, level.queueCapacity);
+    assert.equal(game.snapshot().sourceRemaining, 1);
+  }
+
+  game.initializeQueues([-1], 0.5, [2], 1);
+  assert.equal(game.snapshot().queues[0].length, 0);
+  assert.equal(game.snapshot().sourceRemaining, 6);
+
+  game.initializeQueues([2.9], 0.5, [2], 1);
+  assert.equal(game.snapshot().queues[0].length, 2);
+  assert.equal(game.snapshot().sourceRemaining, 4);
+});
