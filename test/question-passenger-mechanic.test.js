@@ -69,7 +69,43 @@ test('authored mode uses only strict true masks and never calls random', () => {
   assert.equal(randomCalls, 0);
 });
 
-test('invalid mode and chance values normalize to safe chance assignment', () => {
+test('authored mask statistics use only array rows from the exact configuration path', () => {
+  const missingLevelState = questionPassengerMechanic.createRuntime().createState().questionPassenger;
+  assert.equal(missingLevelState.authoredMarked, 0);
+  assert.equal(missingLevelState.authoredTotal, 0);
+
+  const missingMasksState = questionPassengerMechanic.createRuntime({
+    level: { mechanics: { 'question-passenger': {} } }
+  }).createState().questionPassenger;
+  assert.equal(missingMasksState.authoredMarked, 0);
+  assert.equal(missingMasksState.authoredTotal, 0);
+
+  const nonArrayMasksState = questionPassengerMechanic.createRuntime({
+    level: makeLevel('bad')
+  }).createState().questionPassenger;
+  assert.equal(nonArrayMasksState.authoredMarked, 0);
+  assert.equal(nonArrayMasksState.authoredTotal, 0);
+
+  const mixedRowsState = questionPassengerMechanic.createRuntime({
+    level: makeLevel([[true, false], 'bad', [true, 1]])
+  }).createState().questionPassenger;
+  assert.equal(mixedRowsState.authoredMarked, 2);
+  assert.equal(mixedRowsState.authoredTotal, 4);
+
+  const wrongPathState = questionPassengerMechanic.createRuntime({
+    level: {
+      authoredMasks: [[true]],
+      mechanics: {
+        authoredMasks: [[true]],
+        questionPassenger: { authoredMasks: [[true]] }
+      }
+    }
+  }).createState().questionPassenger;
+  assert.equal(wrongPathState.authoredMarked, 0);
+  assert.equal(wrongPathState.authoredTotal, 0);
+});
+
+test('mode and chance options normalize to safe chance assignment', () => {
   const invalidRuntime = questionPassengerMechanic.createRuntime({
     random: () => 0.2999,
     options: { mode: 'invalid', chance: Number.NaN }
@@ -91,6 +127,25 @@ test('invalid mode and chance values normalize to safe chance assignment', () =>
   });
   assert.equal(aboveRangeRuntime.createState().questionPassenger.chance, 1);
   assert.equal(aboveRangeRuntime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 }).questionPassenger.hidden, true);
+
+  const coercedRandomValues = [0.4499, 0.45];
+  const coercedRuntime = questionPassengerMechanic.createRuntime({
+    random: () => coercedRandomValues.shift(),
+    options: { chance: '0.45' }
+  });
+  assert.equal(coercedRuntime.createState().questionPassenger.chance, 0.45);
+  assert.equal(coercedRuntime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 }).questionPassenger.hidden, true);
+  assert.equal(coercedRuntime.createQueueItemData({ queueIndex: 0, sourceIndex: 1 }).questionPassenger.hidden, false);
+
+  const positiveInfinityRuntime = questionPassengerMechanic.createRuntime({
+    options: { chance: Number.POSITIVE_INFINITY }
+  });
+  assert.equal(positiveInfinityRuntime.createState().questionPassenger.chance, 0.3);
+
+  const negativeInfinityRuntime = questionPassengerMechanic.createRuntime({
+    options: { chance: Number.NEGATIVE_INFINITY }
+  });
+  assert.equal(negativeInfinityRuntime.createState().questionPassenger.chance, 0.3);
 });
 
 test('runtime exposes mechanic identity and empty slot metadata', () => {
