@@ -63,3 +63,10 @@ export function createMechanicRuntime(id, context = {}) {
   if (module?.createRuntime) return module.createRuntime(context);
   return base.createRuntime(context);
 }
+
+export function createMechanicDetailView(id, context = {}) {
+  const module = getMechanicModuleById(id);
+  return typeof module?.createDetailView === 'function'
+    ? module.createDetailView(context)
+    : null;
+}

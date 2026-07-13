@@ -5,6 +5,7 @@ import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
 import * as questionPassengerMechanic from '../src/mechanics/question-passenger/index.js';
 import { createQuestionPassengerRuntime } from '../src/mechanics/question-passenger/model.js';
+import { createQuestionPassengerDetailView } from '../src/mechanics/question-passenger/view.js';
 
 function makeLevel(authoredMasks = [[true, false], [false, true]]) {
   return {
@@ -216,6 +217,8 @@ test('runtime exposes mechanic identity and empty slot metadata', () => {
   assert.equal(questionPassengerMechanic.definition.status, 'planned');
   assert.equal(questionPassengerMechanic.default.definition, questionPassengerMechanic.definition);
   assert.equal(questionPassengerMechanic.default.createRuntime, questionPassengerMechanic.createRuntime);
+  assert.equal(questionPassengerMechanic.createDetailView, createQuestionPassengerDetailView);
+  assert.equal(questionPassengerMechanic.default.createDetailView, createQuestionPassengerDetailView);
 });
 
 test('hidden passengers reveal once when entering a belt slot without mutating queue state', () => {

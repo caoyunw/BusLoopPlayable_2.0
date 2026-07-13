@@ -12,6 +12,8 @@ import {
   createMechanicLibrary,
   filterMechanicCollection
 } from '../src/mechanic-library.js';
+import { createMechanicDetailView } from '../src/mechanics/index.js';
+import { createQuestionPassengerDetailView } from '../src/mechanics/question-passenger/view.js';
 import * as mechanicLab from '../src/mechanic-lab.js';
 
 const {
@@ -179,8 +181,12 @@ class FakeElement {
   matches(selector) {
     if (selector.startsWith('#')) return this.id === selector.slice(1);
     if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
-    if (selector === '[data-mechanic-id]') {
-      return Object.hasOwn(this.dataset, 'mechanicId');
+    const dataSelector = selector.match(/^\[data-([a-z0-9-]+)(?:="([^"]*)")?\]$/i);
+    if (dataSelector) {
+      const key = dataSelector[1]
+        .replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+      if (!Object.hasOwn(this.dataset, key)) return false;
+      return dataSelector[2] === undefined || this.dataset[key] === dataSelector[2];
     }
     return this.tagName === selector.toUpperCase();
   }
@@ -342,6 +348,20 @@ test('mechanic lab styles define the desktop grid and mobile drawer breakpoint',
     /@media\s*\(max-width:\s*860px\)[\s\S]*?\n\s{2}\.mechanic-library-toggle\s*\{[^}]*display:\s*block/
   );
   assert.doesNotMatch(css, /\.cta-button|@keyframes\s+cta-pulse/);
+});
+
+test('question passenger detail styles stay mechanic-owned and load through the root stylesheet', () => {
+  const css = readFileSync(join('src', 'styles.css'), 'utf8');
+  const questionCss = readFileSync(
+    join('src', 'mechanics', 'question-passenger', 'styles.css'),
+    'utf8'
+  );
+
+  assert.match(css, /^@import ['"]\.\/mechanics\/question-passenger\/styles\.css['"];/);
+  assert.match(questionCss, /\[data-question-passenger-settings\]/);
+  assert.match(questionCss, /\[hidden\]\s*\{\s*display:\s*none/);
+  assert.match(questionCss, /:focus-visible/);
+  assert.match(questionCss, /@media\s*\(max-width:\s*860px\)/);
 });
 
 test('createMechanicLibrary renders unique groups with textContent and rerenders search states', () => {
@@ -509,6 +529,171 @@ test('destroy detaches search, toggle, list, and viewport behavior', () => {
     assert.equal(fixture.toggle.getAttribute('aria-expanded'), 'false');
     assert.deepEqual(selected, []);
     assert.equal(betaButton.getAttribute('aria-current'), 'false');
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('detail extensions replace and clean up exactly once across selection and destroy', () => {
+  const fixture = createLibraryFixture();
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const rendered = [];
+  const destroyed = [];
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      renderDetailExtension({ mechanic, document }) {
+        rendered.push({ mechanic, document });
+        const element = document.createElement('section');
+        element.setAttribute('data-detail-extension', mechanic.id);
+        return {
+          element,
+          destroy: () => destroyed.push(mechanic.id)
+        };
+      }
+    });
+
+    assert.equal(
+      fixture.detail.querySelector('[data-detail-extension="alpha"]').textContent,
+      ''
+    );
+    assert.equal(rendered[0].mechanic, mechanics[0]);
+    assert.equal(rendered[0].document, fixture.document);
+
+    library.setActive('beta');
+
+    assert.deepEqual(destroyed, ['alpha']);
+    assert.equal(fixture.detail.querySelector('[data-detail-extension="alpha"]'), null);
+    assert.ok(fixture.detail.querySelector('[data-detail-extension="beta"]'));
+
+    library.destroy();
+    library.destroy();
+
+    assert.deepEqual(destroyed, ['alpha', 'beta']);
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('detail extension factory delegates optional mechanic views without id branching', () => {
+  const fixture = createLibraryFixture();
+
+  try {
+    const extension = createMechanicDetailView('question-passenger', {
+      document: fixture.document
+    });
+
+    assert.ok(extension?.element.matches('[data-question-passenger-settings]'));
+    assert.equal(typeof extension.destroy, 'function');
+    assert.equal(createMechanicDetailView('base', { document: fixture.document }), null);
+    assert.equal(createMechanicDetailView('missing', { document: fixture.document }), null);
+    extension.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('question passenger detail view renders chance controls and authored visibility', () => {
+  const fixture = createLibraryFixture();
+
+  try {
+    const view = createQuestionPassengerDetailView({
+      document: fixture.document,
+      options: { chance: 0.3 }
+    });
+    const mode = view.element.querySelector('[data-question-mode]');
+    const chance = view.element.querySelector('[data-question-chance]');
+    const output = view.element.querySelector('[data-question-chance-output]');
+    const chanceRow = view.element.querySelector('[data-question-chance-row]');
+    const authoredSummary = view.element.querySelector('[data-question-authored-summary]');
+
+    assert.equal(view.element.querySelector('h3').textContent, '机制设置');
+    assert.deepEqual(
+      mode.querySelectorAll('option').map((option) => [option.value, option.textContent]),
+      [['chance', '概率随机'], ['authored', '关卡标记']]
+    );
+    assert.equal(mode.value, 'chance');
+    assert.equal(chance.value, '30');
+    assert.equal(chance.getAttribute('min'), '0');
+    assert.equal(chance.getAttribute('max'), '100');
+    assert.equal(chance.getAttribute('step'), '1');
+    assert.equal(output.textContent, '30%');
+    assert.equal(chanceRow.hidden, false);
+    assert.equal(authoredSummary.hidden, true);
+    assert.equal(authoredSummary.textContent, '固定标记：0/0 组');
+    view.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('question passenger detail view commits normalized mode and authored counts once', () => {
+  const fixture = createLibraryFixture();
+  const commits = [];
+
+  try {
+    const view = createQuestionPassengerDetailView({
+      document: fixture.document,
+      options: { mode: 'authored', chance: '0.45' },
+      state: { questionPassenger: { authoredMarked: 3, authoredTotal: 8 } },
+      onCommit: (options) => commits.push(options)
+    });
+    const mode = view.element.querySelector('[data-question-mode]');
+    const chanceRow = view.element.querySelector('[data-question-chance-row]');
+    const authoredSummary = view.element.querySelector('[data-question-authored-summary]');
+
+    assert.equal(mode.value, 'authored');
+    assert.equal(chanceRow.hidden, true);
+    assert.equal(authoredSummary.hidden, false);
+    assert.equal(authoredSummary.textContent, '固定标记：3/8 组');
+
+    mode.value = 'invalid';
+    mode.dispatchEvent({ type: 'change', bubbles: false, target: null });
+
+    assert.equal(mode.value, 'chance');
+    assert.equal(chanceRow.hidden, false);
+    assert.equal(authoredSummary.hidden, true);
+    assert.deepEqual(commits, [{ mode: 'chance', chance: 0.45 }]);
+    view.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('question passenger chance input previews, change commits, and destroy detaches controls', () => {
+  const fixture = createLibraryFixture();
+  const commits = [];
+
+  try {
+    const view = createQuestionPassengerDetailView({
+      document: fixture.document,
+      options: { chance: Number.POSITIVE_INFINITY },
+      onCommit: (options) => commits.push(options)
+    });
+    const mode = view.element.querySelector('[data-question-mode]');
+    const chance = view.element.querySelector('[data-question-chance]');
+    const output = view.element.querySelector('[data-question-chance-output]');
+
+    assert.equal(chance.value, '30');
+    chance.value = '45';
+    chance.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    assert.equal(output.textContent, '45%');
+    assert.deepEqual(commits, []);
+
+    chance.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    assert.deepEqual(commits, [{ mode: 'chance', chance: 0.45 }]);
+
+    view.destroy();
+    chance.value = '72';
+    chance.dispatchEvent({ type: 'input', bubbles: false, target: null });
+    chance.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    mode.value = 'authored';
+    mode.dispatchEvent({ type: 'change', bubbles: false, target: null });
+
+    assert.equal(output.textContent, '45%');
+    assert.deepEqual(commits, [{ mode: 'chance', chance: 0.45 }]);
   } finally {
     fixture.restore();
   }

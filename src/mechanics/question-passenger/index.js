@@ -1,4 +1,5 @@
 import { createQuestionPassengerRuntime } from './model.js';
+import { createQuestionPassengerDetailView } from './view.js';
 
 export const definition = {
   id: 'question-passenger',
@@ -12,5 +13,6 @@ export const definition = {
 };
 
 export const createRuntime = createQuestionPassengerRuntime;
+export const createDetailView = createQuestionPassengerDetailView;
 
-export default { definition, createRuntime };
+export default { definition, createRuntime, createDetailView };

@@ -25,7 +25,8 @@ export function createMechanicLibrary(root, {
   mechanics,
   activeId,
   onSelect = () => {},
-  filter = filterMechanicCollection
+  filter = filterMechanicCollection,
+  renderDetailExtension = () => null
 }) {
   const search = root?.querySelector('#mechanic-search');
   const list = root?.querySelector('#mechanic-list');
@@ -42,8 +43,16 @@ export function createMechanicLibrary(root, {
   const mechanicById = new Map(mechanics.map((mechanic) => [mechanic.id, mechanic]));
   const allowedIds = new Set(mechanicById.keys());
   let currentId = mechanicById.has(activeId) ? activeId : mechanics[0]?.id;
+  let destroyActiveDetailExtension = null;
+
+  function destroyDetailExtension() {
+    const destroy = destroyActiveDetailExtension;
+    destroyActiveDetailExtension = null;
+    destroy?.();
+  }
 
   function renderDetail() {
+    destroyDetailExtension();
     detail.replaceChildren();
     const mechanic = mechanicById.get(currentId);
     if (!mechanic) {
@@ -86,6 +95,14 @@ export function createMechanicLibrary(root, {
     }
     categoryBlock.append(categoryList);
     detail.append(categoryBlock);
+
+    const extension = renderDetailExtension({ mechanic, document });
+    if (extension?.element) {
+      detail.append(extension.element);
+      if (typeof extension.destroy === 'function') {
+        destroyActiveDetailExtension = extension.destroy;
+      }
+    }
   }
 
   function syncCurrentButtons() {
@@ -186,6 +203,7 @@ export function createMechanicLibrary(root, {
   return {
     setActive,
     destroy() {
+      destroyDetailExtension();
       search.removeEventListener('input', handleSearch);
       toggle.removeEventListener('click', handleToggle);
       list.removeEventListener('click', handleListClick);
