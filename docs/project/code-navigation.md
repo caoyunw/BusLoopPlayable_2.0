@@ -85,7 +85,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ## Known Test Baseline
 
-As of 2026-07-13, the full suite passes 112/112. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
+As of 2026-07-13, the full suite passes 114/114. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
 ## Historical Material
 

@@ -577,6 +577,46 @@ test('detail extensions replace and clean up exactly once across selection and d
   }
 });
 
+test('synchronous selection feedback does not remount the active detail extension', () => {
+  const fixture = createLibraryFixture();
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const rendered = [];
+  const destroyed = [];
+  let library;
+
+  try {
+    library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      onSelect: (id) => library.setActive(id),
+      renderDetailExtension({ mechanic, document }) {
+        rendered.push(mechanic.id);
+        const element = document.createElement('section');
+        element.setAttribute('data-detail-extension', mechanic.id);
+        return {
+          element,
+          destroy: () => destroyed.push(mechanic.id)
+        };
+      }
+    });
+    const betaButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'beta');
+
+    betaButton.click();
+
+    assert.deepEqual(rendered, ['alpha', 'beta']);
+    assert.deepEqual(destroyed, ['alpha']);
+    assert.ok(fixture.detail.querySelector('[data-detail-extension="beta"]'));
+
+    library.destroy();
+    library.destroy();
+    assert.deepEqual(destroyed, ['alpha', 'beta']);
+  } finally {
+    fixture.restore();
+  }
+});
+
 test('detail extension factory delegates optional mechanic views without id branching', () => {
   const fixture = createLibraryFixture();
 
@@ -620,6 +660,9 @@ test('question passenger detail view renders chance controls and authored visibi
     assert.equal(chance.getAttribute('max'), '100');
     assert.equal(chance.getAttribute('step'), '1');
     assert.equal(output.textContent, '30%');
+    assert.match(chance.id, /^question-passenger-chance-\d+$/);
+    assert.equal(output.getAttribute('for'), chance.id);
+    assert.equal(chance.getAttribute('aria-valuetext'), '30%');
     assert.equal(chanceRow.hidden, false);
     assert.equal(authoredSummary.hidden, true);
     assert.equal(authoredSummary.textContent, '固定标记：0/0 组');
@@ -662,6 +705,45 @@ test('question passenger detail view commits normalized mode and authored counts
   }
 });
 
+test('question passenger mode transitions retain quantized fractional chance with exact commits', () => {
+  const fixture = createLibraryFixture();
+  const commits = [];
+
+  try {
+    const view = createQuestionPassengerDetailView({
+      document: fixture.document,
+      options: { mode: 'chance', chance: 0.304 },
+      onCommit: (options) => commits.push(options)
+    });
+    const mode = view.element.querySelector('[data-question-mode]');
+    const chance = view.element.querySelector('[data-question-chance]');
+    const output = view.element.querySelector('[data-question-chance-output]');
+    const chanceRow = view.element.querySelector('[data-question-chance-row]');
+    const authoredSummary = view.element.querySelector('[data-question-authored-summary]');
+
+    assert.equal(chance.value, '30');
+    assert.equal(output.textContent, '30%');
+
+    mode.value = 'authored';
+    mode.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    assert.equal(chanceRow.hidden, true);
+    assert.equal(authoredSummary.hidden, false);
+    assert.deepEqual(commits, [{ mode: 'authored', chance: 0.3 }]);
+
+    mode.value = 'chance';
+    mode.dispatchEvent({ type: 'change', bubbles: false, target: null });
+    assert.equal(chanceRow.hidden, false);
+    assert.equal(authoredSummary.hidden, true);
+    assert.deepEqual(commits, [
+      { mode: 'authored', chance: 0.3 },
+      { mode: 'chance', chance: 0.3 }
+    ]);
+    view.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
 test('question passenger chance input previews, change commits, and destroy detaches controls', () => {
   const fixture = createLibraryFixture();
   const commits = [];
@@ -680,6 +762,7 @@ test('question passenger chance input previews, change commits, and destroy deta
     chance.value = '45';
     chance.dispatchEvent({ type: 'input', bubbles: false, target: null });
     assert.equal(output.textContent, '45%');
+    assert.equal(chance.getAttribute('aria-valuetext'), '45%');
     assert.deepEqual(commits, []);
 
     chance.dispatchEvent({ type: 'change', bubbles: false, target: null });

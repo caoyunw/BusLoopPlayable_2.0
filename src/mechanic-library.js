@@ -164,8 +164,10 @@ export function createMechanicLibrary(root, {
 
   function setActive(id) {
     if (!mechanicById.has(id)) return;
+    const changed = currentId !== id;
     currentId = id;
     syncCurrentButtons();
+    if (!changed) return;
     renderDetail();
   }
 
