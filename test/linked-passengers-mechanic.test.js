@@ -5,6 +5,8 @@ import linkedPassengerMechanic, {
 } from '../src/mechanics/linked-passengers/index.js';
 import { createLinkedPassengerRuntime } from '../src/mechanics/linked-passengers/model.js';
 import { LEVEL_1 } from '../src/level-data.js';
+import { BusLoopGame } from '../src/game-model.js';
+import * as mechanics from '../src/mechanics/index.js';
 
 function makeLevel(passengerQueues, authoredStarts = []) {
   return {
@@ -17,6 +19,51 @@ function makeLevel(passengerQueues, authoredStarts = []) {
       'linked-passengers': { authoredStarts }
     }
   };
+}
+
+function makeGameLevel({ queue = [0, 0, 0, 1], authoredStarts = [3, 0, 0, 0], seats = 4 } = {}) {
+  return {
+    id: 99,
+    conveyorCapacity: 5,
+    queueCapacity: 5,
+    queueCount: 1,
+    passengerQueues: [queue],
+    passengerSequence: queue,
+    mechanics: { 'linked-passengers': { authoredStarts: [authoredStarts] } },
+    passengerQueue: { spacing: 0.5 },
+    passengerEntryMotion: {
+      passengerSpeed: 1,
+      initialFillCatchUpDuration: 0.2,
+      catchUpExtraSpeed: 0,
+      snapDistance: 0.02
+    },
+    conveyorSpeed: 1,
+    conveyorPathLength: 1,
+    entryPercents: [0.1],
+    exitStart: 0.55,
+    exitEnd: 0.7,
+    spotCount: 1,
+    groupSize: 4,
+    boardingDepartureDelay: 1,
+    longPressMultiplier: 3,
+    longPressThreshold: 0.25,
+    mapScale: 1,
+    vehicleSize: { width: 0.8, length: 1.2 },
+    vehicleMotion: { spotYaw: 0, spotApproachOffsetZ: 0.4 },
+    vehicles: [{ id: 1, seats, colorIndex: 0, x: 0, z: 0, yaw: 0 }],
+    assets: { audio: {} }
+  };
+}
+
+function makeLinkedGame(level = makeGameLevel()) {
+  const game = new BusLoopGame(level);
+  game.mechanicId = 'linked-passengers';
+  game.mechanicRuntime = createLinkedPassengerRuntime({
+    level,
+    options: { mode: 'authored' }
+  });
+  game.reset();
+  return game;
 }
 
 test('chance mode creates multiple non-overlapping same-color chains with uniform bounded lengths', () => {
@@ -194,4 +241,64 @@ test('level18 authored starts contain balanced 2 3 4 6 8 and 10 row chains on bo
   assert.equal(runtime.createState().linkedPassenger.chainCount, 12);
   assert.equal(runtime.createState().linkedPassenger.linkedGroupCount, 66);
   assert.equal(runtime.createState().linkedPassenger.invalidAuthoredCount, 0);
+});
+
+test('visible queues leave capacity empty rather than split the next linked batch', () => {
+  const game = makeLinkedGame();
+  game.initializeQueues([2], 0.5, [2], 1);
+  const state = game.snapshot();
+  assert.equal(state.queues[0].length, 0);
+  assert.equal(state.sourceRemaining, 4);
+
+  game.initializeQueues([4], 0.5, [2], 1);
+  assert.equal(game.snapshot().queues[0].length, 4);
+  assert.deepEqual(game.snapshot().queueItems[0].slice(0, 3).map((item) => (
+    item.linkedPassenger.memberIndex
+  )), [0, 1, 2]);
+});
+
+test('dequeuePassengerBatch removes and refills complete batches while preserving source indices', () => {
+  const level = makeGameLevel({
+    queue: [0, 0, 0, 1, 1, 2],
+    authoredStarts: [3, 0, 0, 2, 0, 0]
+  });
+  const game = makeLinkedGame(level);
+  game.initializeQueues([3], 0.5, [2], 1);
+  const batch = game.dequeuePassengerBatch(0, true);
+  assert.equal(batch.length, 3);
+  assert.deepEqual(batch.map((item) => item.sourceIndex), [0, 1, 2]);
+  assert.equal(game.snapshot().queues[0].length, 2);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.sourceIndex), [3, 4]);
+  assert.equal(game.snapshot().sourceRemaining, 1);
+});
+
+test('linked passenger batch hooks remain reachable through a linked-passengers plus garage composite', () => {
+  assert.equal(typeof mechanics.createCompositeRuntime, 'function');
+  const linked = createLinkedPassengerRuntime({
+    level: makeLevel([[0, 0]], [[2, 0]]),
+    options: { mode: 'authored' }
+  });
+  linked.createState();
+  const composite = mechanics.createCompositeRuntime([
+    linked,
+    {
+      id: 'garage',
+      onPassengerBatchBoarded: () => ({ garageBatch: true })
+    }
+  ]);
+  const head = {
+    linkedPassenger: linked.createQueueItemData({ queueIndex: 0, sourceIndex: 0 }).linkedPassenger
+  };
+  const tail = {
+    linkedPassenger: linked.createQueueItemData({ queueIndex: 0, sourceIndex: 1 }).linkedPassenger
+  };
+
+  assert.equal(composite.id, 'linked-passengers+garage');
+  assert.equal(composite.getQueueAdmissionBatchSize({ queueIndex: 0, sourceIndex: 0 }), 2);
+  assert.deepEqual(composite.getBeltEntryBatch({ queue: [head, tail] }), [head, tail]);
+  assert.deepEqual(composite.getBoardingBatch({ slot: head, slots: [tail, head] }), [head, tail]);
+  assert.deepEqual(composite.onPassengerBatchBoarded({ slots: [head, tail] }), {
+    linkedPassenger: { chainId: 'linked-0-0', length: 2 },
+    garageBatch: true
+  });
 });

@@ -70,7 +70,7 @@ function mergeObjects(runtimes, method, args, fallback = {}) {
   );
 }
 
-function createCompositeRuntime(runtimes) {
+export function createCompositeRuntime(runtimes) {
   if (runtimes.length === 1) return runtimes[0];
 
   return {
@@ -130,6 +130,31 @@ function createCompositeRuntime(runtimes) {
 
     onPassengerBoarded(context) {
       return mergeObjects(runtimes, 'onPassengerBoarded', [context]);
+    },
+
+    getQueueAdmissionBatchSize(context) {
+      const runtime = runtimes.find((candidate) => (
+        typeof candidate.getQueueAdmissionBatchSize === 'function'
+      ));
+      return runtime?.getQueueAdmissionBatchSize(context);
+    },
+
+    getBeltEntryBatch(context) {
+      const runtime = runtimes.find((candidate) => (
+        typeof candidate.getBeltEntryBatch === 'function'
+      ));
+      return runtime?.getBeltEntryBatch(context);
+    },
+
+    getBoardingBatch(context) {
+      const runtime = runtimes.find((candidate) => (
+        typeof candidate.getBoardingBatch === 'function'
+      ));
+      return runtime?.getBoardingBatch(context);
+    },
+
+    onPassengerBatchBoarded(context) {
+      return mergeObjects(runtimes, 'onPassengerBatchBoarded', [context]);
     },
 
     clearSlotData(context) {

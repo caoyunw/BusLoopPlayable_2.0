@@ -163,10 +163,17 @@ export class BusLoopGame {
     const authoredQueues = this.level.passengerQueues ?? [this.level.passengerSequence];
     this.queueSpacing = this.level.passengerQueue?.spacing ?? 0.4;
     this.queueAvailableLengths = authoredQueues.map(() => Math.max(0, (this.level.queueCapacity - 1) * this.queueSpacing));
-    this.queues = authoredQueues.map((queue, queueIndex) => (
-      this.createQueueItems(queue.slice(0, this.level.queueCapacity), queueIndex)
-    ));
-    this.sourceQueues = authoredQueues.map((queue) => queue.slice(this.level.queueCapacity));
+    const queueCapacities = authoredQueues.map(() => this.level.queueCapacity);
+    this.queueCapacities = queueCapacities.map((capacity) => Math.max(0, Math.min(
+      this.level.queueCapacity,
+      Math.floor(capacity)
+    )));
+    this.queues = authoredQueues.map(() => []);
+    this.sourceQueues = authoredQueues.map((queue) => queue.slice());
+    this.sourceQueueIndices = authoredQueues.map(() => 0);
+    for (let queueIndex = 0; queueIndex < authoredQueues.length; queueIndex += 1) {
+      this.fillQueueFromSource(queueIndex, { initial: true });
+    }
     this.vehicles = this.level.vehicles.map((vehicle) => ({
       ...vehicle, state: 'parked', spotIndex: null, boardedGroups: 0, motion: 0,
       motionData: null, collision: null, hit: null
@@ -198,16 +205,16 @@ export class BusLoopGame {
       0,
       queueLengths[index] ?? ((this.level.queueCapacity - 1) * this.queueSpacing)
     ));
-    this.queues = authoredQueues.map((queue, index) => {
-      const capacity = Math.max(0, Math.min(
-        this.level.queueCapacity,
-        Math.floor(queueCapacities[index] ?? this.level.queueCapacity)
-      ));
-      return this.createQueueItems(queue.slice(0, capacity), index);
-    });
-    this.sourceQueues = authoredQueues.map((queue, index) => (
-      queue.slice(this.queues[index]?.length ?? 0)
-    ));
+    this.queueCapacities = authoredQueues.map((_, index) => Math.max(0, Math.min(
+      this.level.queueCapacity,
+      Math.floor(queueCapacities?.[index] ?? this.level.queueCapacity)
+    )));
+    this.queues = authoredQueues.map(() => []);
+    this.sourceQueues = authoredQueues.map((queue) => queue.slice());
+    this.sourceQueueIndices = authoredQueues.map(() => 0);
+    for (let queueIndex = 0; queueIndex < authoredQueues.length; queueIndex += 1) {
+      this.fillQueueFromSource(queueIndex, { initial: true });
+    }
     this.lastEvent = { type: 'queues-initialized' };
     this.emit();
   }
@@ -606,48 +613,113 @@ export class BusLoopGame {
     };
   }
 
-  dequeuePassenger(queueIndex, includeDetails = false) {
+  getQueueAdmissionBatchSize(queueIndex) {
+    const source = this.sourceQueues[queueIndex] ?? [];
+    if (source.length === 0) return 0;
+    const sourceIndex = this.sourceQueueIndices[queueIndex] ?? 0;
+    const requested = this.mechanicRuntime.getQueueAdmissionBatchSize?.({
+      game: this,
+      queueIndex,
+      sourceIndex,
+      sourceColors: source
+    }) ?? 1;
+    return Number.isInteger(requested) && requested >= 1 && requested <= source.length
+      ? requested
+      : 1;
+  }
+
+  fillQueueFromSource(queueIndex, { initial = false } = {}) {
+    const queue = this.queues[queueIndex];
+    const source = this.sourceQueues[queueIndex];
+    const capacity = this.queueCapacities[queueIndex] ?? this.level.queueCapacity;
+    if (!queue || !source) return;
+
+    while (source.length > 0) {
+      const batchSize = this.getQueueAdmissionBatchSize(queueIndex);
+      if (batchSize < 1 || queue.length + batchSize > capacity) break;
+      const sourceIndex = this.sourceQueueIndices[queueIndex];
+      const colors = source.splice(0, batchSize);
+      const availableLength = this.queueAvailableLengths[queueIndex] ?? 0;
+      const lastDistance = queue.at(-1)?.distanceFromHead;
+      const startDistance = initial
+        ? queue.length * this.queueSpacing
+        : (Number.isFinite(lastDistance) ? lastDistance + this.queueSpacing : availableLength);
+      queue.push(...this.createQueueItems(
+        colors,
+        queueIndex,
+        sourceIndex,
+        startDistance
+      ));
+      this.sourceQueueIndices[queueIndex] += batchSize;
+      if (!initial) break;
+    }
+  }
+
+  peekPassengerBatch(queueIndex) {
     const queue = this.queues[queueIndex];
     if (!queue?.length) return null;
     if (queue[0].distanceFromHead > PASSENGER_READY_DISTANCE_THRESHOLD) return null;
-    const passenger = queue.shift();
-    const source = this.sourceQueues[queueIndex];
-    if (source?.length) {
-      const authoredQueues = this.level.passengerQueues ?? [this.level.passengerSequence];
-      const authoredQueue = authoredQueues[queueIndex] ?? [];
-      const sourceIndex = Math.max(0, authoredQueue.length - source.length);
-      const colorIndex = source.shift();
-      const lastDistance = queue.at(-1)?.distanceFromHead;
-      const spawnDistance = Number.isFinite(lastDistance)
-        ? lastDistance + this.queueSpacing
-        : this.queueAvailableLengths[queueIndex] ?? 0;
-      queue.push({
-        id: this.nextPassengerId++,
-        colorIndex,
-        createdAt: this.time,
-        distanceFromHead: clampNumber(
-          spawnDistance,
-          0,
-          this.queueAvailableLengths[queueIndex] ?? spawnDistance
-        ),
-        ...this.createMechanicQueueItemData({ queueIndex, sourceIndex })
-      });
-    }
-    return includeDetails
-      ? { ...passenger, ...this.cloneMechanicQueueItemSnapshot(passenger) }
-      : passenger.colorIndex;
+    const batch = this.mechanicRuntime.getBeltEntryBatch?.({
+      game: this,
+      queueIndex,
+      queue
+    }) ?? [queue[0]];
+    if (!Array.isArray(batch) || batch.length === 0 || batch.length > queue.length) return null;
+    return batch.every((item, index) => item === queue[index]) ? batch : null;
   }
 
-  createQueueItems(colors, queueIndex, startIndex = 0) {
+  dequeuePassengerBatch(queueIndex, includeDetails = false) {
+    const batch = this.peekPassengerBatch(queueIndex);
+    if (!batch) return null;
+    this.queues[queueIndex].splice(0, batch.length);
+    this.fillQueueFromSource(queueIndex);
+    return includeDetails
+      ? batch.map((passenger) => ({
+          ...passenger,
+          ...this.cloneMechanicQueueItemSnapshot(passenger)
+        }))
+      : batch;
+  }
+
+  dequeuePassenger(queueIndex, includeDetails = false) {
+    const batch = this.dequeuePassengerBatch(queueIndex, includeDetails);
+    if (!batch) return null;
+    return includeDetails ? batch[0] : batch[0].colorIndex;
+  }
+
+  createQueueItems(colors, queueIndex, startIndex = 0, startDistance = 0) {
     const availableLength = this.queueAvailableLengths?.[queueIndex]
       ?? Math.max(0, (this.level.queueCapacity - 1) * (this.queueSpacing ?? 0.4));
     return colors.map((colorIndex, index) => ({
       id: this.nextPassengerId++,
+      sourceIndex: startIndex + index,
       colorIndex,
       createdAt: this.time,
-      distanceFromHead: Math.min(index * (this.queueSpacing ?? 0.4), availableLength),
+      distanceFromHead: clampNumber(
+        startDistance + index * (this.queueSpacing ?? 0.4),
+        0,
+        availableLength
+      ),
       ...this.createMechanicQueueItemData({ queueIndex, sourceIndex: startIndex + index })
     }));
+  }
+
+  getBoardingBatch(slot) {
+    const batch = this.mechanicRuntime.getBoardingBatch?.({
+      game: this,
+      slot,
+      slots: this.slots
+    }) ?? [slot];
+    if (!Array.isArray(batch) || batch.length === 0) return [];
+    return batch.every((candidate) => this.slots.includes(candidate)) ? batch : [];
+  }
+
+  getPassengerBatchBoardingEvent(slots, vehicle) {
+    return this.mechanicRuntime.onPassengerBatchBoarded?.({
+      game: this,
+      slots,
+      vehicle
+    }) ?? {};
   }
 
   createMechanicQueueItemData(context = {}) {

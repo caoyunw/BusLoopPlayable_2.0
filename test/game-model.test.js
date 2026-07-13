@@ -80,6 +80,15 @@ const countSeatsByColor = () => {
   return counts;
 };
 
+test('game model exposes generic passenger batch hooks without linked mechanic branching', () => {
+  const source = readFileSync(join('src', 'game-model.js'), 'utf8');
+  assert.match(source, /getQueueAdmissionBatchSize/);
+  assert.match(source, /getBeltEntryBatch/);
+  assert.match(source, /getBoardingBatch/);
+  assert.match(source, /onPassengerBatchBoarded/);
+  assert.doesNotMatch(source, /linked-passengers/);
+});
+
 const mapVehicleAreaPoint = (point) => {
   const area = SCENE_TUNING.vehicleArea;
   const unitScale = area.positionUnitScale ?? LEVEL_1.mapScale;
