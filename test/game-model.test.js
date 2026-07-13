@@ -160,7 +160,7 @@ test('queue passengers keep Unity-style logic distance and advance after dequeue
   assert.equal(game.dequeuePassenger(0), 5);
 });
 
-test('mechanic queue hooks receive absolute authored queue coordinates', () => {
+test('mechanic queue hooks receive absolute queue coordinates', () => {
   const game = new BusLoopGame(LEVEL_1);
   const seen = [];
   game.mechanicRuntime = {
@@ -183,6 +183,24 @@ test('mechanic queue hooks receive absolute authored queue coordinates', () => {
   assert.equal(passenger.sourceIndex, 0);
   assert.equal(game.snapshot().queueItems[0].at(-1).sourceIndex, 24);
   assert.deepEqual(seen.at(-1), [0, 24]);
+
+  seen.length = 0;
+  game.initializeQueues([17, 18]);
+
+  assert.deepEqual(seen, [
+    ...Array.from({ length: 17 }, (_, sourceIndex) => [0, sourceIndex]),
+    ...Array.from({ length: 18 }, (_, sourceIndex) => [1, sourceIndex])
+  ]);
+
+  game.queues[0][0].distanceFromHead = 0;
+  game.queues[1][0].distanceFromHead = 0;
+  game.dequeuePassenger(0, true);
+  game.dequeuePassenger(1, true);
+
+  const adaptedQueueItems = game.snapshot().queueItems;
+  assert.equal(adaptedQueueItems[0].at(-1).sourceIndex, 17);
+  assert.equal(adaptedQueueItems[1].at(-1).sourceIndex, 18);
+  assert.deepEqual(seen.slice(-2), [[0, 17], [1, 18]]);
 });
 
 test('active mechanic options reconfigure and inactive options are retained without reset', () => {
