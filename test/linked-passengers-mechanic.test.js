@@ -267,9 +267,9 @@ test('dequeuePassengerBatch removes and refills complete batches while preservin
   const batch = game.dequeuePassengerBatch(0, true);
   assert.equal(batch.length, 3);
   assert.deepEqual(batch.map((item) => item.sourceIndex), [0, 1, 2]);
-  assert.equal(game.snapshot().queues[0].length, 2);
-  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.sourceIndex), [3, 4]);
-  assert.equal(game.snapshot().sourceRemaining, 1);
+  assert.equal(game.snapshot().queues[0].length, 3);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.sourceIndex), [3, 4, 5]);
+  assert.equal(game.snapshot().sourceRemaining, 0);
 });
 
 test('linked passenger batch hooks remain reachable through a linked-passengers plus garage composite', () => {

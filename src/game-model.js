@@ -651,7 +651,6 @@ export class BusLoopGame {
         startDistance
       ));
       this.sourceQueueIndices[queueIndex] += batchSize;
-      if (!initial) break;
     }
   }
 
