@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { BusLoopGame } from '../src/game-model.js';
@@ -6,6 +8,16 @@ import { LEVEL_1 } from '../src/level-data.js';
 import * as questionPassengerMechanic from '../src/mechanics/question-passenger/index.js';
 import { createQuestionPassengerRuntime } from '../src/mechanics/question-passenger/model.js';
 import { createQuestionPassengerDetailView } from '../src/mechanics/question-passenger/view.js';
+
+const sceneSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
+
+function getSourceSection(startMarker, endMarker) {
+  const start = sceneSource.indexOf(startMarker);
+  assert.notEqual(start, -1, `missing scene source marker: ${startMarker}`);
+  const end = sceneSource.indexOf(endMarker, start + startMarker.length);
+  assert.notEqual(end, -1, `missing scene source marker: ${endMarker}`);
+  return sceneSource.slice(start, end);
+}
 
 function makeLevel(authoredMasks = [[true, false], [false, true]]) {
   return {
@@ -219,6 +231,84 @@ test('runtime exposes mechanic identity and empty slot metadata', () => {
   assert.equal(questionPassengerMechanic.default.createRuntime, questionPassengerMechanic.createRuntime);
   assert.equal(questionPassengerMechanic.createDetailView, createQuestionPassengerDetailView);
   assert.equal(questionPassengerMechanic.default.createDetailView, createQuestionPassengerDetailView);
+});
+
+test('scene neutralizes hidden passenger materials with the exact question appearance', () => {
+  const helper = getSourceSection(
+    'function applyQuestionPassengerMaterial(material)',
+    'async function loadVatGeometry'
+  );
+
+  assert.match(helper, /setPassengerMaterialMaps\(material, null, null\)/);
+  assert.match(helper, /material\.color\.setHex\(0x9da8b8\)/);
+  assert.match(helper, /material\.emissive\.setHex\(0x303946\)/);
+  assert.match(helper, /material\.emissiveIntensity = 0\.18/);
+  assert.match(helper, /material\.roughness = 0\.72/);
+  assert.match(helper, /material\.metalness = 0/);
+  assert.match(helper, /material\.userData\.passengerColorIndex = null/);
+});
+
+test('scene builds four independent question sprites over passenger positions from one shared texture', () => {
+  const badgeHelpers = getSourceSection(
+    'let questionPassengerBadgeTexture = null;',
+    'function makeStarBadgeLabel'
+  );
+  const passengerGroup = getSourceSection('function makePassengerGroup', 'export class SceneView');
+
+  assert.match(badgeHelpers, /function getQuestionPassengerBadgeTexture\(\)/);
+  assert.match(badgeHelpers, /new THREE\.CanvasTexture\(canvas\)/);
+  assert.match(badgeHelpers, /context\.arc\([\s\S]*?context\.fillStyle = '#ffffff'[\s\S]*?context\.strokeStyle = '#263244'/);
+  assert.match(badgeHelpers, /context\.fillText\('\?',/);
+  assert.match(badgeHelpers, /for \(let index = 0; index < 4; index \+= 1\)/);
+  assert.match(badgeHelpers, /new THREE\.SpriteMaterial\(\{[\s\S]*?map: getQuestionPassengerBadgeTexture\(\),[\s\S]*?transparent: true,[\s\S]*?depthTest: false,[\s\S]*?depthWrite: false,[\s\S]*?toneMapped: false/);
+  assert.match(badgeHelpers, /new THREE\.Sprite\(material\)/);
+  assert.match(badgeHelpers, /sprite\.position\.set\(\(index - 1\.5\) \* spacing,/);
+  assert.match(badgeHelpers, /sprite\.renderOrder = 90/);
+  assert.match(passengerGroup, /const questionBadges = makeQuestionPassengerBadges\(spacing\)/);
+  assert.match(passengerGroup, /group\.userData\.questionBadges = questionBadges/);
+  assert.match(passengerGroup, /group\.add\(\.\.\.questionBadges\)/);
+});
+
+test('scene caches hidden appearance and restores fallback or Unity colors without leaking badges', () => {
+  const appearance = getSourceSection(
+    '  setPassengerAppearance(view, colorIndex, hidden = false)',
+    '  updateStarPassengerBadge'
+  );
+
+  assert.match(appearance, /view\.userData\.colorIndex === colorIndex\s*&&\s*view\.userData\.questionPassengerHidden === questionPassengerHidden/);
+  assert.match(appearance, /view\.userData\.colorIndex = colorIndex/);
+  assert.match(appearance, /view\.userData\.questionPassengerHidden = questionPassengerHidden/);
+  assert.match(appearance, /this\.setQuestionPassengerBadgesVisible\(view, questionPassengerHidden\)/);
+  assert.match(appearance, /applyQuestionPassengerMaterial\(fallbackMaterial\)/);
+  assert.match(appearance, /fallbackMaterial\.color\.setHex\(COLORS\[colorIndex\]\.hex\)/);
+  assert.match(appearance, /applyQuestionPassengerMaterial\(material\)/);
+  assert.match(appearance, /applyPassengerMaterial\(material, colorIndex, map\)/);
+  assert.match(appearance, /badge\.material\.opacity = 1/);
+  assert.match(appearance, /view\.userData\.colorIndex = null/);
+  assert.match(appearance, /view\.userData\.questionPassengerHidden = null/);
+});
+
+test('scene keeps queue questions hidden, belt colors real, and clears reused invisible views', () => {
+  const update = getSourceSection('  update(snapshot, game)', '  updateGuideHandTuning()');
+
+  assert.match(update, /this\.setPassengerAppearance\(view, slot\.colorIndex, false\)/);
+  assert.match(update, /this\.setPassengerAppearance\(view, colorIndex, Boolean\(item\.questionPassenger\?\.hidden\)\)/);
+  assert.equal((update.match(/this\.resetPassengerAppearance\(view\)/g) ?? []).length, 2);
+});
+
+test('scene resynchronizes question badges with spacing and invalidates hidden materials after tuning', () => {
+  const visualTuning = getSourceSection(
+    '  updatePassengerVisualTuning()',
+    '  updatePassengerMaterialTuning'
+  );
+  const materialTuning = getSourceSection(
+    '  updatePassengerMaterialTuning',
+    '  upgradePassengerViews()'
+  );
+
+  assert.match(visualTuning, /root\.userData\.questionBadges\?\.forEach\(\(badge, index\) => \{[\s\S]*?badge\.position\.x = \(index - 1\.5\) \* spacing/);
+  assert.match(materialTuning, /for \(const root of roots\)[\s\S]*?root\.userData\.questionPassengerHidden = null/);
+  assert.match(materialTuning, /applyPassengerMaterial\(material, colorIndex, map\)[\s\S]*?root\.userData\.questionPassengerHidden = null/);
 });
 
 test('hidden passengers reveal once when entering a belt slot without mutating queue state', () => {

@@ -217,6 +217,16 @@ function applyPassengerMaterial(material, colorIndex, map) {
   }
 }
 
+function applyQuestionPassengerMaterial(material) {
+  setPassengerMaterialMaps(material, null, null);
+  material.color.setHex(0x9da8b8);
+  material.emissive.setHex(0x303946);
+  material.emissiveIntensity = 0.18;
+  material.roughness = 0.72;
+  material.metalness = 0;
+  material.userData.passengerColorIndex = null;
+}
+
 async function loadVatGeometry(url, loadingManager) {
   loadingManager?.itemStart(url);
   let buffer;
@@ -450,6 +460,55 @@ function makeVehiclePlaceholder(vehicle) {
   return root;
 }
 
+let questionPassengerBadgeTexture = null;
+
+function getQuestionPassengerBadgeTexture() {
+  if (questionPassengerBadgeTexture) return questionPassengerBadgeTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (context) {
+    const center = canvas.width / 2;
+    context.beginPath();
+    context.arc(center, center, 45, 0, Math.PI * 2);
+    context.fillStyle = '#ffffff';
+    context.fill();
+    context.lineWidth = 8;
+    context.strokeStyle = '#263244';
+    context.stroke();
+    context.fillStyle = '#263244';
+    context.font = '900 72px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('?', center, center + 4);
+  }
+  questionPassengerBadgeTexture = new THREE.CanvasTexture(canvas);
+  questionPassengerBadgeTexture.colorSpace = THREE.SRGBColorSpace;
+  questionPassengerBadgeTexture.needsUpdate = true;
+  return questionPassengerBadgeTexture;
+}
+
+function makeQuestionPassengerBadges(spacing) {
+  const badges = [];
+  for (let index = 0; index < 4; index += 1) {
+    const material = new THREE.SpriteMaterial({
+      map: getQuestionPassengerBadgeTexture(),
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const sprite = new THREE.Sprite(material);
+    sprite.position.set((index - 1.5) * spacing, 0.58, 0.08);
+    sprite.scale.set(0.2, 0.2, 1);
+    sprite.renderOrder = 90;
+    sprite.visible = false;
+    badges.push(sprite);
+  }
+  return badges;
+}
+
 function makeStarBadgeLabel({ width = 96, height = 96, scaleX = 0.18, scaleY = 0.18 } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -587,6 +646,9 @@ function makePassengerGroup(groupScale) {
     group.userData.personSlots.push(slot);
     group.add(slot);
   }
+  const questionBadges = makeQuestionPassengerBadges(spacing);
+  group.userData.questionBadges = questionBadges;
+  group.add(...questionBadges);
   const starBadge = makeStarBadge();
   group.userData.starBadge = starBadge;
   group.add(starBadge);
@@ -1224,6 +1286,9 @@ export class SceneView {
       root.userData.personSlots?.forEach((slot, index) => {
         slot.position.x = (index - 1.5) * spacing;
       });
+      root.userData.questionBadges?.forEach((badge, index) => {
+        badge.position.x = (index - 1.5) * spacing;
+      });
     }
     for (const entry of this.boardingViews) {
       entry.root.scale.setScalar(scale);
@@ -1268,6 +1333,7 @@ export class SceneView {
         const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
         applyPassengerMaterial(material, colorIndex, map);
       }
+      root.userData.questionPassengerHidden = null;
     }
   }
 
@@ -1286,6 +1352,7 @@ export class SceneView {
       }
       view.userData.modelReady = true;
       view.userData.colorIndex = null;
+      view.userData.questionPassengerHidden = null;
     }
   }
 
@@ -1428,22 +1495,57 @@ export class SceneView {
     board.userData.textTexture.needsUpdate = true;
   }
 
-  setPassengerColor(view, colorIndex) {
-    if (view.userData.colorIndex === colorIndex) return;
+  setPassengerAppearance(view, colorIndex, hidden = false) {
+    const questionPassengerHidden = Boolean(hidden);
+    if (
+      view.userData.colorIndex === colorIndex
+      && view.userData.questionPassengerHidden === questionPassengerHidden
+    ) return;
     view.userData.colorIndex = colorIndex;
+    view.userData.questionPassengerHidden = questionPassengerHidden;
+    this.setQuestionPassengerBadgesVisible(view, questionPassengerHidden);
     if (!view.userData.modelReady) {
       for (const slot of view.userData.personSlots) {
-        slot.userData.fallback?.material.color.setHex(COLORS[colorIndex].hex);
+        const fallbackMaterial = slot.userData.fallback?.material;
+        if (!fallbackMaterial) continue;
+        if (questionPassengerHidden) {
+          applyQuestionPassengerMaterial(fallbackMaterial);
+        } else {
+          setPassengerMaterialMaps(fallbackMaterial, null, null);
+          fallbackMaterial.color.setHex(COLORS[colorIndex].hex);
+          fallbackMaterial.emissive.setHex(0x000000);
+          fallbackMaterial.emissiveIntensity = 0;
+          fallbackMaterial.roughness = 0.62;
+          fallbackMaterial.metalness = 0;
+          fallbackMaterial.userData.passengerColorIndex = colorIndex;
+        }
       }
       return;
     }
     for (const slot of view.userData.personSlots) {
       const material = slot.userData.vatMaterial;
       if (material) {
-        const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
-        applyPassengerMaterial(material, colorIndex, map);
+        if (questionPassengerHidden) {
+          applyQuestionPassengerMaterial(material);
+        } else {
+          const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
+          applyPassengerMaterial(material, colorIndex, map);
+        }
       }
     }
+  }
+
+  setQuestionPassengerBadgesVisible(view, visible) {
+    for (const badge of view.userData.questionBadges ?? []) {
+      badge.visible = Boolean(visible);
+      if (badge.material) badge.material.opacity = 1;
+    }
+  }
+
+  resetPassengerAppearance(view) {
+    this.setQuestionPassengerBadgesVisible(view, false);
+    view.userData.colorIndex = null;
+    view.userData.questionPassengerHidden = null;
   }
 
   updateStarPassengerBadge(view, reward, time = 0, passengerId = null) {
@@ -1692,6 +1794,7 @@ export class SceneView {
       const view = this.passengerViews[slot.index];
       view.visible = slot.colorIndex !== null;
       if (!view.visible) {
+        this.resetPassengerAppearance(view);
         this.updateStarPassengerBadge(view, null, snapshot.time);
         continue;
       }
@@ -1717,7 +1820,7 @@ export class SceneView {
         view.position.copy(point);
         view.rotation.y = Math.atan2(tangent.x, tangent.z) + passengerYaw;
       }
-      this.setPassengerColor(view, slot.colorIndex);
+      this.setPassengerAppearance(view, slot.colorIndex, false);
       this.setPassengerAnimation(view, 'move', slot.index > 0 && slot.index % 2 === 0 ? 0.3 : 0);
       this.updateStarPassengerBadge(view, slot.starReward, snapshot.time, slot.passengerId);
     }
@@ -1738,6 +1841,7 @@ export class SceneView {
         const colorIndex = item?.colorIndex;
         view.visible = colorIndex !== undefined;
         if (!view.visible) {
+          this.resetPassengerAppearance(view);
           this.updateStarPassengerBadge(view, null, snapshot.time);
           continue;
         }
@@ -1756,7 +1860,7 @@ export class SceneView {
         );
         view.position.copy(queueVisual.position);
         view.rotation.y = Math.atan2(-queueVisual.tangent.x, -queueVisual.tangent.z) + passengerYaw;
-        this.setPassengerColor(view, colorIndex);
+        this.setPassengerAppearance(view, colorIndex, Boolean(item.questionPassenger?.hidden));
         this.setPassengerAnimation(view, 'idle', (i % 4) * 0.17);
         this.updateStarPassengerBadge(view, item.starReward, snapshot.time, item.id);
       }

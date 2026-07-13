@@ -12,6 +12,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 | Star-passenger lifetime, cyclic charge, and boarding/expiration rules | `src/mechanics/star-passenger/model.js` | `src/mechanics/star-passenger/index.js`, `test/star-passenger-mechanic.test.js` |
 | Question-passenger assignment modes, chance normalization, authored masks, and state metadata | `src/mechanics/question-passenger/model.js` | `src/mechanics/question-passenger/index.js`, `test/question-passenger-mechanic.test.js` |
 | Question-passenger detail mode/chance controls and authored summary | `src/mechanics/question-passenger/view.js` | `src/mechanics/question-passenger/styles.css`, `src/mechanics/question-passenger/index.js`, `src/mechanic-library.js`, `test/mechanic-registry.test.js` |
+| Question-passenger neutral queue appearance and per-person question badges | `src/scene-view.js` | `test/question-passenger-mechanic.test.js`, `test/star-passenger-mechanic.test.js` |
 | Star-passenger HUD, celebration, and reduced-motion feedback | `src/mechanics/star-passenger/view.js` | `src/mechanics/star-passenger/styles.css`, `src/scene-view.js`, `test/star-passenger-mechanic.test.js` |
 | Lab bootstrap, base runtime assembly, mechanic pause/select, tuning storage, QA API | `src/main.js` | `src/mechanic-lab.js`, `src/mechanic-registry.js`, `index.html`, `test/game-model.test.js` |
 | Core gameplay rules, blockers, spots, queues, boarding, win/fail | `src/game-model.js` | `src/level-data.js`, `src/vehicle-motion.js`, `test/game-model.test.js` |
@@ -58,7 +59,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 - `src/game-model.js`: pure gameplay state machine for vehicle clicks, blockers, station reservation, route progress, queues/conveyor, boarding, departure, win/fail, snapshots, and subscriptions.
 - `src/level-data.js`: authored level/color/gameplay constants and all runtime asset URLs.
-- `src/scene-view.js`: Three.js scene construction, loading, camera/background fit, paths, models, passengers, effects, picking, resize, and rendering.
+- `src/scene-view.js`: Three.js scene construction, loading, camera/background fit, paths, models, passenger materials/question badges, effects, picking, resize, and rendering.
 - `src/audio-controller.js`: WebAudio unlock/preload/playback and game-event audio de-duplication.
 - `src/scene-tuning.js`: mutable editor-facing tuning object and authored source values.
 - `src/scene-editor.js`: generated tuning controls, nested path get/set, collapse behavior, and reset-to-authored-defaults hook.
@@ -77,7 +78,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 ### Tests
 
 - `test/mechanic-registry.test.js`: lab shell, CSS breakpoint contracts, library rendering/interactions/detail-extension cleanup, mechanic detail-view factory and question settings controls, registry completeness/freezing/filtering, URL helpers, and safe storage removal.
-- `test/question-passenger-mechanic.test.js`: question-passenger assignment modes, configuration normalization, authored masks, initial state, and module export contracts.
+- `test/question-passenger-mechanic.test.js`: question-passenger assignment/state contracts plus hidden queue material, badge, cache, and scene-wiring source contracts.
 - `test/star-passenger-mechanic.test.js`: star-passenger registry status, reward lifetime, cyclic charge, boarding/expiration behavior, UI wiring, and reduced-motion contracts.
 - `test/game-model.test.js`: base gameplay plus source/runtime contracts, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
@@ -85,7 +86,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ## Known Test Baseline
 
-As of 2026-07-13, the full suite passes 114/114. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
+As of 2026-07-13, the full suite passes 119/119. `pnpm run build` passes with the existing non-blocking chunk-size warning. Star-passenger feedback has passed desktop, 390x844 mobile, and reduced-motion browser QA. The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
 ## Historical Material
 
