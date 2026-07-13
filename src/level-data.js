@@ -56,50 +56,18 @@ const LEVEL12_PASSENGER_QUEUES = Object.freeze([
   ])
 ]);
 
-const LEVEL12_QUESTION_PASSENGER_MASKS = Object.freeze([
-  Object.freeze([
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true, false, false, true, false, false, false, true, false, false,
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true, false, false, true, false, false, false, true, false, false,
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true, false, false, true, false, false, false, true, false, false,
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false
-  ]),
-  Object.freeze([
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true, false, false, true, false, false, false, true, false, false,
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true, false, false, true, false, false, false, true, false, false,
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true, false, false, true, false, false, false, true, false, false,
-    true, false, false, true, false, false, false, true, false, false, true, false,
-    false, true, false, false, false, true, false, false, true, false, false, true,
-    false, false, false, true, false, false, true, false, false, true, false, false,
-    false, true, false, false, true, false, false, true, false, false, false, true,
-    false, false, true
-  ])
+const LEVEL12_QUESTION_PASSENGER_RESIDUES = Object.freeze([
+  Object.freeze([0, 3, 7]),
+  Object.freeze([1, 5, 8])
 ]);
+
+const LEVEL12_QUESTION_PASSENGER_MASKS = Object.freeze(
+  LEVEL12_PASSENGER_QUEUES.map((queue, queueIndex) => Object.freeze(
+    queue.map((_, sourceIndex) => (
+      LEVEL12_QUESTION_PASSENGER_RESIDUES[queueIndex].includes(sourceIndex % 10)
+    ))
+  ))
+);
 
 function decodeUnityInt32Hex(hex) {
   const values = [];

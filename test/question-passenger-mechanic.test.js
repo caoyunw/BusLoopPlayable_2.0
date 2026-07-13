@@ -17,6 +17,7 @@ function makeLevel(authoredMasks = [[true, false], [false, true]]) {
 test('level12 provides frozen authored question-passenger masks', () => {
   const questionConfig = LEVEL_1.mechanics['question-passenger'];
   const authoredMasks = questionConfig.authoredMasks;
+  const authoredResidues = [[0, 3, 7], [1, 5, 8]];
 
   assert.equal(authoredMasks.length, 2);
   assert.deepEqual(
@@ -26,6 +27,15 @@ test('level12 provides frozen authored question-passenger masks', () => {
   assert.equal(authoredMasks.every((row) => row.every((value) => typeof value === 'boolean')), true);
   assert.equal(authoredMasks.flat().filter(Boolean).length, 132);
   assert.equal(authoredMasks.flat().length, 438);
+  authoredMasks.forEach((row, queueIndex) => {
+    row.forEach((value, sourceIndex) => {
+      assert.equal(
+        value,
+        authoredResidues[queueIndex].includes(sourceIndex % 10),
+        `queue ${queueIndex} mask at source index ${sourceIndex}`
+      );
+    });
+  });
   assert.equal(Object.isFrozen(authoredMasks), true);
   assert.equal(authoredMasks.every(Object.isFrozen), true);
   assert.equal(Object.isFrozen(questionConfig), true);
