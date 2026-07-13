@@ -57,25 +57,26 @@ function isDenseSlotBatch(slots, batch, headSlot) {
     ) return false;
     seen.add(candidate);
   }
-  const chain = headSlot.linkedPassenger;
-  if (!chain) return batch.every((candidate) => !candidate.linkedPassenger);
-  if (
-    !chain.isHead
-    || chain.memberIndex !== 0
-    || !Number.isInteger(chain.length)
-    || chain.length !== batch.length
-  ) return false;
-  for (let memberIndex = 0; memberIndex < batch.length; memberIndex += 1) {
-    const member = batch[memberIndex].linkedPassenger;
-    if (
-      !member
-      || member.chainId !== chain.chainId
-      || member.length !== chain.length
-      || member.memberIndex !== memberIndex
-      || member.isHead !== (memberIndex === 0)
-    ) return false;
-  }
   return true;
+}
+
+function cloneSnapshotValue(value, seen = new WeakMap()) {
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) return seen.get(value);
+  if (Array.isArray(value)) {
+    const clone = [];
+    seen.set(value, clone);
+    for (const item of value) clone.push(cloneSnapshotValue(item, seen));
+    return clone;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  const clone = Object.create(prototype);
+  seen.set(value, clone);
+  for (const [key, item] of Object.entries(value)) {
+    clone[key] = cloneSnapshotValue(item, seen);
+  }
+  return clone;
 }
 
 function visualToVehicleAreaPoint(x, z) {
@@ -310,15 +311,9 @@ export class BusLoopGame {
         entryMotion: slot.entryMotion ? { ...slot.entryMotion } : null,
         ...this.cloneMechanicSlotSnapshot(slot)
       })),
-      boardingEvents: this.boardingEvents.map((event) => ({
-        ...event,
-        passengerIds: event.passengerIds ? [...event.passengerIds] : undefined,
-        slotIndices: event.slotIndices ? [...event.slotIndices] : undefined,
-        progresses: event.progresses ? [...event.progresses] : undefined,
-        linkedPassenger: event.linkedPassenger ? { ...event.linkedPassenger } : undefined
-      })),
+      boardingEvents: cloneSnapshotValue(this.boardingEvents),
       ...this.decorateMechanicSnapshot(),
-      lastEvent: { ...this.lastEvent },
+      lastEvent: cloneSnapshotValue(this.lastEvent),
       remainingGroups: this.getRemainingGroups(),
       remainingByColor: this.getRemainingByColor()
     };
@@ -766,24 +761,6 @@ export class BusLoopGame {
       ),
       ...this.createMechanicQueueItemData({ queueIndex, sourceIndex: startIndex + index })
     }));
-  }
-
-  getBoardingBatch(slot) {
-    const batch = this.mechanicRuntime.getBoardingBatch?.({
-      game: this,
-      slot,
-      slots: this.slots
-    }) ?? [slot];
-    if (!Array.isArray(batch) || batch.length === 0) return [];
-    return batch.every((candidate) => this.slots.includes(candidate)) ? batch : [];
-  }
-
-  getPassengerBatchBoardingEvent(slots, vehicle) {
-    return this.mechanicRuntime.onPassengerBatchBoarded?.({
-      game: this,
-      slots,
-      vehicle
-    }) ?? {};
   }
 
   createMechanicQueueItemData(context = {}) {

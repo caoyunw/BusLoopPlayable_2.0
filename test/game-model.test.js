@@ -87,6 +87,9 @@ test('game model exposes generic passenger batch hooks without linked mechanic b
   assert.match(source, /getBoardingBatch/);
   assert.match(source, /onPassengerBatchBoarded/);
   assert.doesNotMatch(source, /linked-passengers/);
+  assert.doesNotMatch(source, /linkedPassenger/);
+  assert.equal((source.match(/\n  getBoardingBatch\(slot\)/g) ?? []).length, 1);
+  assert.doesNotMatch(source, /getPassengerBatchBoardingEvent/);
 });
 
 const mapVehicleAreaPoint = (point) => {

@@ -509,6 +509,32 @@ test('linked passengers board atomically and emit one deeply cloned aggregate ev
   assert.equal(freshEvent.linkedPassenger.length, 3);
 });
 
+test('snapshot recursively clones aggregate and last-event arrays and mechanic objects', () => {
+  const game = makeLinkedGame();
+  const event = {
+    passengerIds: [1, 2],
+    mechanicData: {
+      nested: { value: 3 },
+      items: [{ value: 4 }]
+    }
+  };
+  game.boardingEvents = [event];
+  game.lastEvent = { type: 'group-boarded', ...event };
+
+  const snapshot = game.snapshot();
+  snapshot.boardingEvents[0].passengerIds.push(99);
+  snapshot.boardingEvents[0].mechanicData.nested.value = 30;
+  snapshot.boardingEvents[0].mechanicData.items[0].value = 40;
+  snapshot.lastEvent.passengerIds.push(98);
+  snapshot.lastEvent.mechanicData.nested.value = 300;
+
+  const fresh = game.snapshot();
+  assert.deepEqual(fresh.boardingEvents[0], event);
+  assert.deepEqual(fresh.lastEvent, { type: 'group-boarded', ...event });
+  assert.notEqual(fresh.boardingEvents[0].mechanicData, event.mechanicData);
+  assert.notEqual(fresh.lastEvent.mechanicData, event.mechanicData);
+});
+
 test('invalid runtime boarding batches leave slots vehicles and events unchanged', () => {
   const cases = [
     {
@@ -520,8 +546,7 @@ test('invalid runtime boarding batches leave slots vehicles and events unchanged
       }
     },
     { name: 'foreign', getBatch: () => [{ index: 0, colorIndex: 0, passengerId: 999 }] },
-    { name: 'duplicate', getBatch: (slots) => [slots[0], slots[0]] },
-    { name: 'partial-chain', getBatch: (slots) => [slots[0]] }
+    { name: 'duplicate', getBatch: (slots) => [slots[0], slots[0]] }
   ];
 
   for (const fixture of cases) {
