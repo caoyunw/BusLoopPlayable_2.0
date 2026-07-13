@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Design and plan `linked-passengers` as the next mechanic. The design is approved; the written spec is awaiting final user review before implementation planning.
+Implement `linked-passengers` as the next mechanic from the approved design and committed TDD execution plan. Keep its registry entry `planned` until focused tests, the full suite, build, desktop/mobile browser QA, and reduced-motion QA pass.
 
 ## Completed Gates
 
@@ -15,9 +15,9 @@ Design and plan `linked-passengers` as the next mechanic. The design is approved
 
 ## Next Steps
 
-1. User reviews `docs/superpowers/specs/2026-07-13-linked-passengers-design.md`.
-2. Write and commit the detailed implementation plan.
-3. Execute with TDD while the registry entry remains `planned`.
+1. Execute `docs/superpowers/plans/2026-07-13-linked-passengers.md` task by task with TDD.
+2. Run the full automated/build gate, then desktop 1280x720, mobile 390x844, and live reduced-motion browser QA.
+3. Mark the mechanic playable and update durable project status only after every gate passes.
 
 ## Context Pointers
 
