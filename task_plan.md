@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Implement `linked-passengers` as the next mechanic from the approved design and committed TDD execution plan. Keep its registry entry `planned` until focused tests, the full suite, build, desktop/mobile browser QA, and reduced-motion QA pass.
+Validate the newly implemented `garage` mechanic against the active level18 garage-container configuration, then continue to `question-passenger` while preserving the verified star-passenger baseline.
 
 ## Completed Gates
 
@@ -13,11 +13,32 @@ Implement `linked-passengers` as the next mechanic from the approved design and 
 - A live forced reduced-motion branch passed without transform motion; native in-app browser media emulation was unavailable and is not claimed.
 - Error-level logs and page errors were absent. Existing FBXLoader warnings and four Unity texture fallback gaps remain documented in `findings.md`.
 
-## Next Steps
+- Mechanic registry and searchable library are present.
+- Desktop three-column and mobile drawer layouts are present.
+- The registry contains 17 mechanism definitions: 3 playable (`base`, `garage`, `star-passenger`) and 14 planned.
+- URL selection, planned-mechanic input freeze, persistent scene editor, safe tuning storage, neutral runtime assets, and advertising cleanup are in place.
+- Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
+- Garage hidden stock, one-at-a-time release, counter timing, Unity model rendering path, and runtime smoke are implemented.
+- The active level has been replaced with level18 data: 47 vehicles, two fixed queues of 115 and 191 groups, 42 blocker entries from the supplied CSV, and two garage containers with 16 stocked garage vehicles.
+- The 2026-07-12 full `pnpm test` and `pnpm run build` baseline passed. Current sandboxed `pnpm test` and `pnpm run build` are blocked by Windows `spawn EPERM`.
 
-1. Execute `docs/superpowers/plans/2026-07-13-linked-passengers.md` task by task with TDD.
-2. Run the full automated/build gate, then desktop 1280x720, mobile 390x844, and live reduced-motion browser QA.
-3. Mark the mechanic playable and update durable project status only after every gate passes.
+The next immediate phase is garage QA on level18. After that, continue to `question-passenger`. The star-passenger design and implementation plans remain completed references.
+
+## Implementation Priority
+
+Advance `question-passenger` through the mechanic workflow:
+
+1. Define the hidden-color and reveal rules, player-facing feedback, and acceptance criteria.
+2. Keep the registry entry `planned` while implementing the rule in its own mechanic module.
+3. Add focused model, runtime, registry, and UI tests before changing shared hooks.
+4. Verify desktop, 390x844 mobile, and reduced-motion behavior before marking the mechanic `playable`.
+
+## Verification Gate
+
+- Focused `question-passenger` tests pass.
+- The full suite preserves the 88/88 baseline or increases it with new passing tests.
+- `pnpm run build` passes outside the current sandbox limitation; current sandboxed runs hit Windows `spawn EPERM`.
+- Browser QA covers desktop, 390x844 mobile, and reduced-motion behavior for `question-passenger`.
 
 ## Context Pointers
 

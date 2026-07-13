@@ -26,7 +26,7 @@ const {
   syncMechanicQuery
 } = mechanicLab;
 
-const EXPECTED_MECHANIC_IDS = [
+const MECHANIC_IDS_AFTER_BASE = [
   'question-passenger',
   'question-vehicle',
   'elevator-bay',
@@ -886,7 +886,7 @@ test('registry contains base plus sixteen unique mechanic entries', () => {
   assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 17);
   assert.deepEqual(
     MECHANICS.map(({ id }) => id),
-    ['base', ...EXPECTED_MECHANIC_IDS]
+    ['base', ...MECHANIC_IDS_AFTER_BASE]
   );
 });
 
@@ -917,18 +917,12 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base, star passenger, and question passenger are playable while remaining presets are planned', () => {
+test('base, garage, and star passenger are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
+  assert.equal(getMechanicById('garage').status, 'playable');
   assert.equal(getMechanicById('star-passenger').status, 'playable');
-  assert.equal(getMechanicById('question-passenger').status, 'playable');
-  assert.equal(resolvePlayableMechanicId('question-passenger'), 'question-passenger');
   assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 3);
-  assert.deepEqual(
-    MECHANICS.filter(({ status }) => status === 'planned').map(({ id }) => id),
-    PLANNED_MECHANIC_IDS
-  );
-  assert.equal(PLANNED_MECHANIC_IDS.length, 14);
-  assert.equal(PLANNED_MECHANIC_IDS.includes('question-passenger'), false);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 14);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {

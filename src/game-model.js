@@ -140,8 +140,10 @@ export class BusLoopGame {
   configureMechanic(id) {
     this.mechanicId = resolvePlayableMechanicId(id);
     this.mechanicRuntime = createMechanicRuntime(this.mechanicId, {
+      level: this.level,
       random: this.random,
       level: this.level,
+      mechanicOptions: this.mechanicOptions,
       options: this.mechanicOptions[this.mechanicId] ?? {}
     });
   }
@@ -183,6 +185,7 @@ export class BusLoopGame {
       entryMotion: null,
       ...this.createMechanicSlotData()
     }));
+    this.mechanicRuntime.afterReset?.({ game: this });
     this.lastEvent = { type: 'reset' };
     this.emit();
   }
@@ -269,8 +272,8 @@ export class BusLoopGame {
 
   getBlockers(id) {
     const vehicle = this.getVehicle(id);
-    if (!vehicle || vehicle.state !== 'parked') return [];
-    if (this.level.vehicleDepthes) {
+    if (!vehicle || !['parked', 'in-garage'].includes(vehicle.state)) return [];
+    if (this.level.vehicleDepthes && !vehicle.useDynamicBlockers) {
       const authoredBlockers = this.level.vehicleDepthes[id] ?? [];
       return authoredBlockers.filter((blockerId) => {
         const candidate = this.getVehicle(blockerId);
@@ -426,6 +429,8 @@ export class BusLoopGame {
         }
       }
     }
+
+    changed = Boolean(this.mechanicRuntime.update?.({ game: this, delta })) || changed;
 
     this.updateQueues(delta);
 
@@ -726,6 +731,7 @@ export class BusLoopGame {
       this.lastEvent = { type: 'win' };
       return;
     }
+    if (this.mechanicRuntime.hasPendingVehicles?.(this)) return;
     const enabledSpotsFull = this.spots.every((spot) => spot.vehicleId !== null);
     const beltFull = this.slots.every((slot) => slot.colorIndex !== null);
     const upstreamEmpty = this.sourceQueues.every((queue) => queue.length === 0)

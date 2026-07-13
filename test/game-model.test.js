@@ -62,11 +62,11 @@ const listFiles = (directory) => readdirSync(directory, { withFileTypes: true })
   return entry.isDirectory() ? listFiles(path) : [path];
 });
 
-const LEVEL12_TOTAL_PASSENGERS = 438;
-const LEVEL12_COLOR_TOTALS = { 0: 68, 1: 34, 2: 18, 3: 22, 4: 12, 5: 198, 6: 20, 7: 52, 8: 14 };
-const LEVEL12_INITIAL_MOVABLE_IDS = [1, 4, 34, 51];
-const LEVEL12_DISPATCH_ID = 1;
-const LEVEL12_BLOCKED_ID = 2;
+const LEVEL18_TOTAL_PASSENGERS = 306;
+const LEVEL18_COLOR_TOTALS = { 0: 38, 1: 50, 2: 10, 3: 62, 4: 46, 5: 56, 8: 44 };
+const LEVEL18_INITIAL_MOVABLE_IDS = [30, 31, 32, 56, 58];
+const LEVEL18_DISPATCH_ID = 31;
+const LEVEL18_BLOCKED_ID = 28;
 const PLAYABLE_AD_SOURCE_MARKERS =
   /cta-button|Play Now|cta-pulse|--cta-|\bcta\.|MRAID|STORE_(?:URL|OPEN)|isIOS|openStore|InstallFullGame|installState|MAX_NUMBER_COUNT_BUS|numberCountBus|isFinish|ctaButton|applyCtaTuning|play\.google\.com\/store|apps\.apple\.com\/app|Bus Fever - Car Jam Escape|Main_Prop_GreenBtn|\/assets\/icon\.png/i;
 const ACTIVE_AD_DELIVERY_MARKERS =
@@ -100,29 +100,30 @@ const mapVehicleAreaPoint = (point) => {
   };
 };
 
-test('level12 initializes Unity-authored layout and counts', () => {
+test('level18 initializes Unity-authored layout and counts', () => {
   const state = new BusLoopGame().snapshot();
-  assert.equal(LEVEL_1.id, 0);
+  assert.equal(LEVEL_1.id, 18);
   assert.equal(LEVEL_1.sceneName, 'GameSceneDualQueue2');
-  assert.equal(LEVEL_1.mapScale, 1.0012542);
-  assert.equal(state.vehicles.length, 94);
+  assert.equal(LEVEL_1.mapScale, 1.33);
+  assert.equal(state.vehicles.length, 47);
   assert.equal(state.spots.length, 6);
   assert.equal(state.slots.length, 32);
   assert.equal(LEVEL_1.passengerQueues.length, 2);
-  assert.deepEqual(LEVEL_1.passengerQueues.map((queue) => queue.length), [219, 219]);
-  assert.equal(LEVEL_1.passengerSequence.length, LEVEL12_TOTAL_PASSENGERS);
-  assert.deepEqual(countSeatsByColor(), LEVEL12_COLOR_TOTALS);
-  assert.equal(state.sourceRemaining, LEVEL12_TOTAL_PASSENGERS - LEVEL_1.queueCapacity * 2);
+  assert.deepEqual(LEVEL_1.passengerQueues.map((queue) => queue.length), [115, 191]);
+  assert.equal(LEVEL_1.passengerSequence.length, LEVEL18_TOTAL_PASSENGERS);
+  assert.deepEqual(countSeatsByColor(), LEVEL18_COLOR_TOTALS);
+  assert.equal(state.sourceRemaining, LEVEL18_TOTAL_PASSENGERS - LEVEL_1.queueCapacity * 2);
   assert.deepEqual(state.queueRemaining, [24, 24]);
-  assert.equal(state.remainingGroups, LEVEL12_TOTAL_PASSENGERS);
-  assert.deepEqual(state.remainingByColor, LEVEL12_COLOR_TOTALS);
-  assert.deepEqual(LEVEL_1.vehicles[0], { id: 1, seats: 4, colorIndex: 5, x: 1.8599999, z: 1.6299994, yaw: 90 });
-  assert.deepEqual(LEVEL_1.vehicles.at(-1), { id: 118, seats: 10, colorIndex: 3, x: 1.4415802, z: 0.41113225, yaw: 0 });
+  assert.equal(state.remainingGroups, LEVEL18_TOTAL_PASSENGERS);
+  assert.deepEqual(state.remainingByColor, LEVEL18_COLOR_TOTALS);
+  assert.deepEqual(LEVEL_1.vehicles[0], { id: 28, seats: 10, colorIndex: 0, x: 0.27567083, z: 1.1003189, yaw: 89.999998 });
+  assert.deepEqual(LEVEL_1.vehicles.at(-1), { id: 74, seats: 4, colorIndex: 8, x: 1.0500002, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 });
+  assert.deepEqual(LEVEL_1.containers.filter((container) => container.type === 2).map((container) => container.id), [1, 2]);
   assert.deepEqual(LEVEL_1.passengerQueues[0].slice(0, 24), [
-    5, 5, 3, 3, 0, 0, 0, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 8, 8, 8
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 5, 5, 5, 5, 4, 0, 0, 0, 0, 0
   ]);
   assert.deepEqual(LEVEL_1.passengerQueues[1].slice(0, 24), [
-    5, 5, 3, 3, 0, 0, 0, 5, 5, 1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 3, 3, 3, 7
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 0, 0, 8, 8, 8, 8, 8, 8, 5, 5, 5
   ]);
 });
 
@@ -131,8 +132,8 @@ test('queue initialization can use adapted Unity visible capacities without losi
   game.initializeQueues([17, 18], 0.25, [4, 4.25]);
   const state = game.snapshot();
   assert.deepEqual(state.queueRemaining, [17, 18]);
-  assert.equal(state.sourceRemaining, LEVEL12_TOTAL_PASSENGERS - 17 - 18);
-  assert.equal(state.remainingGroups, LEVEL12_TOTAL_PASSENGERS);
+  assert.equal(state.sourceRemaining, LEVEL18_TOTAL_PASSENGERS - 17 - 18);
+  assert.equal(state.remainingGroups, LEVEL18_TOTAL_PASSENGERS);
   assert.equal(state.queueItems[0][0].distanceFromHead, 0);
   assert.equal(state.queueItems[0][1].distanceFromHead, 0.25);
   assert.equal(state.queueItems[1][17].distanceFromHead, 4.25);
@@ -145,7 +146,7 @@ test('queue passengers keep Unity-style logic distance and advance after dequeue
     game.snapshot().queueItems[0].map((item) => item.distanceFromHead),
     [0, 0.5, 1, 1.5]
   );
-  assert.equal(game.dequeuePassenger(0), 5);
+  assert.equal(game.dequeuePassenger(0), 4);
   assert.deepEqual(
     game.snapshot().queueItems[0].map((item) => item.distanceFromHead),
     [0.5, 1, 1.5, 2]
@@ -157,7 +158,7 @@ test('queue passengers keep Unity-style logic distance and advance after dequeue
   );
   assert.equal(game.dequeuePassenger(0), null);
   game.updateQueues(0.2);
-  assert.equal(game.dequeuePassenger(0), 5);
+  assert.equal(game.dequeuePassenger(0), 4);
 });
 
 test('mechanic queue hooks receive absolute queue coordinates', () => {
@@ -393,6 +394,9 @@ test('Unity visual assets and tunable camera configuration are complete', () => 
   assert.equal('realtimeShadows' in SCENE_TUNING.lighting, false);
   assert.equal(SCENE_TUNING.facing.passengerYawDegrees, 180);
   assert.equal(SCENE_TUNING.facing.passengerModelYawDegrees, -90);
+  assert.equal(SCENE_TUNING.facing.garageYawOffsetDegrees, 180);
+  assert.equal(SCENE_TUNING.facing.garageModelPitchDegrees, -90);
+  assert.equal(SCENE_TUNING.facing.garageModelRollDegrees, 0);
   assert.equal(SCENE_TUNING.vehicleArea.rotationDegrees, 0);
   assert.equal(SCENE_TUNING.vehicleArea.mirrorZ, true);
   assert.equal(SCENE_TUNING.vehicleArea.positionUnitScale, 0.75);
@@ -520,7 +524,7 @@ test('vehicle generation region matches GameSceneDualQueue2 VehicleRoot Cube', (
   });
   const halfWidth = area.sourceCube.width * area.unityToWorldScale * 0.5;
   const halfDepth = area.sourceCube.depth * area.unityToWorldScale * 0.5;
-  for (const vehicle of LEVEL_1.vehicles) {
+  for (const vehicle of LEVEL_1.vehicles.filter((item) => item.containerType !== 2)) {
     const point = mapVehicleAreaPoint(vehicle);
     assert.ok(point.x >= -halfWidth && point.x <= halfWidth);
     assert.ok(point.z >= 6.84 - halfDepth && point.z <= 6.84 + halfDepth);
@@ -790,53 +794,52 @@ test('Unity VAT mesh matches the authored animation texture layout', () => {
   assert.equal(texture.length, 512 * 128 * 4 * 2);
 });
 
-test('initial blocker graph uses level12 Unity vehicleDepthes', () => {
+test('initial blocker graph uses level18 Unity vehicleDepthes', () => {
   const game = new BusLoopGame();
   const movable = LEVEL_1.vehicles
     .filter((vehicle) => game.getBlockers(vehicle.id).length === 0)
     .map((vehicle) => vehicle.id);
-  assert.deepEqual(movable, LEVEL12_INITIAL_MOVABLE_IDS);
-  assert.equal(Object.keys(LEVEL_1.vehicleDepthes).length, 90);
-  assert.deepEqual(LEVEL_1.vehicleDepthes[2], [1, 3]);
-  assert.deepEqual(game.getBlockers(2), [1, 3]);
-  assert.deepEqual(game.getBlockers(3), [1]);
-  assert.deepEqual(game.getBlockers(5), [1, 2, 3]);
-  assert.deepEqual(game.getBlockers(85).slice(-10), [86, 87, 88, 89, 74, 90, 91, 92, 96, 93]);
+  assert.deepEqual(movable, LEVEL18_INITIAL_MOVABLE_IDS);
+  assert.equal(Object.keys(LEVEL_1.vehicleDepthes).length, 42);
+  assert.deepEqual(LEVEL_1.vehicleDepthes[28], [31]);
+  assert.deepEqual(game.getBlockers(28), [31]);
+  assert.deepEqual(game.getBlockers(29), [30, 33, 56]);
+  assert.deepEqual(game.getBlockers(60), [47, 35, 28, 31, 48]);
+  assert.deepEqual(LEVEL_1.vehicleDepthes[74].slice(-6), [68, 69, 70, 71, 72, 73]);
+  assert.deepEqual(game.getBlockers(74), [47, 35, 28, 31, 48]);
 });
 
 test('vehicleDepthes unlock blocked cars as authored blockers leave', () => {
   const game = new BusLoopGame();
-  assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), [1, 3]);
-  assert.deepEqual(game.clickVehicle(1), { ok: true, spotIndex: 0 });
-  assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), [3]);
-  assert.deepEqual(game.clickVehicle(3), { ok: true, spotIndex: 1 });
-  assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), []);
-  assert.deepEqual(game.clickVehicle(LEVEL12_BLOCKED_ID), { ok: true, spotIndex: 2 });
+  assert.deepEqual(game.getBlockers(LEVEL18_BLOCKED_ID), [31]);
+  assert.deepEqual(game.clickVehicle(31), { ok: true, spotIndex: 0 });
+  assert.deepEqual(game.getBlockers(LEVEL18_BLOCKED_ID), []);
+  assert.deepEqual(game.clickVehicle(LEVEL18_BLOCKED_ID), { ok: true, spotIndex: 1 });
 });
 
 test('dispatch reserves the first spot and unlocks cars behind it', () => {
   const game = new BusLoopGame();
-  assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), [1, 3]);
-  assert.deepEqual(game.clickVehicle(LEVEL12_DISPATCH_ID), { ok: true, spotIndex: 0 });
-  assert.equal(game.snapshot().spots[0].vehicleId, LEVEL12_DISPATCH_ID);
-  assert.deepEqual(game.getBlockers(LEVEL12_BLOCKED_ID), [3]);
+  assert.deepEqual(game.getBlockers(LEVEL18_BLOCKED_ID), [31]);
+  assert.deepEqual(game.clickVehicle(LEVEL18_DISPATCH_ID), { ok: true, spotIndex: 0 });
+  assert.equal(game.snapshot().spots[0].vehicleId, LEVEL18_DISPATCH_ID);
+  assert.deepEqual(game.getBlockers(LEVEL18_BLOCKED_ID), []);
 });
 
 test('blocked click uses Unity collision advance, contact hit, and return phases', () => {
   const game = new BusLoopGame();
-  const attackerBeforeClick = game.getVehicle(LEVEL12_BLOCKED_ID);
+  const attackerBeforeClick = game.getVehicle(LEVEL18_BLOCKED_ID);
   const collisionSize = {
     width: game.level.vehicleSize.width / game.level.mapScale,
     length: game.level.vehicleSize.length / game.level.mapScale
   };
-  const expectedTarget = game.getBlockers(LEVEL12_BLOCKED_ID)
+  const expectedTarget = game.getBlockers(LEVEL18_BLOCKED_ID)
     .map((id) => game.getVehicle(id))
     .sort((a, b) => (
       getCollisionDistance(attackerBeforeClick, a, collisionSize)
       - getCollisionDistance(attackerBeforeClick, b, collisionSize)
     ))[0];
-  assert.equal(game.clickVehicle(LEVEL12_BLOCKED_ID).reason, 'blocked');
-  const attacker = game.getVehicle(LEVEL12_BLOCKED_ID);
+  assert.equal(game.clickVehicle(LEVEL18_BLOCKED_ID).reason, 'blocked');
+  const attacker = game.getVehicle(LEVEL18_BLOCKED_ID);
   assert.equal(attacker.state, 'colliding');
   assert.equal(attacker.collision.targetId, expectedTarget.id);
   const forwardDuration = attacker.collision.forwardDuration;
@@ -851,8 +854,8 @@ test('blocked click uses Unity collision advance, contact hit, and return phases
 
 test('station drive uses the Unity rounded path and authored weighted curve', () => {
   const game = new BusLoopGame();
-  game.clickVehicle(LEVEL12_DISPATCH_ID);
-  const data = game.getVehicle(LEVEL12_DISPATCH_ID).motionData;
+  game.clickVehicle(LEVEL18_DISPATCH_ID);
+  const data = game.getVehicle(LEVEL18_DISPATCH_ID).motionData;
   assert.ok(data.path.segments.some((segment) => segment.type === 'cubic'));
   assert.ok(data.duration > 0 && data.duration < 1);
   const middleDistance = data.path.length * evaluateUnityCurve(data.curve, .5);
@@ -866,11 +869,11 @@ test('station approach follows the Unity parking-area rectangle before entering 
   SCENE_TUNING.facing.parkingSpotYawDegrees = 35;
   try {
     const game = new BusLoopGame();
-    game.clickVehicle(LEVEL12_DISPATCH_ID);
+    game.clickVehicle(LEVEL18_DISPATCH_ID);
     const target = game.getSpotPosition(0);
-    const data = game.getVehicle(LEVEL12_DISPATCH_ID).motionData;
+    const data = game.getVehicle(LEVEL18_DISPATCH_ID).motionData;
     const finalSegment = data.path.segments.at(-1);
-    const rawPoints = buildToStationPoints(game.getVehicle(LEVEL12_DISPATCH_ID), target, SCENE_TUNING.vehiclePath);
+    const rawPoints = buildToStationPoints(game.getVehicle(LEVEL18_DISPATCH_ID), target, SCENE_TUNING.vehiclePath);
     assert.equal(target.visualYaw, 35);
     assert.notEqual(target.yaw, target.visualYaw);
     const mappedCenter = mapVehicleAreaPoint(target);
@@ -881,8 +884,8 @@ test('station approach follows the Unity parking-area rectangle before entering 
     assert.equal(target.visualApproachX, target.visualX);
     assert.ok(target.visualApproachZ > target.visualZ);
     assert.notDeepEqual(rawPoints.at(-2), { x: target.approachX, z: target.approachZ });
-    assert.equal(rawPoints[0].x, game.getVehicle(LEVEL12_DISPATCH_ID).x);
-    assert.equal(rawPoints[0].z, game.getVehicle(LEVEL12_DISPATCH_ID).z);
+    assert.equal(rawPoints[0].x, game.getVehicle(LEVEL18_DISPATCH_ID).x);
+    assert.equal(rawPoints[0].z, game.getVehicle(LEVEL18_DISPATCH_ID).z);
     assert.ok(rawPoints.some((point) => (
       Math.abs(point.z - SCENE_TUNING.vehiclePath.parkingBounds.maxZ) < 1e-6
     )));
@@ -901,7 +904,7 @@ test('vehicle path preview and shape controls are wired to scene tuning', () => 
   );
   const game = new BusLoopGame();
   const target = game.getSpotPosition(0);
-  const vehicle = game.getVehicle(LEVEL12_DISPATCH_ID);
+  const vehicle = game.getVehicle(LEVEL18_DISPATCH_ID);
   const originalPoints = buildToStationPoints(vehicle, target, SCENE_TUNING.vehiclePath);
   const tunedMotion = {
     ...SCENE_TUNING.vehiclePath,
@@ -952,22 +955,22 @@ test('seat count board displays remaining passengers, not remaining groups', () 
 
 test('matching groups board only an arrived same-color vehicle', () => {
   const game = new BusLoopGame();
-  game.clickVehicle(LEVEL12_DISPATCH_ID);
+  game.clickVehicle(LEVEL18_DISPATCH_ID);
   advance(game, .8);
-  const vehicle = game.getVehicle(LEVEL12_DISPATCH_ID);
+  const vehicle = game.getVehicle(LEVEL18_DISPATCH_ID);
   assert.equal(vehicle.state, 'at-spot');
   const before = vehicle.boardedGroups;
   for (let i = 0; i < 300 && vehicle.boardedGroups === before; i += 1) game.update(0.05);
   assert.ok(vehicle.boardedGroups > before);
-  assert.equal(game.snapshot().boardingEvents.at(-1).vehicleId, LEVEL12_DISPATCH_ID);
-  assert.equal(game.getVehicle(7).boardedGroups, 0);
+  assert.equal(game.snapshot().boardingEvents.at(-1).vehicleId, LEVEL18_DISPATCH_ID);
+  assert.equal(game.getVehicle(30).boardedGroups, 0);
 });
 
 test('a full vehicle frees its spot and departs', () => {
   const game = new BusLoopGame();
-  game.clickVehicle(LEVEL12_DISPATCH_ID);
+  game.clickVehicle(LEVEL18_DISPATCH_ID);
   advance(game, .8);
-  const vehicle = game.getVehicle(LEVEL12_DISPATCH_ID);
+  const vehicle = game.getVehicle(LEVEL18_DISPATCH_ID);
   vehicle.boardedGroups = vehicle.seats - 1;
   const slot = game.slots[0];
   slot.colorIndex = vehicle.colorIndex;
@@ -984,9 +987,9 @@ test('full vehicle backs out below the parking spot before leaving', () => {
   SCENE_TUNING.facing.parkingSpotYawDegrees = -30;
   try {
     const game = new BusLoopGame();
-    game.clickVehicle(LEVEL12_DISPATCH_ID);
+    game.clickVehicle(LEVEL18_DISPATCH_ID);
     advance(game, .8);
-    const vehicle = game.getVehicle(LEVEL12_DISPATCH_ID);
+    const vehicle = game.getVehicle(LEVEL18_DISPATCH_ID);
     const target = game.getSpotPosition(0);
     vehicle.boardedGroups = vehicle.seats - 1;
     const slot = game.slots[0];
@@ -1020,9 +1023,9 @@ test('vehicle departure path and full-load delay are scene-tunable', () => {
   SCENE_TUNING.vehicleDeparturePath.exitTurnOffsetX = -0.9;
   try {
     const game = new BusLoopGame();
-    game.clickVehicle(LEVEL12_DISPATCH_ID);
+    game.clickVehicle(LEVEL18_DISPATCH_ID);
     advance(game, .8);
-    const vehicle = game.getVehicle(LEVEL12_DISPATCH_ID);
+    const vehicle = game.getVehicle(LEVEL18_DISPATCH_ID);
     vehicle.boardedGroups = vehicle.seats - 1;
     const slot = game.slots[0];
     slot.colorIndex = vehicle.colorIndex;
@@ -1046,17 +1049,21 @@ test('Unity conveyor failure rule triggers on a deadlocked full station', () => 
   for (const queue of game.sourceQueues) queue.length = 0;
   for (const queue of game.queues) queue.length = 0;
   for (const slot of game.slots) slot.colorIndex = 0;
+  for (const garage of game.mechanicState.garages ?? []) {
+    garage.vehicleIds.length = 0;
+    garage.exitingVehicleId = null;
+  }
   game.checkEndState();
   assert.equal(game.status, 'lost');
 });
 
-test('level12 initial movable cars reserve the first parking spots', () => {
+test('level18 initial movable cars reserve the first parking spots', () => {
   const game = new BusLoopGame();
-  for (const id of LEVEL12_INITIAL_MOVABLE_IDS) {
+  for (const id of LEVEL18_INITIAL_MOVABLE_IDS) {
     assert.equal(game.clickVehicle(id).ok, true, `vehicle ${id} should be movable`);
   }
   assert.equal(game.spots.length, 6);
-  assert.deepEqual(game.snapshot().spots.slice(0, LEVEL12_INITIAL_MOVABLE_IDS.length).map((spot) => spot.vehicleId), LEVEL12_INITIAL_MOVABLE_IDS);
+  assert.deepEqual(game.snapshot().spots.slice(0, LEVEL18_INITIAL_MOVABLE_IDS.length).map((spot) => spot.vehicleId), LEVEL18_INITIAL_MOVABLE_IDS);
   assert.deepEqual(
     LEVEL_1.vehicles
       .filter((vehicle) => {
@@ -1064,7 +1071,7 @@ test('level12 initial movable cars reserve the first parking spots', () => {
         return runtimeVehicle.state === 'parked' && game.getBlockers(vehicle.id).length === 0;
       })
       .map((vehicle) => vehicle.id),
-    [3, 6, 33, 35, 38]
+    [28, 33, 39, 50, 51, 55]
   );
 });
 

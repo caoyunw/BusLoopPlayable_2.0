@@ -26,6 +26,9 @@ export const SCENE_TUNING = {
     "passengerModelYawDegrees": -90,
     "passengerShadowYawDegrees": 90,
     "vehicleYawOffsetDegrees": 0,
+    "garageYawOffsetDegrees": 180,
+    "garageModelPitchDegrees": -90,
+    "garageModelRollDegrees": 0,
     "parkingSpotYawDegrees": 16,
     "arrowYawDegrees": 180
   },
