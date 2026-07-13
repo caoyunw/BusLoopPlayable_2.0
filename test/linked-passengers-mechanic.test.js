@@ -326,7 +326,7 @@ test('linked runtime normalizes options, clones metadata, and implements batch h
   runtime.clearSlotData({ slot: enteredSlot });
   assert.equal(enteredSlot.linkedPassenger, null);
   assert.equal(typeof linkedPassengerMechanic.createDetailView, 'function');
-  assert.equal(linkedPassengerMechanic.definition.status, 'planned');
+  assert.equal(linkedPassengerMechanic.definition.status, 'playable');
 });
 
 test('chance plans reroll on createState while authored plans remain deterministic', () => {

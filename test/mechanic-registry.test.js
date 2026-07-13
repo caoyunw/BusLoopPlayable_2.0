@@ -46,7 +46,9 @@ const MECHANIC_IDS_AFTER_BASE = [
 ];
 
 const PLANNED_MECHANIC_IDS = EXPECTED_MECHANIC_IDS.filter((id) => (
-  id !== 'question-passenger' && id !== 'star-passenger'
+  id !== 'question-passenger'
+    && id !== 'star-passenger'
+    && id !== 'linked-passengers'
 ));
 
 const EXPECTED_SUMMARIES = {
@@ -1025,12 +1027,16 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base, garage, and star passenger are playable while remaining presets are planned', () => {
+test('base, question, garage, star, and linked passengers are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
+  assert.equal(getMechanicById('question-passenger').status, 'playable');
   assert.equal(getMechanicById('garage').status, 'playable');
   assert.equal(getMechanicById('star-passenger').status, 'playable');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 3);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 14);
+  assert.equal(getMechanicById('linked-passengers').status, 'playable');
+  assert.equal(resolvePlayableMechanicId('linked-passengers'), 'linked-passengers');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 5);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 12);
+  assert.equal(PLANNED_MECHANIC_IDS.length, 12);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {

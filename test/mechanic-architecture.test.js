@@ -43,3 +43,15 @@ test('star passenger owns its model and view implementation files', () => {
   assert.doesNotMatch(gameSource, /STAR_PASSENGER_MECHANIC_ID/);
   assert.doesNotMatch(gameSource, /createStarPassengerReward/);
 });
+
+test('linked passenger owns model and detail files while game model stays generic', () => {
+  const modelSource = readFileSync(join('src', 'mechanics', 'linked-passengers', 'model.js'), 'utf8');
+  const viewSource = readFileSync(join('src', 'mechanics', 'linked-passengers', 'view.js'), 'utf8');
+  const gameSource = readFileSync(join('src', 'game-model.js'), 'utf8');
+
+  assert.match(modelSource, /createLinkedPassengerRuntime/);
+  assert.match(viewSource, /createLinkedPassengerDetailView/);
+  assert.match(gameSource, /getBeltEntryBatch/);
+  assert.match(gameSource, /getBoardingBatch/);
+  assert.doesNotMatch(gameSource, /linked-passengers/);
+});
