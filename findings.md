@@ -55,7 +55,8 @@
 
 - The base mechanism now targets imported level18 `GameSceneDualQueue2` data rather than the earlier level12-style or original six-vehicle prototype.
 - The merged level18 data has two fixed queues with 115 and 191 groups, a largest vehicle capacity of 10 groups, authored garage containers, and authored `vehicleDepthes` blocker data.
-- The concurrent garage merge currently leaves an extra `})` at `src/level-data.js:96`, causing an immediate syntax error on level import. This garage-owned merge defect must be resolved before linked-passenger tests or browser QA can establish a valid baseline.
+- The duplicate `})` introduced at the `LEVEL18_VEHICLE_DEPTHES` merge boundary was removed; `src/level-data.js` now passes syntax checking and imports level18 with queues 115/191 and 47 vehicles.
+- The post-fix `test/game-model.test.js` run executes 40 tests: 38 pass and 2 pre-existing garage-merge baseline assertions fail. They expect scalar runtime ID `question-passenger` instead of `question-passenger+garage`, and the removed level12 authored question mask instead of the current level18 zero-mask state.
 - Vehicle seat totals match fixed passenger queue totals by color. Initial movable vehicles are `1, 4, 34, 51`.
 
 ### Conveyor And Passenger Entry

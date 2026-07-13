@@ -92,7 +92,6 @@ const LEVEL18_VEHICLE_DEPTHES = Object.freeze({
   72: Object.freeze([47, 35, 28, 31, 48, 60, 68, 69, 70, 71]),
   73: Object.freeze([47, 35, 28, 31, 48, 60, 68, 69, 70, 71, 72]),
   74: Object.freeze([47, 35, 28, 31, 48, 60, 68, 69, 70, 71, 72, 73])
-})
 });
 
 const PASSENGER_SEQUENCE = Object.freeze(LEVEL18_PASSENGER_QUEUES.flat());

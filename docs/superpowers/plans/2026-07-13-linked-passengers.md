@@ -32,8 +32,6 @@
 
 ## Fixed Runtime Contracts
 
-Execution prerequisite: the concurrently merged garage branch currently leaves an extra `})` at `src/level-data.js:96`. Resolve that garage-owned merge error and establish the current `pnpm test` baseline before Task 1. This prerequisite restores the local mechanism lab; it does not add a production-build or advertising-package gate to this plan.
-
 All implementation tasks use these exact optional mechanic-runtime hooks:
 
 ```js
