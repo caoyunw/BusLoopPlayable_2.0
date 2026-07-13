@@ -312,6 +312,7 @@ function startRuntime() {
   function handleBeforeUnload() {
     flushTuningSave();
     mechanicLibrary.destroy();
+    view.destroy();
   }
   window.addEventListener('beforeunload', handleBeforeUnload);
 

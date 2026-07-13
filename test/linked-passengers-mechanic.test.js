@@ -795,6 +795,7 @@ test('composite batch boarding preserves scalar runtime behavior and prefers bat
 
 test('scene owns linked connector lifecycle and keeps reduced-motion visuals static', () => {
   const sceneSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
+  const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
 
   assert.match(sceneSource, /linkedPassengerConnectors = new Map/);
   assert.match(sceneSource, /linkedBoardingBatches = new Map/);
@@ -805,6 +806,12 @@ test('scene owns linked connector lifecycle and keeps reduced-motion visuals sta
   assert.match(sceneSource, /duration:\s*0\.25/);
   assert.match(sceneSource, /linkedPassenger\?\.chainId/);
   assert.match(sceneSource, /reducedMotionQuery\?\.matches/);
+  assert.match(sceneSource, /resetVersionChanged[\s\S]*clearBoardingViews/);
+  assert.match(sceneSource, /destroy\(\)/);
+  assert.match(sceneSource, /resizeObserver\?\.disconnect/);
+  assert.match(sceneSource, /removeEventListener\('resize'/);
+  assert.match(sceneSource, /removeEventListener\('pointerup'/);
+  assert.match(mainSource, /function handleBeforeUnload\(\)[\s\S]*view\.destroy\(\)/);
 });
 
 test('linked boarding spawns every row together from its aggregate progress', () => {

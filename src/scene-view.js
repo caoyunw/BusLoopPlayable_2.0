@@ -824,15 +824,28 @@ export class SceneView {
     this.lastSnapshot = null;
     this.lastSeenResetVersion = null;
     this.lastGame = null;
+    this.destroyed = false;
     this.buildWorld();
     this.applyTuning();
     this.ready = this.loadUnityAssets();
-    window.addEventListener('resize', () => this.resize());
+    this.handleResize = () => this.resize();
+    this.handlePointerUp = (event) => this.pick(event);
+    window.addEventListener('resize', this.handleResize);
     if ('ResizeObserver' in window) {
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(canvas);
     }
-    canvas.addEventListener('pointerup', (event) => this.pick(event));
+    canvas.addEventListener('pointerup', this.handlePointerUp);
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.clearBoardingViews();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    globalThis.window?.removeEventListener('resize', this.handleResize);
+    this.canvas?.removeEventListener('pointerup', this.handlePointerUp);
   }
 
   buildWorld() {
@@ -2058,13 +2071,13 @@ export class SceneView {
   }
 
   update(snapshot, game) {
-    this.syncQuestionPassengerRevealResetVersion(snapshot.resetVersion);
+    const resetVersionChanged = this.syncQuestionPassengerRevealResetVersion(snapshot.resetVersion);
+    if (resetVersionChanged) this.clearBoardingViews();
     const previousUpdateTime = this.lastSnapshot?.time ?? snapshot.time;
     const visualDelta = Math.max(0, Math.min(snapshot.time - previousUpdateTime, 0.1));
     this.lastSnapshot = snapshot;
     this.lastGame = game;
     this.vatTimeUniform.value = snapshot.time;
-    if (snapshot.lastEvent.type === 'reset' && snapshot.time === 0) this.clearBoardingViews();
     this.processBoardingEvents(snapshot);
     this.updateBoardingViews(snapshot.time);
     const vehicleArea = SCENE_TUNING.vehicleArea;

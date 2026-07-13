@@ -207,6 +207,96 @@ test('clearing boarding views disposes in-flight linked passengers and batch fee
   assert.ok(fixture.entries.every(({ root }) => fixture.removed.includes(root)));
 });
 
+test('a reset-version change clears stale boarding ids before a new generation event plays', () => {
+  const fixture = makeLinkedBoardingView();
+  const played = [];
+  fixture.view.lastSeenResetVersion = 4;
+  fixture.view.lastSnapshot = { time: 0 };
+  fixture.view.lastGame = null;
+  fixture.view.vatTimeUniform = { value: 0 };
+  fixture.view.passengerViews = [];
+  fixture.view.linkedPassengerConnectors = new Map();
+  fixture.view.vehicleBoardingPulses = new Map([[84, [0]]]);
+  fixture.view.initialEntryPathStates = new Map([['initial', {}]]);
+  fixture.view.queueEntryPathStates = new Map([['queue', {}]]);
+  fixture.view.lastBoardingEventId = 9;
+  fixture.view.personTemplate = {};
+  fixture.view.spawnLinkedBoardingBatch = (event) => played.push(event.id);
+  fixture.view.seatCountBoards = [];
+  fixture.view.updateGarages = () => {};
+  fixture.view.vehicleViews = new Map();
+  fixture.view.spotPositions = [];
+  fixture.view.pruneInitialEntryPathStates = () => {};
+  fixture.view.queuePassengerViews = [];
+  fixture.view.queueCurves = [];
+  fixture.view.pruneQueueEntryPathStates = () => {};
+  fixture.view.syncLinkedPassengerConnectors = () => {};
+  fixture.view.vehicleEffects = null;
+  fixture.view.updateVehiclePathPreview = () => {};
+  fixture.view.updateGuideHand = () => {};
+  const snapshot = {
+    resetVersion: 5,
+    time: 0,
+    lastEvent: { type: 'queues-initialized' },
+    boardingEvents: [{
+      id: 1,
+      groupCount: 2,
+      linkedPassenger: { chainId: 'linked-0-0', length: 2 }
+    }],
+    vehicles: [],
+    spots: [],
+    slots: [],
+    queueItems: [],
+    speedMultiplier: 1
+  };
+
+  fixture.view.update(snapshot, {});
+
+  assert.deepEqual(played, [1]);
+  assert.equal(fixture.view.lastBoardingEventId, 1);
+  assert.equal(fixture.view.boardingViews.length, 0);
+  assert.equal(fixture.view.linkedBoardingBatches.size, 0);
+  assert.ok(fixture.removed.includes(fixture.connectorRoot));
+});
+
+test('destroy is idempotent and detaches observers listeners and boarding resources', () => {
+  const fixture = makeLinkedBoardingView();
+  const disconnected = [];
+  const removedCanvasListeners = [];
+  const removedWindowListeners = [];
+  const resizeHandler = () => {};
+  const pointerHandler = () => {};
+  fixture.view.canvas = {
+    removeEventListener: (type, handler) => removedCanvasListeners.push([type, handler])
+  };
+  fixture.view.handleResize = resizeHandler;
+  fixture.view.handlePointerUp = pointerHandler;
+  fixture.view.resizeObserver = { disconnect: () => disconnected.push(true) };
+  fixture.view.linkedPassengerConnectors = new Map();
+  fixture.view.vehicleBoardingPulses = new Map();
+  fixture.view.initialEntryPathStates = new Map();
+  fixture.view.queueEntryPathStates = new Map();
+  fixture.view.lastBoardingEventId = 17;
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    removeEventListener: (type, handler) => removedWindowListeners.push([type, handler])
+  };
+
+  try {
+    fixture.view.destroy();
+    fixture.view.destroy();
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+
+  assert.equal(fixture.view.boardingViews.length, 0);
+  assert.equal(fixture.view.linkedBoardingBatches.size, 0);
+  assert.deepEqual(disconnected, [true]);
+  assert.deepEqual(removedWindowListeners, [['resize', resizeHandler]]);
+  assert.deepEqual(removedCanvasListeners, [['pointerup', pointerHandler]]);
+});
+
 test('ParticleRibbon splits Ribbon_01 into the 3x3 sprite atlas frames', () => {
   const scene = new THREE.Group();
   const root = new THREE.Group();
