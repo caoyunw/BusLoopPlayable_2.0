@@ -461,36 +461,30 @@ export class BusLoopGame {
     for (const slot of this.slots) {
       slot.previousProgress = slot.progress;
       slot.progress = wrap01(slot.progress + progressDelta);
-      if (slot.colorIndex === null) {
-        const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
-        if (!entry) continue;
-        const passenger = this.dequeuePassenger(entry.index, true);
-        if (passenger === null) {
-          if (this.initialFillActive) {
-            const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
-            const clamp = wrap01(slot.progress - holdProgress);
-            if (clamp > initialFillClamp) {
-              initialFillClamp = clamp;
-              initialFillHoldSlot = slot;
-              initialFillHoldProgress = holdProgress;
-            }
+    }
+
+    for (const slot of this.slots) {
+      if (slot.colorIndex !== null) continue;
+      const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
+      if (!entry) continue;
+      const waitingBatch = this.peekPassengerBatch(entry.index);
+      if (!waitingBatch) {
+        if (this.initialFillActive) {
+          const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
+          const clamp = wrap01(slot.progress - holdProgress);
+          if (clamp > initialFillClamp) {
+            initialFillClamp = clamp;
+            initialFillHoldSlot = slot;
+            initialFillHoldProgress = holdProgress;
           }
-          continue;
         }
-        slot.colorIndex = passenger.colorIndex;
-        slot.passengerId = passenger.id;
-        slot.entryIndex = entry.index;
-        slot.entryMotion = this.createEntryMotion(entry.index, passenger);
-        this.mechanicRuntime.onPassengerEnteredBelt?.({ game: this, slot, passenger });
-        if (this.initialFillActive) this.initialFilledSlotIndices.add(slot.index);
-        this.lastEvent = {
-          type: 'group-entered-belt',
-          colorIndex: passenger.colorIndex,
-          entryIndex: entry.index,
-          passengerId: passenger.id
-        };
-        changed = true;
+        continue;
       }
+      if (!this.tryEnterPassengerBatch(slot, entry)) {
+        if (this.initialFillActive) this.initialFillActive = false;
+        continue;
+      }
+      changed = true;
     }
 
     if (this.initialFillActive && initialFillClamp > 0) {
@@ -577,6 +571,38 @@ export class BusLoopGame {
       if (!best || distance < best.distance) best = { index, percent, distance };
     }
     return best;
+  }
+
+  tryEnterPassengerBatch(headSlot, entry) {
+    const passengerBatch = this.peekPassengerBatch(entry.index);
+    if (!passengerBatch) return false;
+    const slotBatch = Array.from({ length: passengerBatch.length }, (_, memberIndex) => (
+      this.slots[(headSlot.index - memberIndex + this.slots.length) % this.slots.length]
+    ));
+    if (slotBatch.some((slot) => slot.colorIndex !== null)) return false;
+
+    const dequeued = this.dequeuePassengerBatch(entry.index, true);
+    if (!dequeued || dequeued.length !== slotBatch.length) return false;
+    dequeued.forEach((passenger, memberIndex) => {
+      const slot = slotBatch[memberIndex];
+      slot.colorIndex = passenger.colorIndex;
+      slot.passengerId = passenger.id;
+      slot.entryIndex = entry.index;
+      slot.entryMotion = this.createEntryMotion(entry.index, passenger);
+      this.mechanicRuntime.onPassengerEnteredBelt?.({ game: this, slot, passenger });
+      if (this.initialFillActive) this.initialFilledSlotIndices.add(slot.index);
+    });
+    this.lastEvent = {
+      type: 'group-entered-belt',
+      colorIndex: dequeued[0].colorIndex,
+      entryIndex: entry.index,
+      passengerId: dequeued[0].id,
+      passengerIds: dequeued.map((passenger) => passenger.id),
+      slotIndex: slotBatch[0].index,
+      slotIndices: slotBatch.map((slot) => slot.index),
+      groupCount: dequeued.length
+    };
+    return true;
   }
 
   hasEnteringSlots() {

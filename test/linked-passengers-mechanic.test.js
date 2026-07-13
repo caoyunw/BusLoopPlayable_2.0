@@ -324,3 +324,27 @@ test('queue capacity normalization rejects non-finite values and preserves bound
   assert.equal(game.snapshot().queues[0].length, 2);
   assert.equal(game.snapshot().sourceRemaining, 4);
 });
+
+test('a linked chain enters as one batch with the head at the crossing slot and trailing ring wrap', () => {
+  const game = makeLinkedGame();
+  game.initializeQueues([3], 0.5, [2], 1);
+  const expectedPassengerIds = game.snapshot().queueItems[0].map((item) => item.id);
+  const result = game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 });
+  assert.equal(result, true);
+  assert.deepEqual([0, 4, 3].map((index) => game.slots[index].linkedPassenger.memberIndex), [0, 1, 2]);
+  assert.deepEqual([0, 4, 3].map((index) => game.slots[index].passengerId), expectedPassengerIds);
+  assert.deepEqual(game.lastEvent.passengerIds, expectedPassengerIds);
+  assert.deepEqual(game.lastEvent.slotIndices, [0, 4, 3]);
+  assert.equal(game.lastEvent.groupCount, 3);
+});
+
+test('a linked chain waits intact when any required trailing slot is occupied', () => {
+  const game = makeLinkedGame();
+  game.initializeQueues([3], 0.5, [2], 1);
+  game.slots[4].colorIndex = 9;
+  const before = game.snapshot().queueItems[0].map((item) => item.id);
+  assert.equal(game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 }), false);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.id), before);
+  assert.equal(game.slots[0].colorIndex, null);
+  assert.equal(game.slots[3].colorIndex, null);
+});
