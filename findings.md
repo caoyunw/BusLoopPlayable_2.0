@@ -4,17 +4,18 @@
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. The registry contains 17 definitions: 3 playable (`base`, `star-passenger`, `question-passenger`) and 14 planned.
+- The active product is a mechanic design and experience lab. After the garage merge, the registry contains 17 definitions: 4 playable (`base`, `question-passenger`, `garage`, `star-passenger`) and 13 planned.
 - Each `src/mechanics/*/index.js` owns its mechanic identity, metadata, and status; `src/mechanics/index.js` is the assembled module source of truth. `src/mechanic-registry.js` derives the frozen metadata collection and provides lookup, fallback, and search.
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
 - New mechanism behavior should live behind an isolated module boundary and reuse base runtime contracts. Do not grow a large mechanism switch inside `src/main.js`.
 - A mechanism stays `planned` until its real play loop, focused tests, and browser QA are complete.
+- The lab is no longer a continuation path for playable-ad production. New mechanics do not require production minification/bundling, final-single-page dependency collection, Vite/Three.js delivery verification, or advertising-package checks; Vite remains only a local browser-playtest server.
 
 ### Question-Passenger Rules And Architecture
 
 - Question state changes waiting-stage visibility only. Real `colorIndex`, queue order, matching, boarding, vehicle departure, and win/fail rules remain unchanged.
-- `chance` mode assigns each new queue group independently and defaults to 0.3; reset rerolls question positions. `authored` mode reads only `level.mechanics['question-passenger'].authoredMasks`, does not call random, and the level12 mask marks 132/438 groups.
+- `chance` mode assigns each new queue group independently and defaults to 0.3; reset rerolls question positions. `authored` mode reads only `level.mechanics['question-passenger'].authoredMasks` and does not call random. The merged level18 data currently omits that mask, so authored question assignment has no active marks until the level data is reconciled.
 - Authored summaries and assignments ignore mask rows/items beyond the actual `passengerQueues`; missing entries remain non-question groups.
 - Mode/chance controls are page-session state only: switching away and back retains them, while refresh restores chance/30%. They are not stored or added to the URL.
 - Active `setMechanicOptions` rebuilds the runtime and resets exactly once. Scene reveal de-duplication uses passenger ID plus `revealVersion`; `resetVersion` clears transient state when passenger IDs are reused.
@@ -52,8 +53,9 @@
 
 ### Active Level Layout
 
-- The base mechanism targets imported level12-style `GameSceneDualQueue2` data rather than the original six-vehicle prototype.
-- Active data has 94 visible vehicles, two fixed queues with 219 groups each, and authored `vehicleDepthes` blocker data for 90 vehicles.
+- The base mechanism now targets imported level18 `GameSceneDualQueue2` data rather than the earlier level12-style or original six-vehicle prototype.
+- The merged level18 data has two fixed queues with 115 and 191 groups, a largest vehicle capacity of 10 groups, authored garage containers, and authored `vehicleDepthes` blocker data.
+- The concurrent garage merge currently leaves an extra `})` at `src/level-data.js:96`, causing an immediate syntax error on level import. This garage-owned merge defect must be resolved before linked-passenger tests or browser QA can establish a valid baseline.
 - Vehicle seat totals match fixed passenger queue totals by color. Initial movable vehicles are `1, 4, 34, 51`.
 
 ### Conveyor And Passenger Entry

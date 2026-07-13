@@ -32,6 +32,8 @@
 
 ## Fixed Runtime Contracts
 
+Execution prerequisite: the concurrently merged garage branch currently leaves an extra `})` at `src/level-data.js:96`. Resolve that garage-owned merge error and establish the current `pnpm test` baseline before Task 1. This prerequisite restores the local mechanism lab; it does not add a production-build or advertising-package gate to this plan.
+
 All implementation tasks use these exact optional mechanic-runtime hooks:
 
 ```js
@@ -472,10 +474,10 @@ git add src/mechanics/linked-passengers/index.js src/mechanics/linked-passengers
 git commit -m "feat: plan linked passenger chains"
 ```
 
-## Task 2: Add The Balanced Level 12 Authored Demonstration
+## Task 2: Add The Balanced Level 18 Authored Demonstration
 
 **Files:**
-- Modify: `src/level-data.js:66-106,310-317`
+- Modify: `src/level-data.js` around `LEVEL18_PASSENGER_QUEUES` and `LEVEL_1.passengerQueues`
 - Modify: `test/linked-passengers-mechanic.test.js`
 
 - [ ] **Step 1: Add a failing Level 12 authored-data test**
@@ -485,11 +487,11 @@ Append:
 ```js
 import { LEVEL_1 } from '../src/level-data.js';
 
-test('level12 authored starts contain balanced 2 3 4 6 8 and 10 row chains on both queues', () => {
+test('level18 authored starts contain balanced 2 3 4 6 8 and 10 row chains on both queues', () => {
   const rows = LEVEL_1.mechanics['linked-passengers'].authoredStarts;
   assert.deepEqual(rows.map((row) => row.filter((value) => value > 0)), [
-    [2, 6, 10, 8, 4, 3],
-    [2, 4, 8, 10, 6, 3]
+    [10, 4, 8, 3, 6, 2],
+    [8, 6, 10, 4, 3, 2]
   ]);
   assert.deepEqual(rows.map((row) => row.reduce((sum, value) => sum + value, 0)), [33, 33]);
   assert.equal(rows.every((row, index) => row.length === LEVEL_1.passengerQueues[index].length), true);
@@ -519,7 +521,7 @@ Expected: the new test fails because `LEVEL_1.mechanics['linked-passengers']` is
 
 - [ ] **Step 3: Add frozen authored starts at the verified source indices**
 
-Insert after `LEVEL12_QUESTION_PASSENGER_MASKS`:
+Insert immediately after `LEVEL18_PASSENGER_QUEUES`:
 
 ```js
 function makeLinkedPassengerStarts(queue, entries) {
@@ -528,25 +530,22 @@ function makeLinkedPassengerStarts(queue, entries) {
   return Object.freeze(starts);
 }
 
-const LEVEL12_LINKED_PASSENGER_STARTS = Object.freeze([
-  makeLinkedPassengerStarts(LEVEL12_PASSENGER_QUEUES[0], [
-    [0, 2], [44, 6], [82, 10], [122, 8], [150, 4], [212, 3]
+const LEVEL18_LINKED_PASSENGER_STARTS = Object.freeze([
+  makeLinkedPassengerStarts(LEVEL18_PASSENGER_QUEUES[0], [
+    [0, 10], [14, 4], [29, 8], [47, 3], [78, 6], [107, 2]
   ]),
-  makeLinkedPassengerStarts(LEVEL12_PASSENGER_QUEUES[1], [
-    [0, 2], [19, 4], [57, 8], [93, 10], [133, 6], [183, 3]
+  makeLinkedPassengerStarts(LEVEL18_PASSENGER_QUEUES[1], [
+    [0, 8], [21, 6], [44, 10], [84, 4], [126, 3], [173, 2]
   ])
 ]);
 ```
 
-Extend `LEVEL_1.mechanics`:
+Add the frozen mechanic block immediately after `passengerQueues: LEVEL18_PASSENGER_QUEUES` in `LEVEL_1`:
 
 ```js
 mechanics: Object.freeze({
-  'question-passenger': Object.freeze({
-    authoredMasks: LEVEL12_QUESTION_PASSENGER_MASKS
-  }),
   'linked-passengers': Object.freeze({
-    authoredStarts: LEVEL12_LINKED_PASSENGER_STARTS
+    authoredStarts: LEVEL18_LINKED_PASSENGER_STARTS
   })
 }),
 ```
@@ -1772,7 +1771,7 @@ git add src/scene-view.js test/linked-passengers-mechanic.test.js test/vehicle-e
 git commit -m "feat: animate linked passenger boarding"
 ```
 
-## Task 9: Release Gate, Full Verification, Browser QA, And Durable Handoff
+## Task 9: Release Gate, Automated Verification, Browser QA, And Durable Handoff
 
 **Files:**
 - Modify: `src/mechanics/linked-passengers/index.js`
@@ -1790,8 +1789,8 @@ Update `PLANNED_MECHANIC_IDS` so it also excludes `linked-passengers`, rename th
 ```js
 assert.equal(getMechanicById('linked-passengers').status, 'playable');
 assert.equal(resolvePlayableMechanicId('linked-passengers'), 'linked-passengers');
-assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 4);
-assert.equal(PLANNED_MECHANIC_IDS.length, 13);
+assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 5);
+assert.equal(PLANNED_MECHANIC_IDS.length, 12);
 ```
 
 Extend `test/mechanic-architecture.test.js`:
@@ -1817,7 +1816,7 @@ node --test test/mechanic-registry.test.js test/mechanic-architecture.test.js te
 
 Expected: implementation tests pass; status/count assertions fail because the mechanic is still planned.
 
-- [ ] **Step 3: Flip the mechanic to playable and run the complete automated gate immediately**
+- [ ] **Step 3: Flip the mechanic to playable and run the complete automated test gate immediately**
 
 Change only:
 
@@ -1829,12 +1828,11 @@ Run:
 
 ```powershell
 pnpm test
-pnpm run build
 ```
 
-Expected: every test passes and Vite builds successfully. The existing chunk-size warning is acceptable; no new warnings/errors are acceptable.
+Expected: every test passes. No separate production build, minification, final-single-page dependency collection, or advertising-package check is required for this mechanic lab.
 
-If either command fails, change the definition back to `status: 'planned'`, fix the failure with the narrowest relevant test, and repeat this step before browser QA.
+If the test command fails, change the definition back to `status: 'planned'`, fix the failure with the narrowest relevant test, and repeat this step before browser QA.
 
 - [ ] **Step 4: Start or reuse Vite and perform desktop browser QA at 1280×720**
 
@@ -1885,19 +1883,19 @@ Update `docs/project/code-navigation.md` with:
 - A linked-passenger model/settings route and the new focused test.
 - Scene connector/aggregate boarding ownership.
 - `src/mechanics/linked-passengers/` in file responsibilities.
-- 4 playable / 13 planned and the new full-suite count from the actual `pnpm test` output.
+- 5 playable / 12 planned and the new full-suite count from the actual `pnpm test` output.
 - Actual desktop/mobile/reduced-motion browser result and retained known warnings.
 
-Update `docs/project/playable-project-progress.md`, `task_plan.md`, and `progress.md` concisely with outcome, changed areas, exact automated/build results, browser QA, and the next selection step. Update `findings.md` only if implementation discovered a durable correction to the approved design.
+Update `docs/project/playable-project-progress.md`, `task_plan.md`, and `progress.md` concisely with outcome, changed areas, exact automated-test results, browser QA, and the next selection step. Update `findings.md` only if implementation discovered a durable correction to the approved design.
 
 - [ ] **Step 7: Re-run documentation, unfinished-marker, and status consistency checks**
 
 ```powershell
-rg -n "linked-passengers|4 playable|13 planned" docs/project/code-navigation.md docs/project/playable-project-progress.md task_plan.md progress.md src/mechanics/linked-passengers/index.js
-node --input-type=module -e "import('./src/mechanics/index.js').then(({MECHANIC_DEFINITIONS})=>{const playable=MECHANIC_DEFINITIONS.filter(m=>m.status==='playable').length;const planned=MECHANIC_DEFINITIONS.filter(m=>m.status==='planned').length;console.log(playable,planned);if(playable!==4||planned!==13)process.exit(1)})"
+rg -n "linked-passengers|5 playable|12 planned" docs/project/code-navigation.md docs/project/playable-project-progress.md task_plan.md progress.md src/mechanics/linked-passengers/index.js
+node --input-type=module -e "import('./src/mechanics/index.js').then(({MECHANIC_DEFINITIONS})=>{const playable=MECHANIC_DEFINITIONS.filter(m=>m.status==='playable').length;const planned=MECHANIC_DEFINITIONS.filter(m=>m.status==='planned').length;console.log(playable,planned);if(playable!==5||planned!==12)process.exit(1)})"
 ```
 
-Expected: linked mechanic references are current and the script prints `4 13`.
+Expected: linked mechanic references are current and the script prints `5 12`.
 
 - [ ] **Step 8: Commit the verified release and docs**
 
@@ -1917,7 +1915,7 @@ Before execution begins, verify the plan itself:
 - [ ] Boarding behavior covers chain-head triggering, all-member discovery/order, sufficient same-color vehicle capacity, all-or-none clearing, looping on insufficient space, aggregate events, and win/fail availability checks.
 - [ ] UI covers independent chance/authored modes, 30% and max-10 defaults, page-session persistence, refresh reset, and no question/star stacking.
 - [ ] Visuals cover segmented top connector, one head `×N`, synchronous 250 ms fan-in, one aggregate smoke/audio/pulse, cleanup, mobile layout, and reduced motion.
-- [ ] Release remains planned until focused/full/build/browser gates pass, then updates catalog counts and durable docs.
+- [ ] Release remains planned until focused/full-test/browser gates pass, then updates catalog counts and durable docs; production bundling and advertising-package checks remain out of scope.
 
 Run an unfinished-marker scan without embedding the marker strings literally in this plan:
 
