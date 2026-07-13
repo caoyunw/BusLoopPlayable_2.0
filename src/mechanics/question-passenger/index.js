@@ -1,3 +1,5 @@
+import { createQuestionPassengerRuntime } from './model.js';
+
 export const definition = {
   id: 'question-passenger',
   name: '问号乘客',
@@ -9,4 +11,6 @@ export const definition = {
   difficulty: '中'
 };
 
-export default { definition };
+export const createRuntime = createQuestionPassengerRuntime;
+
+export default { definition, createRuntime };
