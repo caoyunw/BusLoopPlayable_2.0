@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Plan and implement `question-passenger` as the next mechanic while preserving the verified star-passenger baseline.
+Validate the newly implemented `garage` mechanic against the active level18 garage-container configuration, then continue to `question-passenger` while preserving the verified star-passenger baseline.
 
 ## Current Phase
 
@@ -10,13 +10,14 @@ The stabilized foundation is complete:
 
 - Mechanic registry and searchable library are present.
 - Desktop three-column and mobile drawer layouts are present.
-- The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
+- The registry contains 17 mechanism definitions: 3 playable (`base`, `garage`, `star-passenger`) and 14 planned.
 - URL selection, planned-mechanic input freeze, persistent scene editor, safe tuning storage, neutral runtime assets, and advertising cleanup are in place.
 - Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
-- Full `pnpm test` passes 88/88.
-- `pnpm run build` passes with the existing non-blocking chunk-size warning.
+- Garage hidden stock, one-at-a-time release, counter timing, Unity model rendering path, and runtime smoke are implemented.
+- The active level has been replaced with level18 data: 47 vehicles, two fixed queues of 115 and 191 groups, 42 blocker entries from the supplied CSV, and two garage containers with 16 stocked garage vehicles.
+- The 2026-07-12 full `pnpm test` and `pnpm run build` baseline passed. Current sandboxed `pnpm test` and `pnpm run build` are blocked by Windows `spawn EPERM`.
 
-The next phase is `question-passenger`. The star-passenger design and implementation plans remain completed references.
+The next immediate phase is garage QA on level18. After that, continue to `question-passenger`. The star-passenger design and implementation plans remain completed references.
 
 ## Implementation Priority
 
@@ -31,7 +32,7 @@ Advance `question-passenger` through the mechanic workflow:
 
 - Focused `question-passenger` tests pass.
 - The full suite preserves the 88/88 baseline or increases it with new passing tests.
-- `pnpm run build` passes with only the existing non-blocking chunk-size warning.
+- `pnpm run build` passes outside the current sandbox limitation; current sandboxed runs hit Windows `spawn EPERM`.
 - Browser QA covers desktop, 390x844 mobile, and reduced-motion behavior for `question-passenger`.
 
 ## Context Pointers

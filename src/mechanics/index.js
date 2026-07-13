@@ -53,13 +53,118 @@ export function getMechanicModuleById(id) {
   return MECHANIC_MODULES.find((module) => module.definition.id === id) ?? null;
 }
 
+function isGarageType(value) {
+  if (value === 2) return true;
+  return String(value ?? '').trim().toLowerCase() === 'garage';
+}
+
+function hasGarageContainers(level) {
+  return (level?.containers ?? []).some((container) => isGarageType(container.type));
+}
+
+function mergeObjects(runtimes, method, args, fallback = {}) {
+  return Object.assign(
+    {},
+    fallback,
+    ...runtimes.map((runtime) => runtime[method]?.(...args) ?? {})
+  );
+}
+
+function createCompositeRuntime(runtimes) {
+  if (runtimes.length === 1) return runtimes[0];
+
+  return {
+    id: runtimes.map((runtime) => runtime.id).join('+'),
+
+    createState(game) {
+      return mergeObjects(runtimes, 'createState', [game]);
+    },
+
+    afterReset(context) {
+      for (const runtime of runtimes) runtime.afterReset?.(context);
+    },
+
+    update(context) {
+      let changed = false;
+      for (const runtime of runtimes) {
+        changed = Boolean(runtime.update?.(context)) || changed;
+      }
+      return changed;
+    },
+
+    hasPendingVehicles(game) {
+      return runtimes.some((runtime) => Boolean(runtime.hasPendingVehicles?.(game)));
+    },
+
+    createQueueItemData(context) {
+      return mergeObjects(runtimes, 'createQueueItemData', [context]);
+    },
+
+    createSlotData(context) {
+      return mergeObjects(runtimes, 'createSlotData', [context]);
+    },
+
+    cloneQueueItemSnapshot(item) {
+      return mergeObjects(runtimes, 'cloneQueueItemSnapshot', [item]);
+    },
+
+    cloneSlotSnapshot(slot) {
+      return mergeObjects(runtimes, 'cloneSlotSnapshot', [slot]);
+    },
+
+    decorateSnapshot(game) {
+      return mergeObjects(runtimes, 'decorateSnapshot', [game]);
+    },
+
+    onPassengerEnteredBelt(context) {
+      for (const runtime of runtimes) runtime.onPassengerEnteredBelt?.(context);
+    },
+
+    onPassengerExitPassed(context) {
+      let changed = false;
+      for (const runtime of runtimes) {
+        changed = Boolean(runtime.onPassengerExitPassed?.(context)) || changed;
+      }
+      return changed;
+    },
+
+    onPassengerBoarded(context) {
+      return mergeObjects(runtimes, 'onPassengerBoarded', [context]);
+    },
+
+    clearSlotData(context) {
+      for (const runtime of runtimes) runtime.clearSlotData?.(context);
+    },
+
+    getGarageForVehicle(game, vehicleId) {
+      for (const runtime of runtimes) {
+        const garage = runtime.getGarageForVehicle?.(game, vehicleId);
+        if (garage) return garage;
+      }
+      return null;
+    }
+  };
+}
+
 export function resolvePlayableMechanicId(id) {
   const module = getMechanicModuleById(id);
   return module?.definition.status === 'playable' ? module.definition.id : 'base';
 }
 
 export function createMechanicRuntime(id, context = {}) {
-  const module = getMechanicModuleById(resolvePlayableMechanicId(id));
-  if (module?.createRuntime) return module.createRuntime(context);
-  return base.createRuntime(context);
+  const resolvedId = resolvePlayableMechanicId(id);
+  const module = getMechanicModuleById(resolvedId);
+  const selectedRuntime = module?.createRuntime
+    ? module.createRuntime(context)
+    : base.createRuntime(context);
+  const featureRuntimes = [];
+
+  if (resolvedId !== garage.definition.id && hasGarageContainers(context.level)) {
+    featureRuntimes.push(garage.createRuntime({
+      ...context,
+      options: context.mechanicOptions?.[garage.definition.id] ?? {}
+    }));
+  }
+
+  return createCompositeRuntime([selectedRuntime, ...featureRuntimes]);
 }

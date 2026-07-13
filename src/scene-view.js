@@ -305,6 +305,40 @@ function setMaterial(root, material, meshFilter = null) {
   return meshes;
 }
 
+function getSourceMaterialNames(material) {
+  const materials = Array.isArray(material) ? material : [material];
+  return materials.map((entry) => entry?.name ?? '').filter(Boolean);
+}
+
+function isGarageMetalMaterialName(name) {
+  return /metal|matcap/i.test(name);
+}
+
+function applyGarageMaterials(root, materials) {
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    const sourceNames = child.userData.sourceMaterialNames ?? [];
+    if (sourceNames.length > 1 || child.geometry?.groups?.length > 0) {
+      child.material = sourceNames.map((name) => (
+        isGarageMetalMaterialName(name) ? materials.metal : materials.body
+      ));
+      if (child.material.length === 0) child.material = materials.body;
+    } else {
+      const sourceName = sourceNames[0] ?? child.userData.sourceMaterialName ?? '';
+      child.material = isGarageMetalMaterialName(sourceName) ? materials.metal : materials.body;
+    }
+    child.castShadow = false;
+    child.receiveShadow = false;
+  });
+}
+
+function applyGarageModelOrientation(root) {
+  root.rotation.x = deg(SCENE_TUNING.facing.garageModelPitchDegrees ?? 0);
+  root.rotation.z = deg(SCENE_TUNING.facing.garageModelRollDegrees ?? 0);
+  root.updateMatrixWorld(true);
+  return root;
+}
+
 function storeHitBase(object) {
   object.userData.hitBasePosition = object.position.clone();
   object.userData.hitBaseRotation = object.rotation.clone();
@@ -398,6 +432,9 @@ function toStaticMeshGroup(source) {
     geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry);
     mesh.name = child.name;
+    const sourceMaterialNames = getSourceMaterialNames(child.material);
+    mesh.userData.sourceMaterialNames = sourceMaterialNames;
+    mesh.userData.sourceMaterialName = sourceMaterialNames[0] ?? '';
     root.add(mesh);
   });
   return root;
@@ -619,6 +656,7 @@ export class SceneView {
     this.textureLoader = new THREE.TextureLoader(this.loadingManager);
     this.fbxLoader = new FBXLoader(this.loadingManager);
     this.vehicleViews = new Map();
+    this.garageViews = new Map();
     this.passengerViews = [];
     this.queuePassengerViews = [[], []];
     this.spotRoots = [];
@@ -933,6 +971,103 @@ export class SceneView {
     return group;
   }
 
+  createGarageCountLabel() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false
+    }));
+    sprite.renderOrder = 55;
+    sprite.scale.set(0.45, 0.45, 1);
+    sprite.userData.textCanvas = canvas;
+    sprite.userData.textTexture = texture;
+    sprite.userData.value = null;
+    return sprite;
+  }
+
+  updateGarageCountLabel(label, value) {
+    if (label.userData.value === value) return;
+    label.userData.value = value;
+    const canvas = label.userData.textCanvas;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.beginPath();
+    context.arc(64, 64, 46, 0, Math.PI * 2);
+    context.fillStyle = '#f5d85f';
+    context.fill();
+    context.lineWidth = 9;
+    context.strokeStyle = '#7a3e2d';
+    context.stroke();
+    context.font = '900 58px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineWidth = 8;
+    context.strokeStyle = '#7a3e2d';
+    context.fillStyle = '#ffffff';
+    context.strokeText(String(value), 64, 66);
+    context.fillText(String(value), 64, 66);
+    label.userData.textTexture.needsUpdate = true;
+  }
+
+  makeGarageFallback() {
+    const root = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.45, 1.15),
+      new THREE.MeshStandardMaterial({ color: 0x914949, roughness: 0.62 })
+    );
+    body.position.y = 0.225;
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.58, 0.28, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x5c2f2f, roughness: 0.7 })
+    );
+    door.position.set(0, 0.22, 0.595);
+    root.add(body, door);
+    return root;
+  }
+
+  createGarageView(garage) {
+    const root = new THREE.Group();
+    const model = this.garageTemplate
+      ? this.garageTemplate.clone(true)
+      : this.makeGarageFallback();
+    const label = this.createGarageCountLabel();
+    label.position.set(0, 0.88, 0.02);
+    root.add(model, label);
+    root.userData.model = model;
+    root.userData.countLabel = label;
+    root.userData.garageId = garage.id;
+    this.scene.add(root);
+    return root;
+  }
+
+  updateGarages(snapshot) {
+    const activeIds = new Set();
+    for (const garage of snapshot.garages ?? []) {
+      activeIds.add(garage.id);
+      let view = this.garageViews.get(garage.id);
+      if (!view) {
+        view = this.createGarageView(garage);
+        this.garageViews.set(garage.id, view);
+      }
+      const mapped = mapVehicleAreaPoint(garage.position);
+      view.position.set(mapped.x, SCENE_TUNING.vehicleArea.y, mapped.y);
+      view.rotation.y = mapVehicleAreaYaw(garage.yaw) + deg(SCENE_TUNING.facing.garageYawOffsetDegrees ?? 0);
+      view.visible = !garage.hidden;
+      this.updateGarageCountLabel(view.userData.countLabel, garage.displayCount);
+    }
+    for (const [id, view] of this.garageViews) {
+      if (activeIds.has(id)) continue;
+      this.scene.remove(view);
+      this.garageViews.delete(id);
+    }
+  }
+
   async loadUnityAssets() {
     try {
       const modelPaths = LEVEL_1.assets.models;
@@ -949,9 +1084,12 @@ export class SceneView {
         carShadowFbx,
         vanShadowFbx,
         busShadowFbx,
+        garageFbx,
         shadowTexture,
         parkingTexture,
         seatCountBoardTexture,
+        garageBodyTexture,
+        garageMetalMatcapTexture,
         carShadowTexture,
         vanShadowTexture,
         busShadowTexture,
@@ -980,9 +1118,16 @@ export class SceneView {
         this.fbxLoader.loadAsync(modelPaths.vehicleShadowBySeats[4]),
         this.fbxLoader.loadAsync(modelPaths.vehicleShadowBySeats[6]),
         this.fbxLoader.loadAsync(modelPaths.vehicleShadowBySeats[10]),
+        modelPaths.garage ? this.fbxLoader.loadAsync(modelPaths.garage).catch(() => null) : Promise.resolve(null),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.shadow),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.parkingSpot),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.seatCountBoard),
+        LEVEL_1.assets.textures.garage?.body
+          ? this.textureLoader.loadAsync(LEVEL_1.assets.textures.garage.body).catch(() => null)
+          : Promise.resolve(null),
+        LEVEL_1.assets.textures.garage?.metalMatcap
+          ? this.textureLoader.loadAsync(LEVEL_1.assets.textures.garage.metalMatcap).catch(() => null)
+          : Promise.resolve(null),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.vehicleShadowBySeats[4]),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.vehicleShadowBySeats[6]),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.vehicleShadowBySeats[10]),
@@ -1002,6 +1147,8 @@ export class SceneView {
       configureColorTexture(parkingTexture);
       configureColorTexture(seatCountBoardTexture);
       configureColorTexture(shadowTexture);
+      if (garageBodyTexture) configureColorTexture(garageBodyTexture);
+      if (garageMetalMatcapTexture) configureColorTexture(garageMetalMatcapTexture);
       [carShadowTexture, vanShadowTexture, busShadowTexture].forEach(configureColorTexture);
       [
         aboardSmokeTexture,
@@ -1058,6 +1205,27 @@ export class SceneView {
         transparent: true,
         alphaTest: 0.02
       });
+      this.garageMaterials = {
+        body: new THREE.MeshStandardMaterial({
+          map: garageBodyTexture ?? null,
+          color: 0xffffff,
+          roughness: 0.58,
+          metalness: 0,
+          side: THREE.DoubleSide
+        }),
+        metal: garageMetalMatcapTexture
+          ? new THREE.MeshMatcapMaterial({
+            matcap: garageMetalMatcapTexture,
+            color: 0xffffff,
+            side: THREE.DoubleSide
+          })
+          : new THREE.MeshStandardMaterial({
+            color: 0x71759a,
+            roughness: 0.3,
+            metalness: 0.45,
+            side: THREE.DoubleSide
+          })
+      };
       this.seatCountBoardTexture = seatCountBoardTexture;
 
       const vatRoot = new THREE.Group();
@@ -1081,6 +1249,14 @@ export class SceneView {
         depth: SCENE_TUNING.parkingSpots.modelDepth
       });
       setMaterial(this.parkingTemplate, this.parkingMaterial);
+      if (garageFbx) {
+        const garageStaticRoot = applyGarageModelOrientation(toStaticMeshGroup(garageFbx));
+        this.garageTemplate = normalizeObject(garageStaticRoot, {
+          width: 0.95,
+          depth: 1.2
+        });
+        applyGarageMaterials(this.garageTemplate, this.garageMaterials);
+      }
 
       this.vehicleTemplates = {
         4: this.prepareVehicleTemplate(carFbx, 4),
@@ -1095,6 +1271,12 @@ export class SceneView {
       this.upgradePassengerViews();
       this.upgradeVehicleViews();
       this.upgradeSpotViews();
+      for (const view of this.garageViews.values()) {
+        view.userData.model?.removeFromParent?.();
+        const model = this.garageTemplate ? this.garageTemplate.clone(true) : this.makeGarageFallback();
+        view.userData.model = model;
+        view.add(model);
+      }
       this.applyTuning();
     } catch (error) {
       console.warn('Unity asset load failed; keeping geometric fallbacks.', error);
@@ -1611,6 +1793,7 @@ export class SceneView {
     for (const board of this.seatCountBoards) {
       board.visible = false;
     }
+    this.updateGarages(snapshot);
     for (const vehicle of snapshot.vehicles) {
       const view = this.vehicleViews.get(vehicle.id);
       const layoutStart = mapVehicleAreaPoint(vehicle);
@@ -1621,7 +1804,7 @@ export class SceneView {
         layoutStart.y
       );
       const spot = this.spotPositions[vehicle.spotIndex ?? 0];
-      view.visible = vehicle.state !== 'done';
+      view.visible = !['done', 'in-garage'].includes(vehicle.state);
       let vehicleScale = vehicle.state === 'parked' || vehicle.state === 'colliding'
         ? 1 : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
       if (vehicle.state === 'parked') {
@@ -1646,6 +1829,17 @@ export class SceneView {
           UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1,
           evaluateUnityCurve(UNITY_CURVES.smoothScale, vehicle.motion)
         );
+      } else if (vehicle.state === 'leaving-garage') {
+        const data = vehicle.motionData;
+        const from = data?.from ?? vehicle;
+        const to = data?.to ?? vehicle;
+        const t = THREE.MathUtils.smoothstep(vehicle.motion, 0, 1);
+        const position = {
+          x: THREE.MathUtils.lerp(from.x, to.x, t),
+          z: THREE.MathUtils.lerp(from.z, to.z, t)
+        };
+        view.position.copy(mapMotionPoint(position));
+        view.rotation.y = mapVehicleAreaYaw(THREE.MathUtils.lerp(from.yaw, to.yaw, t)) + vehicleYawOffset;
       } else if (vehicle.state === 'at-spot' || vehicle.state === 'boarding-final') {
         view.position.copy(spot);
         view.rotation.y = deg(SCENE_TUNING.facing.parkingSpotYawDegrees + 180) + vehicleYawOffset;
