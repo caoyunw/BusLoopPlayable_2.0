@@ -160,6 +160,65 @@ test('queue passengers keep Unity-style logic distance and advance after dequeue
   assert.equal(game.dequeuePassenger(0), 5);
 });
 
+test('mechanic queue hooks receive absolute authored queue coordinates', () => {
+  const game = new BusLoopGame(LEVEL_1);
+  const seen = [];
+  game.mechanicRuntime = {
+    createState: () => ({}),
+    createQueueItemData({ game: runtimeGame, queueIndex, sourceIndex }) {
+      assert.equal(runtimeGame, game);
+      seen.push([queueIndex, sourceIndex]);
+      return { sourceIndex };
+    }
+  };
+
+  game.reset();
+
+  assert.deepEqual(seen.slice(0, 3), [[0, 0], [0, 1], [0, 2]]);
+  assert.deepEqual(seen.slice(24, 27), [[1, 0], [1, 1], [1, 2]]);
+
+  game.queues[0][0].distanceFromHead = 0;
+  const passenger = game.dequeuePassenger(0, true);
+
+  assert.equal(passenger.sourceIndex, 0);
+  assert.equal(game.snapshot().queueItems[0].at(-1).sourceIndex, 24);
+  assert.deepEqual(seen.at(-1), [0, 24]);
+});
+
+test('active mechanic options reconfigure and inactive options are retained without reset', () => {
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'star-passenger',
+    mechanics: {
+      'star-passenger': { chance: 0, progressTarget: 20 },
+      'question-passenger': { mode: 'authored' }
+    }
+  });
+  const initialState = game.mechanicState;
+  game.time = 9;
+  game.mechanicState.starReward.charge = 3;
+
+  assert.equal(game.setMechanicOptions('star-passenger', { progressTarget: 7 }), true);
+  assert.equal(game.time, 0);
+  assert.notEqual(game.mechanicState, initialState);
+  assert.equal(game.mechanicState.starReward.target, 7);
+  assert.equal(game.mechanicState.starReward.charge, 0);
+
+  game.time = 4;
+  game.mechanicState.starReward.charge = 2;
+  const activeRuntime = game.mechanicRuntime;
+  const activeState = game.mechanicState;
+
+  assert.equal(game.setMechanicOptions('question-passenger', { chance: 0.75 }), false);
+  assert.deepEqual(game.mechanicOptions['question-passenger'], {
+    mode: 'authored',
+    chance: 0.75
+  });
+  assert.equal(game.time, 4);
+  assert.equal(game.mechanicRuntime, activeRuntime);
+  assert.equal(game.mechanicState, activeState);
+  assert.equal(game.mechanicState.starReward.charge, 2);
+});
+
 test('both DualQueue2 entrances feed the shared conveyor', () => {
   const game = new BusLoopGame();
   advance(game, 1);

@@ -125,10 +125,22 @@ export class BusLoopGame {
     return true;
   }
 
+  setMechanicOptions(id, options = {}) {
+    this.mechanicOptions[id] = {
+      ...(this.mechanicOptions[id] ?? {}),
+      ...options
+    };
+    if (id !== this.mechanicId) return false;
+    this.configureMechanic(id);
+    this.reset();
+    return true;
+  }
+
   configureMechanic(id) {
     this.mechanicId = resolvePlayableMechanicId(id);
     this.mechanicRuntime = createMechanicRuntime(this.mechanicId, {
       random: this.random,
+      level: this.level,
       options: this.mechanicOptions[this.mechanicId] ?? {}
     });
   }
@@ -593,20 +605,24 @@ export class BusLoopGame {
     const passenger = queue.shift();
     const source = this.sourceQueues[queueIndex];
     if (source?.length) {
+      const authoredQueues = this.level.passengerQueues ?? [this.level.passengerSequence];
+      const authoredQueue = authoredQueues[queueIndex] ?? [];
+      const sourceIndex = Math.max(0, authoredQueue.length - source.length);
+      const colorIndex = source.shift();
       const lastDistance = queue.at(-1)?.distanceFromHead;
       const spawnDistance = Number.isFinite(lastDistance)
         ? lastDistance + this.queueSpacing
         : this.queueAvailableLengths[queueIndex] ?? 0;
       queue.push({
         id: this.nextPassengerId++,
-        colorIndex: source.shift(),
+        colorIndex,
         createdAt: this.time,
         distanceFromHead: clampNumber(
           spawnDistance,
           0,
           this.queueAvailableLengths[queueIndex] ?? spawnDistance
         ),
-        ...this.createMechanicQueueItemData()
+        ...this.createMechanicQueueItemData({ queueIndex, sourceIndex })
       });
     }
     return includeDetails
@@ -614,7 +630,7 @@ export class BusLoopGame {
       : passenger.colorIndex;
   }
 
-  createQueueItems(colors, queueIndex) {
+  createQueueItems(colors, queueIndex, startIndex = 0) {
     const availableLength = this.queueAvailableLengths?.[queueIndex]
       ?? Math.max(0, (this.level.queueCapacity - 1) * (this.queueSpacing ?? 0.4));
     return colors.map((colorIndex, index) => ({
@@ -622,12 +638,12 @@ export class BusLoopGame {
       colorIndex,
       createdAt: this.time,
       distanceFromHead: Math.min(index * (this.queueSpacing ?? 0.4), availableLength),
-      ...this.createMechanicQueueItemData()
+      ...this.createMechanicQueueItemData({ queueIndex, sourceIndex: startIndex + index })
     }));
   }
 
-  createMechanicQueueItemData() {
-    return this.mechanicRuntime.createQueueItemData?.({ game: this }) ?? {};
+  createMechanicQueueItemData(context = {}) {
+    return this.mechanicRuntime.createQueueItemData?.({ game: this, ...context }) ?? {};
   }
 
   createMechanicSlotData() {

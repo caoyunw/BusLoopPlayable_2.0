@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { BusLoopGame } from '../src/game-model.js';
+import { LEVEL_1 } from '../src/level-data.js';
 import * as questionPassengerMechanic from '../src/mechanics/question-passenger/index.js';
+import { createQuestionPassengerRuntime } from '../src/mechanics/question-passenger/model.js';
 
 function makeLevel(authoredMasks = [[true, false], [false, true]]) {
   return {
@@ -304,4 +307,44 @@ test('clearing slot data removes question-passenger state', () => {
   runtime.clearSlotData({ slot });
 
   assert.equal(slot.questionPassenger, null);
+});
+
+test('question-passenger runtime flows hidden queue metadata through game belt entry', () => {
+  const authoredMasks = LEVEL_1.passengerQueues.map((queue, queueIndex) => (
+    queue.map((_, sourceIndex) => queueIndex === 0 && sourceIndex === 0)
+  ));
+  const level = {
+    ...LEVEL_1,
+    mechanics: {
+      'question-passenger': { authoredMasks }
+    }
+  };
+  const game = new BusLoopGame(level);
+  game.mechanicRuntime = createQuestionPassengerRuntime({
+    level,
+    options: { mode: 'authored' }
+  });
+
+  game.reset();
+
+  const queueSnapshot = game.snapshot();
+  assert.deepEqual(queueSnapshot.queueItems[0][0].questionPassenger, {
+    hidden: true,
+    wasHidden: true,
+    revealVersion: 0
+  });
+  queueSnapshot.queueItems[0][0].questionPassenger.hidden = false;
+  assert.equal(game.snapshot().queueItems[0][0].questionPassenger.hidden, true);
+
+  game.slots[0].progress = 0.999;
+  game.slots[0].previousProgress = 0.999;
+  game.update(0.01);
+
+  const beltSlot = game.snapshot().slots[0];
+  assert.equal(beltSlot.entryIndex, 0);
+  assert.deepEqual(beltSlot.questionPassenger, {
+    hidden: false,
+    wasHidden: true,
+    revealVersion: 1
+  });
 });
