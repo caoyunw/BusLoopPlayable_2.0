@@ -234,8 +234,9 @@ function startRuntime() {
     resetMechanicUi();
     if (game.setMechanicOptions(id, mechanicSessionOptions[id])) {
       game.initializeQueues(view.getQueueCapacities(), view.getQueueSpacing(), view.getQueueLengths(), view.getConveyorPathLength());
+    } else {
+      syncHud(game.snapshot());
     }
-    syncHud(game.snapshot());
   }
 
   function renderDetailExtension({ mechanic, document }) {

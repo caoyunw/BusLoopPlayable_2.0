@@ -1183,6 +1183,9 @@ test('main delegates detail extensions through the generic mechanic factory', ()
   const renderStart = mainSource.indexOf('  function renderDetailExtension(');
   const renderEnd = mainSource.indexOf('\n  function selectMechanic(', renderStart);
   const renderSource = mainSource.slice(renderStart, renderEnd);
+  const selectStart = renderEnd;
+  const selectEnd = mainSource.indexOf('\n  mechanicLibrary = createMechanicLibrary', selectStart);
+  const selectSource = mainSource.slice(selectStart, selectEnd);
 
   assert.match(
     mainSource,
@@ -1203,9 +1206,16 @@ test('main delegates detail extensions through the generic mechanic factory', ()
     mainSource,
     /createMechanicLibrary\(mechanicLibraryRoot,\s*\{[\s\S]*?renderDetailExtension\s*\}\)/
   );
+  assert.notEqual(selectEnd, -1);
+  assert.ok(selectSource.indexOf('game.setMechanic(gameMechanicId)') >= 0);
+  assert.ok(selectSource.indexOf('mechanicLibrary.setActive(resolvedId)') >= 0);
+  assert.ok(
+    selectSource.indexOf('game.setMechanic(gameMechanicId)')
+      < selectSource.indexOf('mechanicLibrary.setActive(resolvedId)')
+  );
 });
 
-test('main applies mechanic options with one model reset before queue reinitialization', () => {
+test('main reinitializes active mechanic queues and explicitly syncs only inactive option commits', () => {
   const mainSource = readFileSync(join('src', 'main.js'), 'utf8');
   const applyStart = mainSource.indexOf('  function applyMechanicOptions(');
   const applyEnd = mainSource.indexOf('\n  function renderDetailExtension(', applyStart);
@@ -1219,14 +1229,17 @@ test('main applies mechanic options with one model reset before queue reinitiali
   assert.equal((applySource.match(/resetMechanicUi\(\)/g) ?? []).length, 1);
   assert.match(
     applySource,
-    /if \(game\.setMechanicOptions\(id, mechanicSessionOptions\[id\]\)\) \{[\s\S]*?game\.initializeQueues\(view\.getQueueCapacities\(\), view\.getQueueSpacing\(\), view\.getQueueLengths\(\), view\.getConveyorPathLength\(\)\);[\s\S]*?\}\s*syncHud\(game\.snapshot\(\)\)/
+    /if \(game\.setMechanicOptions\(id, mechanicSessionOptions\[id\]\)\) \{[\s\S]*?game\.initializeQueues\(view\.getQueueCapacities\(\), view\.getQueueSpacing\(\), view\.getQueueLengths\(\), view\.getConveyorPathLength\(\)\);[\s\S]*?\} else \{\s*syncHud\(game\.snapshot\(\)\);\s*\}/
   );
+  assert.equal((applySource.match(/syncHud\(game\.snapshot\(\)\)/g) ?? []).length, 1);
 
   const resetIndex = applySource.indexOf('resetMechanicUi()');
   const modelIndex = applySource.indexOf('game.setMechanicOptions');
   const queueIndex = applySource.indexOf('game.initializeQueues');
-  const hudIndex = applySource.lastIndexOf('syncHud(game.snapshot())');
+  const elseIndex = applySource.indexOf('} else {');
+  const hudIndex = applySource.indexOf('syncHud(game.snapshot())');
   assert.ok(resetIndex < modelIndex);
   assert.ok(modelIndex < queueIndex);
-  assert.ok(queueIndex < hudIndex);
+  assert.ok(queueIndex < elseIndex);
+  assert.ok(elseIndex < hudIndex);
 });

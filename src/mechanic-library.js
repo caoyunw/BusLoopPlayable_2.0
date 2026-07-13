@@ -186,8 +186,8 @@ export function createMechanicLibrary(root, {
     const button = event.target.closest('[data-mechanic-id]');
     if (!button || !list.contains(button)) return;
     const id = button.dataset.mechanicId;
-    setActive(id);
     onSelect(id);
+    setActive(id);
     if (mobileViewport?.matches) {
       setCollapsed(true);
       toggle.focus();

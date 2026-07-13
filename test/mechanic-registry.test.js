@@ -617,6 +617,98 @@ test('synchronous selection feedback does not remount the active detail extensio
   }
 });
 
+test('synchronous selection renders the target extension from updated runtime state once', () => {
+  const fixture = createLibraryFixture();
+  const mechanics = [createTestMechanic('base'), createTestMechanic('question-passenger')];
+  const rendered = [];
+  const destroyed = [];
+  let runtimeState = { questionPassenger: { authoredMarked: 0, authoredTotal: 0 } };
+  let library;
+
+  try {
+    library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'base',
+      onSelect(id) {
+        runtimeState = id === 'question-passenger'
+          ? { questionPassenger: { authoredMarked: 3, authoredTotal: 8 } }
+          : { questionPassenger: { authoredMarked: 0, authoredTotal: 0 } };
+        library.setActive(id);
+      },
+      renderDetailExtension({ mechanic, document }) {
+        const authoredMarked = runtimeState.questionPassenger.authoredMarked;
+        const authoredTotal = runtimeState.questionPassenger.authoredTotal;
+        rendered.push({ id: mechanic.id, authoredMarked, authoredTotal });
+        const element = document.createElement('section');
+        element.setAttribute('data-runtime-extension', mechanic.id);
+        element.textContent = `${authoredMarked}/${authoredTotal}`;
+        return {
+          element,
+          destroy: () => destroyed.push(mechanic.id)
+        };
+      }
+    });
+    const questionButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'question-passenger');
+
+    questionButton.click();
+
+    assert.deepEqual(rendered, [
+      { id: 'base', authoredMarked: 0, authoredTotal: 0 },
+      { id: 'question-passenger', authoredMarked: 3, authoredTotal: 8 }
+    ]);
+    assert.equal(
+      fixture.detail.querySelectorAll('[data-runtime-extension="question-passenger"]').length,
+      1
+    );
+    assert.equal(
+      fixture.detail.querySelector('[data-runtime-extension="question-passenger"]').textContent,
+      '3/8'
+    );
+    assert.deepEqual(destroyed, ['base']);
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('selection fallback renders the target when onSelect does not manage active state', () => {
+  const fixture = createLibraryFixture();
+  const mechanics = [createTestMechanic('alpha'), createTestMechanic('beta')];
+  const selected = [];
+  const rendered = [];
+
+  try {
+    const library = createMechanicLibrary(fixture.root, {
+      mechanics,
+      activeId: 'alpha',
+      onSelect: (id) => selected.push(id),
+      renderDetailExtension({ mechanic, document }) {
+        rendered.push(mechanic.id);
+        const element = document.createElement('section');
+        element.setAttribute('data-fallback-extension', mechanic.id);
+        return { element };
+      }
+    });
+    const betaButton = fixture.list
+      .querySelectorAll('[data-mechanic-id]')
+      .find((button) => button.dataset.mechanicId === 'beta');
+
+    betaButton.click();
+
+    assert.deepEqual(selected, ['beta']);
+    assert.deepEqual(rendered, ['alpha', 'beta']);
+    assert.equal(betaButton.getAttribute('aria-current'), 'true');
+    assert.ok(fixture.detail.querySelector('[data-fallback-extension="beta"]'));
+
+    library.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
 test('detail extension factory delegates optional mechanic views without id branching', () => {
   const fixture = createLibraryFixture();
 
