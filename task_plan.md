@@ -20,6 +20,8 @@ Continue with the next mechanic priority while preserving the verified star-pass
 - Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
 - Garage hidden stock, one-at-a-time release, counter timing, Unity model rendering path, and runtime smoke are implemented.
 - Valve side gating is implemented and browser-verified: initial conveyor fill lets both side queues enter normally; after that, the open side feeds only its current queue-head color run into the conveyor, then automatically switches to the other side.
+- Order-passenger is implemented and browser-verified: the level goal is red/yellow/brown order completion, the top HUD shows remaining passenger counts using group count x 4, and level18 currently shows `184/224/176`.
+- Count-garage is implemented with dispatch-count unlocks: garage id `1` unlocks after 10 successful vehicle dispatches and garage id `2` unlocks after 20, then both reuse the existing garage one-at-a-time release flow.
 - The active level has been replaced with level18 data: 47 vehicles, two fixed queues of 115 and 191 groups, 42 blocker entries from the supplied CSV, and two garage containers with 16 stocked garage vehicles.
 - The 2026-07-12 full `pnpm test` and `pnpm run build` baseline passed. Current sandboxed `pnpm test` and `pnpm run build` are blocked by Windows `spawn EPERM`.
 
@@ -39,6 +41,8 @@ Advance the next selected mechanic through the mechanic workflow:
 - Focused tests for the next selected mechanic pass.
 - Use narrow focused tests by default. Full `pnpm test` and `pnpm run build` should only run when explicitly requested.
 - Browser QA covers desktop and 390x844 mobile behavior for the next selected mechanic.
+- 2026-07-13 order-passenger focused gate passed: `node --check` for touched order/runtime/registry files, direct `node test/order-passenger-mechanic.test.js` 4/4, direct `node test/mechanic-registry.test.js` 33/33, and desktop/mobile browser QA with no console errors.
+- 2026-07-13 count-garage focused gate passed: `node --check` for touched count-garage/garage/runtime files, direct `node test/count-garage-mechanic.test.js` 1/1, direct `node test/garage-mechanic.test.js` 7/7, and direct `node test/mechanic-registry.test.js` 33/33.
 
 ## Context Pointers
 

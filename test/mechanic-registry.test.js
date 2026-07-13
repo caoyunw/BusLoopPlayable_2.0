@@ -45,8 +45,17 @@ const MECHANIC_IDS_AFTER_BASE = [
   'maglev-spot'
 ];
 
-const PLANNED_MECHANIC_IDS = EXPECTED_MECHANIC_IDS.filter((id) => (
-  id !== 'question-passenger' && id !== 'star-passenger'
+const PLAYABLE_MECHANIC_IDS = new Set([
+  'base',
+  'question-passenger',
+  'garage',
+  'star-passenger',
+  'order-passenger',
+  'valve',
+  'count-garage'
+]);
+const PLANNED_MECHANIC_IDS = ['base', ...MECHANIC_IDS_AFTER_BASE].filter((id) => (
+  !PLAYABLE_MECHANIC_IDS.has(id)
 ));
 
 const EXPECTED_SUMMARIES = {
@@ -58,7 +67,7 @@ const EXPECTED_SUMMARIES = {
   'linked-vehicles': '两辆车联动，同时进入并各占一个停车位。',
   'special-gate': '车辆经过停车场两侧特殊门时触发对应效果。',
   'star-passenger': '上车时获得星星并为道具充能。',
-  'order-passenger': '普通车挡住南瓜车，解救后对应乘客上车并给予奖励。',
+  'order-passenger': '接完订单上的红色、黄色、棕色乘客即可完成关卡。',
   valve: '玩家手动控制左右哪边乘客进入。',
   train: '车厢移至轨道，集齐4节并上满乘客后开走。',
   'locked-garage': '带钥匙车辆开走后解锁上锁停车场。',
@@ -919,13 +928,16 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base, garage, star passenger, and valve are playable while remaining presets are planned', () => {
+test('base, question passenger, garage, star passenger, order passenger, valve, and count garage are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
+  assert.equal(getMechanicById('question-passenger').status, 'playable');
   assert.equal(getMechanicById('garage').status, 'playable');
   assert.equal(getMechanicById('star-passenger').status, 'playable');
   assert.equal(getMechanicById('valve').status, 'playable');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 4);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 13);
+  assert.equal(getMechanicById('order-passenger').status, 'playable');
+  assert.equal(getMechanicById('count-garage').status, 'playable');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 7);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 10);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {
@@ -941,7 +953,7 @@ test('filterMechanics searches names, summaries, and categories', () => {
     filterMechanics('车库').map(({ id }) => id),
     ['garage', 'locked-garage', 'count-garage']
   );
-  assert.deepEqual(filterMechanics('南瓜车').map(({ id }) => id), ['order-passenger']);
+  assert.deepEqual(filterMechanics('订单').map(({ id }) => id), ['order-passenger']);
   assert.deepEqual(filterMechanics('火车').map(({ id }) => id), ['train']);
   assert.deepEqual(filterMechanics('磁悬浮').map(({ id }) => id), ['maglev-spot']);
   assert.deepEqual(

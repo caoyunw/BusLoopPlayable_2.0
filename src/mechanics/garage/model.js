@@ -48,12 +48,30 @@ function cloneGarage(garage) {
     lastOutVehicleId: garage.lastOutVehicleId,
     remainingCount: garage.vehicleIds.length,
     displayCount,
+    stockDisplayCount: getStockDisplayCount(garage),
+    unlockThreshold: garage.unlockThreshold,
+    unlockCount: garage.unlockCount,
+    unlockRemaining: getUnlockRemaining(garage),
+    locked: isGarageLocked(garage),
     hidden: garage.hidden
   };
 }
 
 function getDisplayCount(garage) {
+  if (isGarageLocked(garage)) return getUnlockRemaining(garage);
+  return getStockDisplayCount(garage);
+}
+
+function getStockDisplayCount(garage) {
   return Math.max(0, garage.vehicleIds.length - (garage.exitingVehicleId == null ? 0 : 1));
+}
+
+function getUnlockRemaining(garage) {
+  return Math.max(0, garage.unlockThreshold - garage.unlockCount);
+}
+
+function isGarageLocked(garage) {
+  return garage.unlockThreshold > 0 && garage.unlockCount < garage.unlockThreshold;
 }
 
 function removeVehicleId(ids, vehicleId) {
@@ -65,8 +83,25 @@ function isGarageVehicle(vehicle, garageId) {
   return isGarageType(vehicle.containerType) && Number(vehicle.containerId) === Number(garageId);
 }
 
-export function createGarageRuntime({ options = {} } = {}) {
+function normalizeUnlockThresholds(options = {}) {
+  const source = options.unlockThresholds ?? options.unlocks ?? {};
+  const entries = Array.isArray(source)
+    ? source.map((item) => [item.id ?? item.garageId, item.count ?? item.threshold])
+    : Object.entries(source);
+  const thresholds = new Map();
+
+  for (const [garageId, count] of entries) {
+    const normalizedId = Number(garageId);
+    const normalizedCount = Math.max(0, Math.floor(Number(count) || 0));
+    if (!Number.isFinite(normalizedId) || normalizedCount <= 0) continue;
+    thresholds.set(normalizedId, normalizedCount);
+  }
+  return thresholds;
+}
+
+export function createGarageRuntime({ id = 'garage', options = {} } = {}) {
   const config = { ...DEFAULT_CONFIG, ...options };
+  const unlockThresholds = normalizeUnlockThresholds(options);
 
   function transformLocalPoint(garage, offset = {}) {
     const yaw = garage.yaw * Math.PI / 180;
@@ -98,6 +133,8 @@ export function createGarageRuntime({ options = {} } = {}) {
           vehicleIds,
           exitingVehicleId: null,
           lastOutVehicleId: null,
+          unlockThreshold: unlockThresholds.get(Number(container.id)) ?? 0,
+          unlockCount: 0,
           hidden: vehicleIds.length === 0
         };
       });
@@ -175,7 +212,8 @@ export function createGarageRuntime({ options = {} } = {}) {
   }
 
   return {
-    id: 'garage',
+    id,
+    handlesGarageContainers: true,
 
     createState(game) {
       return { garages: getGarages(game.level) };
@@ -207,7 +245,12 @@ export function createGarageRuntime({ options = {} } = {}) {
           if (vehicle) changed = updateDriveOut(game, garage, vehicle, delta) || changed;
         }
 
-        if (garage.exitingVehicleId == null && garage.vehicleIds.length > 0 && isGarageDoorClear(game, garage)) {
+        if (
+          garage.exitingVehicleId == null
+          && garage.vehicleIds.length > 0
+          && !isGarageLocked(garage)
+          && isGarageDoorClear(game, garage)
+        ) {
           const nextVehicleId = garage.vehicleIds.at(-1);
           const vehicle = game.getVehicle(nextVehicleId);
           if (vehicle) {
@@ -229,6 +272,16 @@ export function createGarageRuntime({ options = {} } = {}) {
 
     getGarageForVehicle(game, vehicleId) {
       return getGarageForVehicle(game.mechanicState, vehicleId);
+    },
+
+    onVehicleDispatched({ game }) {
+      let changed = false;
+      for (const garage of game.mechanicState.garages) {
+        if (garage.unlockThreshold <= 0) continue;
+        garage.unlockCount += 1;
+        changed = true;
+      }
+      return changed;
     }
   };
 }

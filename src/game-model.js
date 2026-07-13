@@ -338,6 +338,7 @@ export class BusLoopGame {
       motionData: { path, duration: stationMotion.duration, curve: stationMotion.curve }
     });
     this.lastEvent = { type: 'vehicle-dispatched', vehicleId: id, spotIndex: spot.index };
+    this.mechanicRuntime.onVehicleDispatched?.({ game: this, vehicle, spot });
     this.emit();
     return { ok: true, spotIndex: spot.index };
   }
@@ -731,6 +732,11 @@ export class BusLoopGame {
   }
 
   checkEndState() {
+    if (this.mechanicRuntime.hasWon?.(this)) {
+      this.status = 'won';
+      this.lastEvent = { type: 'win', reason: 'mechanic-goal-complete', mechanicId: this.mechanicId };
+      return;
+    }
     if (this.vehicles.every((vehicle) => vehicle.state === 'done')) {
       this.status = 'won';
       this.lastEvent = { type: 'win' };

@@ -6,9 +6,13 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Mechanic Lab Foundation
 
+<<<<<<< Updated upstream
 - The registry contains 17 mechanism definitions: 3 playable (`base`, `star-passenger`, `question-passenger`) and 14 planned.
+=======
+- The registry contains 17 mechanism definitions: 4 playable (`base`, `garage`, `star-passenger`, `valve`) and 13 planned.
+>>>>>>> Stashed changes
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
-- The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
+- The base runtime, active level18 data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
 
 ### Star-Passenger Feedback
@@ -17,12 +21,46 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 - Boarding advances a repeatable `0/20` charge. Completion holds `20/20` during the celebration, resets to `0/20`, and continues at `1/20` on the next reward.
 - The feedback supports reduced motion. The design and implementation plans remain completed references.
 
+<<<<<<< Updated upstream
 ### Question-Passenger
 
 - Waiting-queue groups can use independent 30% chance assignment or the fixed authored mask; the authored level12 distribution marks 132/438 groups.
 - Hidden groups keep their models and shadows, use neutral-gray materials with four readable question badges, and reveal their real color once on entering the belt. True color order and base boarding/win/fail rules are unchanged.
 - Chance resets reroll only question positions; authored resets remain fixed. Mode/chance options persist only for the page session, survive switching away and back, and return to chance/30% on refresh.
 - Reveal de-duplication uses passenger identity plus `revealVersion`; reset generations clear transient reveal state. The reduced-motion branch preserves color/brightness/fade feedback without scale or expanding-flash transforms.
+=======
+### Garage Mechanic
+
+- `garage` is now a playable runtime mechanic instead of a planned card.
+- Garage vehicles are hidden from the parking field at reset when their level data has `containerType: Garage` and matching `containerId`.
+- The garage releases one hidden vehicle at a time through a `leaving-garage` state; ordinary `vehicleDepthes` blockers do not stop garage spawning.
+- Released garage vehicles now use the Unity `BusObject` and `ParkPos` prefab anchors instead of the hidden-stock layout row for their drive-out start/end positions.
+- The garage model hides as soon as the displayed inside-stock count reaches `0`.
+- The garage counter decrements as soon as a vehicle begins exiting, matching the Unity timing.
+- The scene view loads the Unity `Truck_01.fbx` garage model, applies its web-axis correction before sizing, and restores the Unity Truck body plus `Truck_Metal_Matcap` material slots, with a geometric fallback only if the model cannot load.
+- The active level18 configuration now includes two garage containers and stocked garage vehicles. Garage containers auto-enable as a level feature even when the selected mechanic is `base`.
+
+### Valve Mechanic
+
+- `valve` is now a playable runtime mechanic instead of a planned card.
+- The conveyor has left/right entrance valves tied to the two side queues. During initial conveyor fill both queues can enter normally.
+- After initial fill completes, only the currently open side can feed an empty belt slot. The open side locks to its current queue-head color; when that side's visible same-color run has entered the belt, the valve automatically switches to the other side and repeats.
+- The scene renders lightweight valve markers at both conveyor entry points, with open/closed state and current color feedback.
+
+### Count Garage Mechanic
+
+- `count-garage` is now a playable runtime mechanic instead of a planned card.
+- It reuses the garage hidden-stock and release runtime with dispatch-count unlock gates.
+- Garage id `1` unlocks after 10 successful vehicle dispatches; garage id `2` unlocks after 20.
+- Locked garage labels use a dark lock-shaped badge and show remaining unlock count. Once unlocked, the garage returns to the ordinary yellow stock-count badge and one-at-a-time release behavior.
+
+### Active Level18 Configuration
+
+- The active runtime level is `GameSceneDualQueue2` level18 with 47 vehicles, two fixed queues of 115 and 191 passenger groups, and 306 total passenger groups.
+- Vehicle seat totals match the fixed passenger queues by color: 0=38, 1=50, 2=10, 3=62, 4=46, 5=56, 8=44.
+- Blocking data comes from the supplied level18 CSV front-vehicle relationships: 42 vehicles have authored blockers, and initial movable vehicles are `30, 31, 32, 56, 58`.
+- The level includes two garage containers (`1`, `2`) and 16 garage-stocked vehicles using `containerType: 2`.
+>>>>>>> Stashed changes
 
 ### Advertising Cleanup And Runtime Assets
 
@@ -32,6 +70,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
+<<<<<<< Updated upstream
 - Focused question-passenger suite: 36/36 passed; focused question/registry gate: 69/69 passed. Full `pnpm test`: 142/142 passed.
 - `pnpm run build` passed with the existing non-blocking chunk-size warning.
 - In-app browser QA passed at 1280x720 and exactly 390x844: no planned overlay or horizontal overflow, chance 0/30/100%, rerolls, authored 132/438 fixed positions, session-only options, reset/switch/refresh behavior, mobile drawer controls, one-shot belt reveals, and scene-editor usability were exercised through real controls.
@@ -41,6 +80,26 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 ### Next Step
 
 Select the next mechanic from the 14 planned definitions, then begin its design and implementation workflow. No next-mechanic priority has been chosen.
+=======
+- 2026-07-12 full suite: `pnpm test` passed 88/88.
+- 2026-07-12 production build: `pnpm run build` passed with the existing non-blocking chunk-size warning.
+- 2026-07-13 garage checks: `node --check` passed for touched garage/runtime/render/audio files, direct `node test/garage-mechanic.test.js` passed 5/5, direct `node test/game-model.test.js` passed 32/32, and an in-process garage runtime smoke passed.
+- 2026-07-13 level18 checks: `node --check src/level-data.js`, `node --check src/game-model.js`, `node --check src/mechanics/index.js`, `node --check test/game-model.test.js`, direct `node test/game-model.test.js` passed 32/32, `node test/garage-mechanic.test.js` passed 5/5, `node test/mechanic-registry.test.js` passed 23/23, and a default-base level18 smoke confirmed garage stock is hidden as `in-garage`.
+- 2026-07-13 garage blocker semantics fix: direct `node test/garage-mechanic.test.js` passed 6/6, direct `node test/game-model.test.js` passed 32/32, elevated `pnpm test` passed 94/94, elevated `pnpm run build` passed with the existing non-blocking chunk-size warning, and level18 smoke confirmed first garage vehicles `38` and `60` auto-release on entry.
+- 2026-07-13 garage Unity position parity fix: direct `node test/garage-mechanic.test.js` passed 7/7, direct `node test/game-model.test.js` passed 32/32, elevated `pnpm test` passed 95/95, and elevated `pnpm run build` passed with the existing non-blocking chunk-size warning.
+- 2026-07-13 garage empty-hide fix: direct `node test/garage-mechanic.test.js` passed 7/7, direct `node test/game-model.test.js` passed 32/32, elevated `pnpm test` passed 95/95, and elevated `pnpm run build` passed with the existing non-blocking chunk-size warning.
+- 2026-07-13 valve checks: `node --check` passed for touched valve/runtime/render/test files; direct `node test/valve-mechanic.test.js` passed 4/4; direct `node test/mechanic-registry.test.js` passed 23/23; direct `node test/mechanic-architecture.test.js` passed 3/3; direct `node test/game-model.test.js` passed 32/32.
+- 2026-07-13 valve full verification: elevated `pnpm test` passed 99/99, elevated `pnpm run build` passed with the existing non-blocking chunk-size warning, and browser QA passed on desktop plus 390x844 mobile with selected valve card, nonblank canvas, visible entrance markers, mobile drawers collapsed, and no console errors.
+- 2026-07-13 valve initial-fill rule update: `node --check src/mechanics/valve/model.js` passed and direct `node test/valve-mechanic.test.js` passed 5/5. Full suite and build were not rerun because the current project preference is focused checks unless explicitly requested.
+- 2026-07-13 order-passenger checks: `node --check` passed for touched order/runtime/registry files, direct `node test/order-passenger-mechanic.test.js` passed 4/4, direct `node test/mechanic-registry.test.js` passed 33/33, and browser QA passed on desktop 1280x900 plus mobile 390x844 with selected order card, top order HUD, level18 counts `184/224/176`, nonblank canvas, mobile drawers collapsed, and no console errors. Full suite and build were not run under the focused-check preference.
+- 2026-07-13 count-garage checks: `node --check` passed for touched count-garage/garage/runtime files, direct `node test/count-garage-mechanic.test.js` passed 1/1, direct `node test/garage-mechanic.test.js` passed 7/7, and direct `node test/mechanic-registry.test.js` passed 33/33. Full suite and build were not run under the focused-check preference.
+- Current environment limits: sandboxed `node --test`, `pnpm test`, and `pnpm run build` still hit Windows `spawn EPERM` in this workspace.
+- Browser visual QA passed with system Edge on desktop and 390x844 mobile, including reduced-motion emulation. Star feedback remained readable, `20/20 -> 0/20 -> 1/20` completed correctly, celebration preserved pointer input and layout, and no console, page, or network errors occurred.
+
+### Next Step
+
+Continue with the next mechanic priority. The [star-passenger design](../superpowers/specs/2026-07-10-star-passenger-feedback-design.md) and [implementation plan](../superpowers/plans/2026-07-10-star-passenger-feedback.md) remain completed references.
+>>>>>>> Stashed changes
 
 ## Historical Playable/Advertising Log
 

@@ -1105,27 +1105,58 @@ export class SceneView {
     return sprite;
   }
 
-  updateGarageCountLabel(label, value) {
-    if (label.userData.value === value) return;
+  updateGarageCountLabel(label, value, { locked = false } = {}) {
+    if (label.userData.value === value && label.userData.locked === locked) return;
     label.userData.value = value;
+    label.userData.locked = locked;
     const canvas = label.userData.textCanvas;
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.beginPath();
-    context.arc(64, 64, 46, 0, Math.PI * 2);
-    context.fillStyle = '#f5d85f';
-    context.fill();
-    context.lineWidth = 9;
-    context.strokeStyle = '#7a3e2d';
-    context.stroke();
-    context.font = '900 58px Arial, sans-serif';
+
+    if (locked) {
+      context.fillStyle = '#273244';
+      context.strokeStyle = '#ffb454';
+      context.lineWidth = 8;
+      context.beginPath();
+      context.moveTo(36, 34);
+      context.lineTo(92, 34);
+      context.quadraticCurveTo(108, 34, 108, 50);
+      context.lineTo(108, 90);
+      context.quadraticCurveTo(108, 106, 92, 106);
+      context.lineTo(36, 106);
+      context.quadraticCurveTo(20, 106, 20, 90);
+      context.lineTo(20, 50);
+      context.quadraticCurveTo(20, 34, 36, 34);
+      context.fill();
+      context.stroke();
+      context.strokeStyle = '#ffb454';
+      context.lineWidth = 9;
+      context.beginPath();
+      context.arc(64, 40, 24, Math.PI, 0);
+      context.stroke();
+      context.fillStyle = '#ffb454';
+      context.beginPath();
+      context.arc(64, 86, 7, 0, Math.PI * 2);
+      context.fill();
+      context.fillRect(61, 88, 6, 12);
+    } else {
+      context.beginPath();
+      context.arc(64, 64, 46, 0, Math.PI * 2);
+      context.fillStyle = '#f5d85f';
+      context.fill();
+      context.lineWidth = 9;
+      context.strokeStyle = '#7a3e2d';
+      context.stroke();
+    }
+
+    context.font = locked ? '900 46px Arial, sans-serif' : '900 58px Arial, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.lineWidth = 8;
-    context.strokeStyle = '#7a3e2d';
+    context.lineWidth = locked ? 7 : 8;
+    context.strokeStyle = locked ? '#273244' : '#7a3e2d';
     context.fillStyle = '#ffffff';
-    context.strokeText(String(value), 64, 66);
-    context.fillText(String(value), 64, 66);
+    context.strokeText(String(value), 64, locked ? 65 : 66);
+    context.fillText(String(value), 64, locked ? 65 : 66);
     label.userData.textTexture.needsUpdate = true;
   }
 
@@ -1246,7 +1277,9 @@ export class SceneView {
       view.position.set(mapped.x, SCENE_TUNING.vehicleArea.y, mapped.y);
       view.rotation.y = mapVehicleAreaYaw(garage.yaw) + deg(SCENE_TUNING.facing.garageYawOffsetDegrees ?? 0);
       view.visible = !garage.hidden;
-      this.updateGarageCountLabel(view.userData.countLabel, garage.displayCount);
+      this.updateGarageCountLabel(view.userData.countLabel, garage.displayCount, {
+        locked: garage.locked
+      });
     }
     for (const [id, view] of this.garageViews) {
       if (activeIds.has(id)) continue;
