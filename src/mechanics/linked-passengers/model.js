@@ -127,6 +127,8 @@ export function createLinkedPassengerRuntime({
   const maxVehicleSeats = getMaxVehicleSeats(level);
   const maxLength = normalizeMaxLength(options.maxLength, maxVehicleSeats);
   const authoredStarts = level?.mechanics?.['linked-passengers']?.authoredStarts;
+  const authoredBuilt = buildAuthoredPlan(queues, authoredStarts, maxVehicleSeats);
+  const authoredSummary = summarizePlan(authoredBuilt.plan);
   let activePlan = queues.map((queue) => Array(queue.length).fill(null));
   let warned = false;
 
@@ -138,7 +140,7 @@ export function createLinkedPassengerRuntime({
     id: 'linked-passengers',
     createState() {
       const built = mode === 'authored'
-        ? buildAuthoredPlan(queues, authoredStarts, maxVehicleSeats)
+        ? authoredBuilt
         : {
             plan: buildChancePlan(queues, chance, maxLength, random),
             invalidAuthoredCount: 0
@@ -155,7 +157,10 @@ export function createLinkedPassengerRuntime({
           maxLength,
           maxVehicleSeats,
           ...summarizePlan(activePlan),
-          invalidAuthoredCount: built.invalidAuthoredCount
+          invalidAuthoredCount: built.invalidAuthoredCount,
+          authoredChainCount: authoredSummary.chainCount,
+          authoredLinkedGroupCount: authoredSummary.linkedGroupCount,
+          authoredInvalidAuthoredCount: authoredBuilt.invalidAuthoredCount
         }
       };
     },

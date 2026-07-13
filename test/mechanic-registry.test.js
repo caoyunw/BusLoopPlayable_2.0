@@ -768,9 +768,12 @@ test('linked passenger detail view keeps chance and authored settings independen
       state: {
         linkedPassenger: {
           maxVehicleSeats: 10,
-          chainCount: 12,
-          linkedGroupCount: 66,
-          invalidAuthoredCount: 0
+          chainCount: 2,
+          linkedGroupCount: 5,
+          invalidAuthoredCount: 0,
+          authoredChainCount: 12,
+          authoredLinkedGroupCount: 66,
+          authoredInvalidAuthoredCount: 0
         }
       },
       onCommit: (options) => commits.push(options)
@@ -806,6 +809,8 @@ test('linked passenger detail view keeps chance and authored settings independen
     assert.equal(authoredSummary.hidden, true);
     assert.match(authoredSummary.textContent, /12/);
     assert.match(authoredSummary.textContent, /66/);
+    assert.doesNotMatch(authoredSummary.textContent, /固定标记：2 组连体/);
+    assert.doesNotMatch(authoredSummary.textContent, /，5 排乘客/);
 
     chance.value = '45';
     chance.dispatchEvent({ type: 'change', bubbles: false, target: null });
@@ -817,6 +822,7 @@ test('linked passenger detail view keeps chance and authored settings independen
     assert.equal(chanceRow.hidden, true);
     assert.equal(lengthRow.hidden, true);
     assert.equal(authoredSummary.hidden, false);
+    assert.equal(authoredSummary.textContent, '固定标记：12 组连体，66 排乘客');
     assert.deepEqual(commits, [
       { mode: 'chance', chance: 0.45, maxLength: 10 },
       { mode: 'chance', chance: 0.45, maxLength: 6 },

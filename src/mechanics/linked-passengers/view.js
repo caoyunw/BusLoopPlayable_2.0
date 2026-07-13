@@ -38,6 +38,10 @@ export function createLinkedPassengerDetailView({
 } = {}) {
   const runtimeState = state.linkedPassenger ?? {};
   const maximum = normalizeMaximum(runtimeState.maxVehicleSeats);
+  const authoredChainCount = runtimeState.authoredChainCount ?? runtimeState.chainCount ?? 0;
+  const authoredLinkedGroupCount = (
+    runtimeState.authoredLinkedGroupCount ?? runtimeState.linkedGroupCount ?? 0
+  );
   let mode = normalizeMode(options.mode);
   let chance = normalizeChance(options.chance);
   let maxLength = normalizeLength(options.maxLength, maximum);
@@ -109,7 +113,7 @@ export function createLinkedPassengerDetailView({
     document,
     element,
     'p',
-    `固定标记：${runtimeState.chainCount ?? 0} 组连体，${runtimeState.linkedGroupCount ?? 0} 排乘客`
+    `固定标记：${authoredChainCount} 组连体，${authoredLinkedGroupCount} 排乘客`
   );
   authoredSummary.setAttribute('data-linked-authored-summary', '');
 

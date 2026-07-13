@@ -155,9 +155,12 @@ test('linked detail settings render and commit chance max-length and authored mo
     state: {
       linkedPassenger: {
         maxVehicleSeats: 10,
-        chainCount: 12,
-        linkedGroupCount: 66,
-        invalidAuthoredCount: 0
+        chainCount: 2,
+        linkedGroupCount: 5,
+        invalidAuthoredCount: 0,
+        authoredChainCount: 12,
+        authoredLinkedGroupCount: 66,
+        authoredInvalidAuthoredCount: 0
       }
     },
     onCommit: (options) => commits.push(options)
@@ -174,6 +177,8 @@ test('linked detail settings render and commit chance max-length and authored mo
   assert.equal(maxLength.getAttribute('max'), '10');
   assert.match(authoredSummary.textContent, /12/);
   assert.match(authoredSummary.textContent, /66/);
+  assert.doesNotMatch(authoredSummary.textContent, /固定标记：2 组连体/);
+  assert.doesNotMatch(authoredSummary.textContent, /，5 排乘客/);
 
   chance.value = '45';
   chance.dispatchEvent({ type: 'change' });
@@ -182,6 +187,7 @@ test('linked detail settings render and commit chance max-length and authored mo
   mode.value = 'authored';
   mode.dispatchEvent({ type: 'change' });
 
+  assert.equal(authoredSummary.textContent, '固定标记：12 组连体，66 排乘客');
   assert.deepEqual(commits, [
     { mode: 'chance', chance: 0.45, maxLength: 10 },
     { mode: 'chance', chance: 0.45, maxLength: 6 },
@@ -208,7 +214,10 @@ test('chance mode creates multiple non-overlapping same-color chains with unifor
     maxVehicleSeats: 10,
     chainCount: 2,
     linkedGroupCount: 6,
-    invalidAuthoredCount: 0
+    invalidAuthoredCount: 0,
+    authoredChainCount: 0,
+    authoredLinkedGroupCount: 0,
+    authoredInvalidAuthoredCount: 0
   });
   assert.deepEqual(
     [0, 1, 2, 3].map((sourceIndex) => (
@@ -238,6 +247,9 @@ test('authored mode accepts valid earlier chains and continues scanning after in
   assert.equal(state.chainCount, 2);
   assert.equal(state.linkedGroupCount, 4);
   assert.equal(state.invalidAuthoredCount, 3);
+  assert.equal(state.authoredChainCount, 2);
+  assert.equal(state.authoredLinkedGroupCount, 4);
+  assert.equal(state.authoredInvalidAuthoredCount, 3);
   assert.equal(warnings.length, 1);
   assert.equal(runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 0 }).linkedPassenger.length, 2);
   assert.equal(runtime.createQueueItemData({ queueIndex: 0, sourceIndex: 1 }).linkedPassenger.memberIndex, 1);
@@ -326,6 +338,33 @@ test('chance plans reroll on createState while authored plans remain determinist
   assert.equal(runtime.createState().linkedPassenger.chainCount, 0);
 });
 
+test('chance state exposes authored summary without consuming extra random values', () => {
+  let randomCalls = 0;
+  const runtime = createLinkedPassengerRuntime({
+    level: makeLevel([[0, 0]], [[2, 0]]),
+    options: { mode: 'chance', chance: 0, maxLength: 2 },
+    random() {
+      randomCalls += 1;
+      return 0.5;
+    }
+  });
+
+  assert.equal(randomCalls, 0);
+  assert.deepEqual(runtime.createState().linkedPassenger, {
+    mode: 'chance',
+    chance: 0,
+    maxLength: 2,
+    maxVehicleSeats: 10,
+    chainCount: 0,
+    linkedGroupCount: 0,
+    invalidAuthoredCount: 0,
+    authoredChainCount: 1,
+    authoredLinkedGroupCount: 2,
+    authoredInvalidAuthoredCount: 0
+  });
+  assert.equal(randomCalls, 1);
+});
+
 test('authored mode safely ignores missing and non-array start rows', () => {
   const warnings = [];
   const runtime = createLinkedPassengerRuntime({
@@ -343,7 +382,10 @@ test('authored mode safely ignores missing and non-array start rows', () => {
     maxVehicleSeats: 10,
     chainCount: 0,
     linkedGroupCount: 0,
-    invalidAuthoredCount: 0
+    invalidAuthoredCount: 0,
+    authoredChainCount: 0,
+    authoredLinkedGroupCount: 0,
+    authoredInvalidAuthoredCount: 0
   });
   assert.equal(warnings.length, 0);
 });
