@@ -6,7 +6,8 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 | Change area | Start here | Also check |
 | --- | --- | --- |
-| Mechanic identity, metadata, status, lookup, filtering | `src/mechanic-registry.js` | `test/mechanic-registry.test.js`, `src/mechanic-library.js` |
+| Mechanic identity, metadata, status, module lookup, and playable runtime resolution | `src/mechanics/index.js` | `src/mechanics/*/index.js`, `src/mechanic-registry.js`, `test/mechanic-registry.test.js` |
+| Frozen mechanic collection, metadata lookup, fallback, and text filtering | `src/mechanic-registry.js` | `src/mechanics/index.js`, `test/mechanic-registry.test.js`, `src/mechanic-library.js` |
 | `?mechanic=` parsing/sync and safe storage removal | `src/mechanic-lab.js` | `test/mechanic-registry.test.js`, `src/main.js` |
 | Mechanic search, grouping, generic detail extensions, selection, mobile drawer | `src/mechanic-library.js` | `src/mechanics/index.js`, `test/mechanic-registry.test.js`, `src/styles.css`, `index.html` |
 | Star-passenger lifetime, cyclic charge, and boarding/expiration rules | `src/mechanics/star-passenger/model.js` | `src/mechanics/star-passenger/index.js`, `test/star-passenger-mechanic.test.js` |
@@ -47,13 +48,14 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 ### Mechanic Lab
 
-- `src/mechanic-registry.js`: immutable registry for 17 mechanism definitions: 3 playable (`base`, `star-passenger`, `question-passenger`) and 14 planned. Owns IDs, names, categories, status, summary/effect/experience/difficulty, exact lookup, fallback to `base`, and text filtering.
+- `src/mechanics/*/index.js`: owns each mechanic's identity, metadata, and status. `src/mechanics/index.js` assembles and freezes the 17 modules (3 playable and 14 planned), resolves playable runtimes, and delegates optional detail views.
+- `src/mechanic-registry.js`: derives an immutable metadata collection from `src/mechanics/index.js` and owns exact lookup, fallback to `base`, and text filtering; it does not own mechanic definitions.
 - `src/mechanic-lab.js`: pure lab helpers. Owns query parsing, same-origin query replacement/sync, unknown-ID fallback through the registry, and exception-safe storage removal.
 - `src/mechanic-library.js`: mechanism browser UI. Owns search, unique primary-category grouping, status labels, detail rendering with `textContent`, generic detail-extension mounting/cleanup, host-first selection with an idempotent active-state fallback, mobile collapse/focus behavior, viewport synchronization, and listener cleanup.
 - `src/mechanics/index.js`: immutable mechanic-module catalog plus exact module lookup, playable-runtime resolution, and optional generic detail-view factory delegation.
 - `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; owns page-local mechanic option defaults, generic detail-view commits from the current runtime snapshot, active-mechanic reset/queue reinitialization, and inactive-option HUD synchronization; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
 - `src/mechanics/star-passenger/`: completed star-passenger mechanic. `model.js` owns lifetime and charge state; `view.js` and `styles.css` own HUD, celebration, and reduced-motion feedback.
-- `src/mechanics/question-passenger/`: playable question-passenger module. `model.js` owns chance/authored assignment normalization and state metadata; `view.js` and `styles.css` own persistence-free detail mode/chance controls, normalized commit payloads, and authored-count summary.
+- `src/mechanics/question-passenger/`: playable question-passenger module. `index.js` owns its definition/status and runtime/detail exports; `model.js` owns chance/authored assignment normalization and state metadata; `view.js` and `styles.css` own persistence-free detail mode/chance controls, normalized commit payloads, and authored-count summary.
 
 ### Base Runtime
 
