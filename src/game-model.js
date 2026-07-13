@@ -33,6 +33,16 @@ function normalizeQueueCapacity(value, maximum) {
   );
 }
 
+function isDenseQueuePrefix(queue, batch) {
+  if (!Array.isArray(queue) || !Array.isArray(batch) || batch.length === 0 || batch.length > queue.length) {
+    return false;
+  }
+  for (let index = 0; index < batch.length; index += 1) {
+    if (!Object.hasOwn(batch, index) || batch[index] !== queue[index]) return false;
+  }
+  return true;
+}
+
 function visualToVehicleAreaPoint(x, z) {
   const area = SCENE_TUNING.vehicleArea;
   const unitScale = area.positionUnitScale ?? LEVEL_1.mapScale;
@@ -481,7 +491,10 @@ export class BusLoopGame {
         continue;
       }
       if (!this.tryEnterPassengerBatch(slot, entry)) {
-        if (this.initialFillActive) this.initialFillActive = false;
+        if (this.initialFillActive) {
+          this.initialFillActive = false;
+          changed = true;
+        }
         continue;
       }
       changed = true;
@@ -574,14 +587,24 @@ export class BusLoopGame {
   }
 
   tryEnterPassengerBatch(headSlot, entry) {
+    if (
+      !headSlot
+      || !Number.isInteger(headSlot.index)
+      || this.slots[headSlot.index] !== headSlot
+      || !entry
+      || !Number.isInteger(entry.index)
+    ) return false;
     const passengerBatch = this.peekPassengerBatch(entry.index);
-    if (!passengerBatch) return false;
+    if (!passengerBatch || passengerBatch.length > this.slots.length) return false;
     const slotBatch = Array.from({ length: passengerBatch.length }, (_, memberIndex) => (
       this.slots[(headSlot.index - memberIndex + this.slots.length) % this.slots.length]
     ));
-    if (slotBatch.some((slot) => slot.colorIndex !== null)) return false;
+    if (
+      new Set(slotBatch).size !== slotBatch.length
+      || slotBatch.some((slot) => !slot || slot.colorIndex !== null)
+    ) return false;
 
-    const dequeued = this.dequeuePassengerBatch(entry.index, true);
+    const dequeued = this.dequeuePassengerBatch(entry.index, true, passengerBatch);
     if (!dequeued || dequeued.length !== slotBatch.length) return false;
     dequeued.forEach((passenger, memberIndex) => {
       const slot = slotBatch[memberIndex];
@@ -698,14 +721,16 @@ export class BusLoopGame {
       queueIndex,
       queue
     }) ?? [queue[0]];
-    if (!Array.isArray(batch) || batch.length === 0 || batch.length > queue.length) return null;
-    return batch.every((item, index) => item === queue[index]) ? batch : null;
+    return isDenseQueuePrefix(queue, batch) ? batch.slice() : null;
   }
 
-  dequeuePassengerBatch(queueIndex, includeDetails = false) {
-    const batch = this.peekPassengerBatch(queueIndex);
-    if (!batch) return null;
-    this.queues[queueIndex].splice(0, batch.length);
+  dequeuePassengerBatch(queueIndex, includeDetails = false, expectedBatch = undefined) {
+    const queue = this.queues[queueIndex];
+    const batch = expectedBatch === undefined
+      ? this.peekPassengerBatch(queueIndex)
+      : expectedBatch;
+    if (!isDenseQueuePrefix(queue, batch)) return null;
+    queue.splice(0, batch.length);
     this.fillQueueFromSource(queueIndex);
     return includeDetails
       ? batch.map((passenger) => ({

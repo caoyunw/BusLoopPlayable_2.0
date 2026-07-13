@@ -348,3 +348,103 @@ test('a linked chain waits intact when any required trailing slot is occupied', 
   assert.equal(game.slots[0].colorIndex, null);
   assert.equal(game.slots[3].colorIndex, null);
 });
+
+test('atomic entry commits the first validated runtime batch without asking the hook again', () => {
+  const game = makeLinkedGame();
+  game.initializeQueues([3], 0.5, [2], 1);
+  let hookCalls = 0;
+  game.mechanicRuntime.getBeltEntryBatch = (context) => {
+    hookCalls += 1;
+    return hookCalls === 1
+      ? context.queue
+      : [context.queue[0]];
+  };
+  const expectedPassengerIds = game.snapshot().queueItems[0].map((item) => item.id);
+
+  assert.equal(game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 }), true);
+  assert.equal(hookCalls, 1);
+  assert.deepEqual([0, 4, 3].map((index) => game.slots[index].passengerId), expectedPassengerIds);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.sourceIndex), [3]);
+});
+
+test('sparse runtime batches are rejected without consuming passengers or changing slots and events', () => {
+  const game = makeLinkedGame();
+  game.initializeQueues([3], 0.5, [2], 1);
+  game.mechanicRuntime.getBeltEntryBatch = ({ queue }) => {
+    const sparseBatch = Array(2);
+    sparseBatch[0] = queue[0];
+    return sparseBatch;
+  };
+  const beforeIds = game.snapshot().queueItems[0].map((item) => item.id);
+  const beforeEvent = { ...game.lastEvent };
+
+  assert.equal(game.peekPassengerBatch(0), null);
+  assert.equal(game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 }), false);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.id), beforeIds);
+  assert.equal(game.slots.every((slot) => slot.colorIndex === null), true);
+  assert.deepEqual(game.lastEvent, beforeEvent);
+});
+
+test('a batch larger than the conveyor ring is rejected before dequeue', () => {
+  const queue = Array(6).fill(0);
+  const level = makeGameLevel({
+    queue,
+    authoredStarts: [6, 0, 0, 0, 0, 0],
+    seats: 6
+  });
+  level.queueCapacity = 6;
+  const game = makeLinkedGame(level);
+  const beforeIds = game.snapshot().queueItems[0].map((item) => item.id);
+  const beforeEvent = { ...game.lastEvent };
+
+  assert.equal(game.tryEnterPassengerBatch(game.slots[0], { index: 0, percent: 0.1 }), false);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.id), beforeIds);
+  assert.equal(game.slots.every((slot) => slot.colorIndex === null), true);
+  assert.deepEqual(game.lastEvent, beforeEvent);
+});
+
+test('atomic entry rejects foreign heads and missing trailing slots without mutation', () => {
+  const foreignHeadGame = makeLinkedGame();
+  foreignHeadGame.initializeQueues([3], 0.5, [2], 1);
+  const foreignBefore = foreignHeadGame.snapshot().queueItems[0].map((item) => item.id);
+  assert.equal(
+    foreignHeadGame.tryEnterPassengerBatch({ index: 0 }, { index: 0, percent: 0.1 }),
+    false
+  );
+  assert.deepEqual(foreignHeadGame.snapshot().queueItems[0].map((item) => item.id), foreignBefore);
+
+  const missingSlotGame = makeLinkedGame();
+  missingSlotGame.initializeQueues([3], 0.5, [2], 1);
+  const missingBefore = missingSlotGame.snapshot().queueItems[0].map((item) => item.id);
+  const removedSlot = missingSlotGame.slots[4];
+  missingSlotGame.slots[4] = undefined;
+  assert.equal(
+    missingSlotGame.tryEnterPassengerBatch(missingSlotGame.slots[0], { index: 0, percent: 0.1 }),
+    false
+  );
+  missingSlotGame.slots[4] = removedSlot;
+  assert.deepEqual(missingSlotGame.snapshot().queueItems[0].map((item) => item.id), missingBefore);
+});
+
+test('update keeps a blocked chain queued and emits the end of fast initial fill', () => {
+  const game = makeLinkedGame();
+  game.initializeQueues([3], 0.5, [2], 1);
+  game.slots[0].progress = 0.09;
+  game.slots[0].previousProgress = 0.09;
+  game.slots[4].colorIndex = 9;
+  const beforeIds = game.snapshot().queueItems[0].map((item) => item.id);
+  let notifications = 0;
+  const unsubscribe = game.subscribe(() => {
+    notifications += 1;
+  });
+
+  game.update(0.02);
+  unsubscribe();
+
+  assert.equal(game.initialFillActive, false);
+  assert.equal(notifications, 2);
+  assert.deepEqual(game.snapshot().queueItems[0].map((item) => item.id), beforeIds);
+  assert.equal(game.slots[0].colorIndex, null);
+  assert.equal(game.slots[3].colorIndex, null);
+  assert.equal(game.slots[4].colorIndex, 9);
+});
