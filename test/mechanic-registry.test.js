@@ -12,7 +12,10 @@ import {
   createMechanicLibrary,
   filterMechanicCollection
 } from '../src/mechanic-library.js';
-import { createMechanicDetailView } from '../src/mechanics/index.js';
+import {
+  createMechanicDetailView,
+  resolvePlayableMechanicId
+} from '../src/mechanics/index.js';
 import { createQuestionPassengerDetailView } from '../src/mechanics/question-passenger/view.js';
 import * as mechanicLab from '../src/mechanic-lab.js';
 
@@ -23,7 +26,7 @@ const {
   syncMechanicQuery
 } = mechanicLab;
 
-const PLANNED_MECHANIC_IDS = [
+const EXPECTED_MECHANIC_IDS = [
   'question-passenger',
   'question-vehicle',
   'elevator-bay',
@@ -41,6 +44,10 @@ const PLANNED_MECHANIC_IDS = [
   'double-gate',
   'maglev-spot'
 ];
+
+const PLANNED_MECHANIC_IDS = EXPECTED_MECHANIC_IDS.filter((id) => (
+  id !== 'question-passenger' && id !== 'star-passenger'
+));
 
 const EXPECTED_SUMMARIES = {
   'question-passenger': '左右队列不可见颜色，进入传送带后显示。',
@@ -879,7 +886,7 @@ test('registry contains base plus sixteen unique mechanic entries', () => {
   assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 17);
   assert.deepEqual(
     MECHANICS.map(({ id }) => id),
-    ['base', ...PLANNED_MECHANIC_IDS]
+    ['base', ...EXPECTED_MECHANIC_IDS]
   );
 });
 
@@ -910,11 +917,18 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base and star passenger are playable while remaining presets are planned', () => {
+test('base, star passenger, and question passenger are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
   assert.equal(getMechanicById('star-passenger').status, 'playable');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 2);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 15);
+  assert.equal(getMechanicById('question-passenger').status, 'playable');
+  assert.equal(resolvePlayableMechanicId('question-passenger'), 'question-passenger');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 3);
+  assert.deepEqual(
+    MECHANICS.filter(({ status }) => status === 'planned').map(({ id }) => id),
+    PLANNED_MECHANIC_IDS
+  );
+  assert.equal(PLANNED_MECHANIC_IDS.length, 14);
+  assert.equal(PLANNED_MECHANIC_IDS.includes('question-passenger'), false);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {

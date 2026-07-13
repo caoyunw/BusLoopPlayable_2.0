@@ -237,6 +237,66 @@ test('active mechanic options reconfigure and inactive options are retained with
   assert.equal(game.mechanicState.starReward.charge, 2);
 });
 
+test('question passenger starts its playable runtime with active chance options', () => {
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'question-passenger',
+    random: () => 0.99,
+    mechanics: {
+      'question-passenger': { mode: 'chance', chance: 0.3 }
+    }
+  });
+  const state = game.snapshot();
+
+  assert.equal(game.mechanicRuntime.id, 'question-passenger');
+  assert.deepEqual(state.questionPassenger, {
+    mode: 'chance',
+    chance: 0.3,
+    authoredMarked: 132,
+    authoredTotal: 438
+  });
+  assert.equal(
+    state.queueItems.every((queue) => (
+      queue.every((item) => item.questionPassenger?.hidden === false)
+    )),
+    true
+  );
+});
+
+test('active question passenger options reset once and apply the fixed authored mask', () => {
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'question-passenger',
+    random: () => 0.99,
+    mechanics: {
+      'question-passenger': { mode: 'chance', chance: 0.3 }
+    }
+  });
+  const initialResetVersion = game.snapshot().resetVersion;
+  game.time = 9;
+
+  assert.equal(
+    game.setMechanicOptions('question-passenger', { mode: 'authored' }),
+    true
+  );
+
+  const state = game.snapshot();
+  assert.equal(state.time, 0);
+  assert.equal(state.resetVersion, initialResetVersion + 1);
+  assert.deepEqual(state.questionPassenger, {
+    mode: 'authored',
+    chance: 0.3,
+    authoredMarked: 132,
+    authoredTotal: 438
+  });
+  assert.deepEqual(
+    state.queueItems.map((queue) => (
+      queue.map((item) => item.questionPassenger?.hidden === true)
+    )),
+    LEVEL_1.mechanics['question-passenger'].authoredMasks.map((mask) => (
+      mask.slice(0, LEVEL_1.queueCapacity)
+    ))
+  );
+});
+
 test('resetVersion advances exactly once for explicit and active mechanic resets', () => {
   const game = new BusLoopGame(LEVEL_1);
   const initialVersion = game.snapshot().resetVersion;

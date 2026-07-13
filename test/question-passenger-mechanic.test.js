@@ -285,7 +285,7 @@ test('runtime exposes mechanic identity and empty slot metadata', () => {
 
   assert.equal(runtime.id, 'question-passenger');
   assert.deepEqual(runtime.createSlotData(), { questionPassenger: null });
-  assert.equal(questionPassengerMechanic.definition.status, 'planned');
+  assert.equal(questionPassengerMechanic.definition.status, 'playable');
   assert.equal(questionPassengerMechanic.default.definition, questionPassengerMechanic.definition);
   assert.equal(questionPassengerMechanic.default.createRuntime, questionPassengerMechanic.createRuntime);
   assert.equal(questionPassengerMechanic.createDetailView, createQuestionPassengerDetailView);

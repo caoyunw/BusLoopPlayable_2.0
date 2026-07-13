@@ -1,12 +1,12 @@
 # Playable Project Progress
 
-## Current Snapshot - 2026-07-12
+## Current Snapshot - 2026-07-13
 
 The active project is now the BusLoop mechanic lab, not an advertising playable. The lab is for designing and experiencing gameplay mechanisms and contains no active advertising package flow or store redirect.
 
 ### Mechanic Lab Foundation
 
-- The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
+- The registry contains 17 mechanism definitions: 3 playable (`base`, `star-passenger`, `question-passenger`) and 14 planned.
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
 - The base runtime, level12-style data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
@@ -17,6 +17,13 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 - Boarding advances a repeatable `0/20` charge. Completion holds `20/20` during the celebration, resets to `0/20`, and continues at `1/20` on the next reward.
 - The feedback supports reduced motion. The design and implementation plans remain completed references.
 
+### Question-Passenger
+
+- Waiting-queue groups can use independent 30% chance assignment or the fixed authored mask; the authored level12 distribution marks 132/438 groups.
+- Hidden groups keep their models and shadows, use neutral-gray materials with four readable question badges, and reveal their real color once on entering the belt. True color order and base boarding/win/fail rules are unchanged.
+- Chance resets reroll only question positions; authored resets remain fixed. Mode/chance options persist only for the page session, survive switching away and back, and return to chance/30% on refresh.
+- Reveal de-duplication uses passenger identity plus `revealVersion`; reset generations clear transient reveal state. The reduced-motion branch preserves color/brightness/fade feedback without scale or expanding-flash transforms.
+
 ### Advertising Cleanup And Runtime Assets
 
 - CTA/store routing, install gates, MRAID startup, advertising package scripts/checkers, generated package artifacts, and platform-specific runtime ownership were removed.
@@ -25,13 +32,15 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Full suite: `pnpm test` passed 88/88.
-- Production build: `pnpm run build` passed with the existing non-blocking chunk-size warning.
-- Browser visual QA passed with system Edge on desktop and 390x844 mobile, including reduced-motion emulation. Star feedback remained readable, `20/20 -> 0/20 -> 1/20` completed correctly, celebration preserved pointer input and layout, and no console, page, or network errors occurred.
+- Focused question-passenger suite: 32/32 passed. Full `pnpm test`: 138/138 passed.
+- `pnpm run build` passed with the existing non-blocking chunk-size warning.
+- In-app browser QA passed at 1280x720 and exactly 390x844: no planned overlay or horizontal overflow, chance 0/30/100%, rerolls, authored 132/438 fixed positions, session-only options, reset/switch/refresh behavior, mobile drawer controls, one-shot belt reveals, and scene-editor usability were exercised through real controls.
+- The in-app browser could not emulate native `prefers-reduced-motion`. A temporary exact source substitution forced the live reduced-motion branch; color/brightness/fade remained clear, transforms stayed fixed, and controls remained interactive. The source was immediately reverted and verified clean.
+- Error-level browser logs and page errors were absent. Existing FBXLoader material warnings remain, and four Unity texture references currently return the HTML fallback (`Idle_girl01_pink.png`, `img_v3_...fdg.png`, `Idle_boy02_blue.png`, `Car_P2.png`); the scene continues through existing fallback/material paths.
 
 ### Next Step
 
-Plan and implement `question-passenger` next. Define the hidden-color and reveal rules, keep the registry entry `planned` during implementation, add focused coverage, preserve the 88/88 baseline, and complete desktop, 390x844 mobile, and reduced-motion QA before marking it `playable`. The [star-passenger design](../superpowers/specs/2026-07-10-star-passenger-feedback-design.md) and [implementation plan](../superpowers/plans/2026-07-10-star-passenger-feedback.md) remain completed references.
+Select the next mechanic from the 14 planned definitions, then begin its design and implementation workflow. No next-mechanic priority has been chosen.
 
 ## Historical Playable/Advertising Log
 

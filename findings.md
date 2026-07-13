@@ -1,15 +1,24 @@
 # Findings
 
-## Current Durable Findings - 2026-07-12
+## Current Durable Findings - 2026-07-13
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. The registry contains 17 definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
+- The active product is a mechanic design and experience lab. The registry contains 17 definitions: 3 playable (`base`, `star-passenger`, `question-passenger`) and 14 planned.
 - `src/mechanic-registry.js` is the source of truth for mechanism identity, metadata, state, lookup, fallback, and search.
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
 - New mechanism behavior should live behind an isolated module boundary and reuse base runtime contracts. Do not grow a large mechanism switch inside `src/main.js`.
 - A mechanism stays `planned` until its real play loop, focused tests, and browser QA are complete.
+
+### Question-Passenger Rules And Architecture
+
+- Question state changes waiting-stage visibility only. Real `colorIndex`, queue order, matching, boarding, vehicle departure, and win/fail rules remain unchanged.
+- `chance` mode assigns each new queue group independently and defaults to 0.3; reset rerolls question positions. `authored` mode reads only `level.mechanics['question-passenger'].authoredMasks`, does not call random, and the level12 mask marks 132/438 groups.
+- Mode/chance controls are page-session state only: switching away and back retains them, while refresh restores chance/30%. They are not stored or added to the URL.
+- Active `setMechanicOptions` rebuilds the runtime and resets exactly once. Scene reveal de-duplication uses passenger ID plus `revealVersion`; `resetVersion` clears transient state when passenger IDs are reused.
+- Hidden waiting groups use a neutral-gray material and four question badges. Belt groups always show real color and receive one non-blocking reveal. The reduced-motion branch keeps color/brightness/fade while removing scale/pop/expanding-flash transforms.
+- Browser QA exercised a live forced reduced-motion branch because the in-app browser lacked native media-feature emulation; this is not evidence of native OS preference emulation.
 
 ### Runtime Asset Naming
 
@@ -17,6 +26,7 @@
 - Runtime assets remain under `public/assets/runtime/`; Unity provenance assets remain under `public/assets/unity/`.
 - Runtime asset paths must use neutral names. Advertising platform names are not runtime ownership boundaries.
 - `src/level-data.js` is the primary asset URL inventory; `src/scene-view.js` directly owns the runtime guide-hand URL.
+- Existing FBXLoader material warnings remain. Four Unity texture references currently resolve to the HTML fallback rather than image bytes: `Idle_girl01_pink.png`, `img_v3_...fdg.png`, `Idle_boy02_blue.png`, and `Car_P2.png`; do not invent replacements without source assets.
 
 ### Persistent Editor And Authored Defaults
 
