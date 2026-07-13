@@ -68,6 +68,8 @@ const EXPECTED_SUMMARIES = {
   'maglev-spot': '点击切换车位升降，升起时不阻挡地面车辆。'
 };
 
+EXPECTED_SUMMARIES.valve = '传送带左右阀门自动轮流放行同色乘客段。';
+
 class FakeClassList {
   constructor(element) {
     this.element = element;
@@ -917,12 +919,13 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base, garage, and star passenger are playable while remaining presets are planned', () => {
+test('base, garage, star passenger, and valve are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
   assert.equal(getMechanicById('garage').status, 'playable');
   assert.equal(getMechanicById('star-passenger').status, 'playable');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 3);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 14);
+  assert.equal(getMechanicById('valve').status, 'playable');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 4);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 13);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {

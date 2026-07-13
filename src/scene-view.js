@@ -768,6 +768,7 @@ export class SceneView {
     this.fbxLoader = new FBXLoader(this.loadingManager);
     this.vehicleViews = new Map();
     this.garageViews = new Map();
+    this.valveViews = [];
     this.passengerViews = [];
     this.queuePassengerViews = [[], []];
     this.spotRoots = [];
@@ -825,6 +826,7 @@ export class SceneView {
     this.camera.add(this.backgroundPlane);
     this.scene.add(this.camera, this.loopPlane);
     this.buildPathCurves();
+    this.buildValveViews();
     this.buildSpots();
     this.buildGuideHand();
 
@@ -1156,6 +1158,79 @@ export class SceneView {
     root.userData.garageId = garage.id;
     this.scene.add(root);
     return root;
+  }
+
+  createValveView(index) {
+    const root = new THREE.Group();
+    const postMaterial = new THREE.MeshBasicMaterial({
+      color: 0x263241,
+      depthTest: false,
+      depthWrite: false
+    });
+    const doorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff6b4a,
+      depthTest: false,
+      depthWrite: false
+    });
+    const indicatorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false
+    });
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.48, 16), postMaterial);
+    post.position.y = 0.24;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.2), doorMaterial);
+    door.position.y = 0.36;
+    const indicator = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.035, 24), indicatorMaterial);
+    indicator.position.y = 0.64;
+    for (const part of [post, door, indicator]) part.renderOrder = 80;
+    root.add(post, door, indicator);
+    root.visible = false;
+    root.userData.entryIndex = index;
+    root.userData.door = door;
+    root.userData.doorMaterial = doorMaterial;
+    root.userData.indicator = indicator;
+    root.userData.indicatorMaterial = indicatorMaterial;
+    this.scene.add(root);
+    return root;
+  }
+
+  buildValveViews() {
+    for (let index = 0; index < LEVEL_1.entryPercents.length; index += 1) {
+      this.valveViews[index] = this.createValveView(index);
+    }
+  }
+
+  updateValves(snapshot) {
+    const valve = snapshot.valve;
+    if (!valve) {
+      for (const view of this.valveViews) {
+        if (view) view.visible = false;
+      }
+      return;
+    }
+
+    for (let index = 0; index < LEVEL_1.entryPercents.length; index += 1) {
+      const view = this.valveViews[index] ?? this.createValveView(index);
+      this.valveViews[index] = view;
+      const entry = valve.entries?.[index];
+      const percent = LEVEL_1.entryPercents[index] ?? 0;
+      const point = this.curve.getPointAt(percent);
+      const tangent = this.curve.getTangentAt(percent).normalize();
+      const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+      const sideOffset = index === 0 ? -0.28 : 0.28;
+      view.visible = Boolean(entry);
+      view.position.copy(point).addScaledVector(normal, sideOffset);
+      view.position.y = SCENE_TUNING.path.groundY + 0.06;
+      view.rotation.y = Math.atan2(tangent.x, tangent.z);
+      view.userData.door.rotation.y = entry?.open ? Math.PI / 2 : 0;
+      view.userData.doorMaterial.color.setHex(entry?.open ? 0x51d98b : 0xff6b4a);
+      const colorIndex = entry?.activeColorIndex ?? entry?.headColorIndex;
+      view.userData.indicatorMaterial.color.setHex(COLORS[colorIndex]?.hex ?? 0xffffff);
+      view.userData.indicator.scale.setScalar(entry?.open ? 1.18 : 0.82);
+    }
   }
 
   updateGarages(snapshot) {
@@ -1972,6 +2047,7 @@ export class SceneView {
     this.loopPlane.material.opacity = conveyor.opacity;
 
     this.buildPathCurves();
+    this.updateValves(this.lastSnapshot ?? {});
     const spots = SCENE_TUNING.parkingSpots;
     for (let i = 0; i < this.spotRoots.length; i += 1) {
       const position = this.spotPositions[i];
@@ -2040,6 +2116,7 @@ export class SceneView {
       board.visible = false;
     }
     this.updateGarages(snapshot);
+    this.updateValves(snapshot);
     for (const vehicle of snapshot.vehicles) {
       const view = this.vehicleViews.get(vehicle.id);
       const layoutStart = mapVehicleAreaPoint(vehicle);

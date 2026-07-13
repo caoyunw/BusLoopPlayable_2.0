@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Validate the newly implemented `garage` mechanic against the active level18 garage-container configuration, then continue to `question-passenger` while preserving the verified star-passenger baseline.
+Continue with the next mechanic priority while preserving the verified star-passenger, garage, and valve baselines.
 
 ## Completed Gates
 
@@ -15,30 +15,30 @@ Validate the newly implemented `garage` mechanic against the active level18 gara
 
 - Mechanic registry and searchable library are present.
 - Desktop three-column and mobile drawer layouts are present.
-- The registry contains 17 mechanism definitions: 3 playable (`base`, `garage`, `star-passenger`) and 14 planned.
+- The registry contains 17 mechanism definitions: 4 playable (`base`, `garage`, `star-passenger`, `valve`) and 13 planned.
 - URL selection, planned-mechanic input freeze, persistent scene editor, safe tuning storage, neutral runtime assets, and advertising cleanup are in place.
 - Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
 - Garage hidden stock, one-at-a-time release, counter timing, Unity model rendering path, and runtime smoke are implemented.
+- Valve side gating is implemented and browser-verified: initial conveyor fill lets both side queues enter normally; after that, the open side feeds only its current queue-head color run into the conveyor, then automatically switches to the other side.
 - The active level has been replaced with level18 data: 47 vehicles, two fixed queues of 115 and 191 groups, 42 blocker entries from the supplied CSV, and two garage containers with 16 stocked garage vehicles.
 - The 2026-07-12 full `pnpm test` and `pnpm run build` baseline passed. Current sandboxed `pnpm test` and `pnpm run build` are blocked by Windows `spawn EPERM`.
 
-The next immediate phase is garage QA on level18. After that, continue to `question-passenger`. The star-passenger design and implementation plans remain completed references.
+The next immediate phase is to choose and advance the next mechanic priority. The star-passenger design and implementation plans remain completed references.
 
 ## Implementation Priority
 
-Advance `question-passenger` through the mechanic workflow:
+Advance the next selected mechanic through the mechanic workflow:
 
-1. Define the hidden-color and reveal rules, player-facing feedback, and acceptance criteria.
-2. Keep the registry entry `planned` while implementing the rule in its own mechanic module.
-3. Add focused model, runtime, registry, and UI tests before changing shared hooks.
-4. Verify desktop, 390x844 mobile, and reduced-motion behavior before marking the mechanic `playable`.
+1. Define the rule and player-facing feedback.
+2. Keep the registry entry `planned` until gameplay, focused tests, and browser QA are complete.
+3. Add focused model, runtime, registry, and UI/render tests before changing shared hooks.
+4. Verify desktop, 390x844 mobile, reset, mechanic switching, planned-mechanic recovery, and console errors before marking it `playable`.
 
 ## Verification Gate
 
-- Focused `question-passenger` tests pass.
-- The full suite preserves the 88/88 baseline or increases it with new passing tests.
-- `pnpm run build` passes outside the current sandbox limitation; current sandboxed runs hit Windows `spawn EPERM`.
-- Browser QA covers desktop, 390x844 mobile, and reduced-motion behavior for `question-passenger`.
+- Focused tests for the next selected mechanic pass.
+- Use narrow focused tests by default. Full `pnpm test` and `pnpm run build` should only run when explicitly requested.
+- Browser QA covers desktop and 390x844 mobile behavior for the next selected mechanic.
 
 ## Context Pointers
 

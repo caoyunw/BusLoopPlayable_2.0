@@ -63,7 +63,7 @@ Verified baseline on 2026-07-12:
 - `pnpm run build`: passing with the existing non-blocking chunk-size warning.
 - The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
-Use the narrowest relevant tests while implementing, then run the full suite and build for cross-module or release-facing changes.
+Use the narrowest relevant tests while implementing. Do not run the full suite or production build unless the user explicitly asks for it, or unless a release-facing verification request makes it necessary and you explain why first.
 
 Browser QA is required for layout or interaction work. Check desktop three-column layout, mobile drawers, nonblank canvas, mechanism selection, search/empty states, frozen planned-mechanic overlay, reset/end states, editor controls, and console errors. Record viewport and remaining gaps.
 

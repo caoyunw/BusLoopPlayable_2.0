@@ -120,6 +120,10 @@ function createCompositeRuntime(runtimes) {
       for (const runtime of runtimes) runtime.onPassengerEnteredBelt?.(context);
     },
 
+    canPassengerEnterBelt(context) {
+      return runtimes.every((runtime) => runtime.canPassengerEnterBelt?.(context) ?? true);
+    },
+
     onPassengerExitPassed(context) {
       let changed = false;
       for (const runtime of runtimes) {

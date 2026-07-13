@@ -448,6 +448,7 @@ export class BusLoopGame {
       if (slot.colorIndex === null) {
         const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
         if (!entry) continue;
+        if (!this.canPassengerEnterBelt(entry)) continue;
         const passenger = this.dequeuePassenger(entry.index, true);
         if (passenger === null) {
           if (this.initialFillActive) {
@@ -668,6 +669,10 @@ export class BusLoopGame {
 
   decorateMechanicSnapshot() {
     return this.mechanicRuntime.decorateSnapshot?.(this) ?? {};
+  }
+
+  canPassengerEnterBelt(entry) {
+    return this.mechanicRuntime.canPassengerEnterBelt?.({ game: this, entry }) ?? true;
   }
 
   updateQueues(delta) {
