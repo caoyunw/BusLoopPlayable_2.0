@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { BusLoopGame } from '../src/game-model.js';
+import { LEVEL_1 } from '../src/level-data.js';
 import {
   classifyTransportTunnelApproach,
+  createTransportTunnelRuntime,
   getTransportTunnelExitPose,
   normalizeTransportTunnelPairs
 } from '../src/mechanics/transport-tunnel/model.js';
@@ -27,6 +30,35 @@ const PAIR = Object.freeze({
     spawnDistance: 0.8
   })
 });
+
+function createTunnelGame({ vehicles, options = {}, pairs = [PAIR], vehicleDepthes = {} } = {}) {
+  const level = {
+    ...LEVEL_1,
+    containers: [],
+    vehicleDepthes,
+    vehicles: vehicles ?? [
+      { id: 1, seats: 4, colorIndex: 0, x: 0, z: 0, yaw: 0 },
+      { id: 2, seats: 4, colorIndex: 1, x: 0.05, z: -0.8, yaw: 0 }
+    ],
+    mechanics: {
+      ...LEVEL_1.mechanics,
+      'transport-tunnel': { pairs }
+    }
+  };
+  const game = new BusLoopGame(level, { random: () => 0 });
+  const runtime = createTransportTunnelRuntime({
+    level,
+    options: {
+      entryDuration: 0.1,
+      hiddenDuration: 0.1,
+      exitDuration: 0.1,
+      ...options
+    }
+  });
+  game.mechanicRuntime = runtime;
+  game.mechanicState = runtime.createState(game);
+  return { game, runtime };
+}
 
 test('tunnel normalization keeps valid degree-based pairs and rejects malformed or duplicate pairs', () => {
   const result = normalizeTransportTunnelPairs({
@@ -83,4 +115,157 @@ test('exit pose follows the authored exit direction in degrees', () => {
     z: 0,
     yaw: 90
   });
+});
+
+test('a valid click reserves its pair and advances through enter hidden exit and parked states', () => {
+  const { game } = createTunnelGame();
+
+  assert.deepEqual(game.clickVehicle(1), { ok: true, pairId: PAIR.id });
+  assert.equal(game.getVehicle(1).state, 'entering-tunnel');
+  assert.equal(game.mechanicState.transportTunnel.pairs[0].busyVehicleId, 1);
+
+  game.update(0.1);
+  assert.equal(game.getVehicle(1).state, 'hidden-in-tunnel');
+  game.update(0.1);
+  assert.equal(game.getVehicle(1).state, 'exiting-tunnel');
+  game.update(0.1);
+
+  assert.equal(game.getVehicle(1).state, 'parked');
+  assert.equal(game.getVehicle(1).x, 5.8);
+  assert.equal(game.getVehicle(1).z, 0);
+  assert.equal(game.getVehicle(1).yaw, 90);
+  assert.equal(game.getVehicle(1).useDynamicBlockers, true);
+  assert.equal(game.mechanicState.transportTunnel.pairs[0].busyVehicleId, null);
+});
+
+test('wall collision busy pair and occupied exit return distinct handled failures', () => {
+  const wallGame = createTunnelGame({
+    vehicles: [{ id: 1, seats: 4, colorIndex: 0, x: 0.34, z: 0, yaw: 0 }]
+  }).game;
+  assert.deepEqual(wallGame.clickVehicle(1), {
+    ok: false,
+    reason: 'tunnel-wall-blocked'
+  });
+
+  const busyGame = createTunnelGame().game;
+  assert.equal(busyGame.clickVehicle(1).ok, true);
+  assert.deepEqual(busyGame.clickVehicle(2), {
+    ok: false,
+    reason: 'tunnel-busy'
+  });
+
+  const occupiedGame = createTunnelGame({
+    vehicles: [
+      { id: 1, seats: 4, colorIndex: 0, x: 0, z: 0, yaw: 0 },
+      { id: 2, seats: 4, colorIndex: 1, x: 5.8, z: 0, yaw: 90 }
+    ]
+  }).game;
+  assert.deepEqual(occupiedGame.clickVehicle(1), {
+    ok: false,
+    reason: 'tunnel-exit-blocked'
+  });
+  assert.equal(
+    occupiedGame.mechanicState.transportTunnel.pairs[0].feedback.reason,
+    'tunnel-exit-blocked'
+  );
+});
+
+test('paths unrelated to a tunnel fall through to an ordinary parking spot', () => {
+  const { game } = createTunnelGame({
+    vehicles: [{ id: 1, seats: 4, colorIndex: 0, x: 2, z: 0, yaw: 0 }]
+  });
+  assert.deepEqual(game.clickVehicle(1), { ok: true, spotIndex: 0 });
+  assert.equal(game.getVehicle(1).state, 'moving-to-spot');
+});
+
+test('ordinary authored vehicle blockers win before tunnel dispatch', () => {
+  const { game } = createTunnelGame({
+    vehicleDepthes: { 1: [2] },
+    vehicles: [
+      { id: 1, seats: 4, colorIndex: 0, x: 0, z: 0, yaw: 0 },
+      { id: 2, seats: 4, colorIndex: 1, x: 0, z: 0.5, yaw: 0 }
+    ]
+  });
+  const result = game.clickVehicle(1);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'blocked');
+  assert.deepEqual(result.blockers, [2]);
+  assert.equal(game.mechanicState.transportTunnel.pairs[0].busyVehicleId, null);
+});
+
+test('independent pairs can transfer different vehicles at the same time', () => {
+  const secondPair = {
+    ...PAIR,
+    id: 'cyan-2',
+    label: '2',
+    color: '#31d6e8',
+    entrance: { ...PAIR.entrance, x: 4 },
+    exit: { ...PAIR.exit, x: -5, yaw: -90 }
+  };
+  const { game } = createTunnelGame({
+    pairs: [PAIR, secondPair],
+    vehicles: [
+      { id: 1, seats: 4, colorIndex: 0, x: 0, z: 0, yaw: 0 },
+      { id: 2, seats: 4, colorIndex: 1, x: 4, z: 0, yaw: 0 }
+    ]
+  });
+
+  assert.deepEqual(game.clickVehicle(1), { ok: true, pairId: 'purple-1' });
+  assert.deepEqual(game.clickVehicle(2), { ok: true, pairId: 'cyan-2' });
+  assert.deepEqual(
+    game.mechanicState.transportTunnel.pairs.map(({ busyVehicleId }) => busyVehicleId),
+    [1, 2]
+  );
+});
+
+test('a transfer is pending and only a currently actionable tunnel counts as an open destination', () => {
+  const { game, runtime } = createTunnelGame();
+  assert.equal(runtime.hasOpenVehicleDestination(game), true);
+  game.clickVehicle(1);
+  assert.equal(runtime.hasPendingVehicles(game), true);
+  assert.equal(runtime.hasOpenVehicleDestination(game), false);
+});
+
+test('an open tunnel and an active transfer both prevent premature parking-capacity loss', () => {
+  const { game } = createTunnelGame();
+  for (const spot of game.spots) spot.vehicleId = 999;
+  game.sourceQueues = [[], []];
+  game.queues = [[], []];
+  for (const slot of game.slots) {
+    slot.colorIndex = 8;
+    slot.passengerId = slot.index + 1;
+  }
+
+  game.checkEndState();
+  assert.equal(game.status, 'playing');
+  assert.equal(game.clickVehicle(1).ok, true);
+  game.checkEndState();
+  assert.equal(game.status, 'playing');
+});
+
+test('the same pair can be reused after the exited vehicle clears its spawn footprint', () => {
+  const { game } = createTunnelGame();
+  game.clickVehicle(1);
+  game.update(0.1);
+  game.update(0.1);
+  game.update(0.1);
+
+  assert.deepEqual(game.clickVehicle(1), { ok: true, spotIndex: 0 });
+  assert.deepEqual(game.clickVehicle(2), { ok: true, pairId: PAIR.id });
+});
+
+test('snapshot decoration clones pair endpoints and feedback state', () => {
+  const { game, runtime } = createTunnelGame({
+    vehicles: [{ id: 1, seats: 4, colorIndex: 0, x: 0.34, z: 0, yaw: 0 }]
+  });
+  game.clickVehicle(1);
+  const snapshot = runtime.decorateSnapshot(game);
+  snapshot.transportTunnel.pairs[0].entrance.x = 999;
+  snapshot.transportTunnel.pairs[0].feedback.reason = 'mutated';
+
+  assert.equal(game.mechanicState.transportTunnel.pairs[0].entrance.x, 0);
+  assert.equal(
+    game.mechanicState.transportTunnel.pairs[0].feedback.reason,
+    'tunnel-wall-blocked'
+  );
 });
