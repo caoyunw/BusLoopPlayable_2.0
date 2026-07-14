@@ -6,10 +6,9 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Mechanic Lab Foundation
 
-- The registry contains 17 mechanism definitions: 8 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`) and 9 planned.
+- The registry contains 18 mechanism definitions: 11 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`, `upgrade-spot`, `double-gate`, `maglev-spot`) and 7 planned.
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
 - The base runtime, active level18 data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
->>>>>>> 8d5b7ba7d29a06ec344a0598eac672f277919c25
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
 
 ### Star-Passenger Feedback
@@ -37,6 +36,12 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 - `count-garage` is a dispatch-count-gated garage variant that unlocks per configured thresholds and reuses the garage one-at-a-time flow.
 
+### Capacity And Maglev Mechanics
+
+- `upgrade-spot` and `double-gate` are playable first-parking-spot capacity mechanics. Upgrade spot doubles effective capacity; double gate keeps capacity unchanged but makes each boarded group consume two capacity groups.
+- `maglev-spot` is playable for vehicles `28`, `35`, `33`, `50`, `39`, `58`, `41`, and `52`. Every successful dispatch toggles raised/lowered state; raised maglev vehicles do not block ground vehicles and cannot be dispatched. Vehicles `31` and `48` remain ordinary vehicles.
+- The scene uses compact square maglev spot markers and hides the marker as soon as its vehicle starts moving to a parking spot.
+
 ### Active Level18 Configuration
 
 - The active runtime level is `GameSceneDualQueue2` level18 with 47 vehicles, two fixed queues of 115 and 191 passenger groups, and 306 total passenger groups. The level includes two garage containers and stocked garage vehicles where provided.
@@ -56,8 +61,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Focused verification highlights: question-passenger focused suite and registry gates passed; linked-passenger focused gate passed; focused garage/valve/order/count-garage checks passed in their focused runs. `pnpm run build` has historically passed with a known non-blocking chunk-size warning. Full suite and build should only be run when explicitly requested; focused checks are the default verification path.
->>>>>>> 8d5b7ba7d29a06ec344a0598eac672f277919c25
+- Focused verification highlights: question-passenger focused suite and registry gates passed; linked-passenger focused gate passed; focused garage/valve/order/count-garage/capacity/maglev checks passed in their focused runs. `pnpm run build` has historically passed with a known non-blocking chunk-size warning. Full suite and build should only be run when explicitly requested; focused checks are the default verification path.
 
 ## Historical Playable/Advertising Log
 

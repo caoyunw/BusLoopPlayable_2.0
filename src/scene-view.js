@@ -674,6 +674,45 @@ function drawStarBadgeDecrement(label) {
   if (label.texture) label.texture.needsUpdate = true;
 }
 
+function makeSpotMarkerLabel(text, {
+  fill = '#ffffff',
+  stroke = '#12344c',
+  width = 160,
+  height = 96,
+  scaleX = 0.46,
+  scaleY = 0.28
+} = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, width, height);
+  context.font = '900 58px Arial, sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.lineJoin = 'round';
+  context.lineWidth = 14;
+  context.strokeStyle = stroke;
+  context.strokeText(text, width / 2, height / 2 + 2);
+  context.fillStyle = fill;
+  context.fillText(text, width / 2, height / 2 + 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(scaleX, scaleY, 1);
+  sprite.renderOrder = 92;
+  return sprite;
+}
+
 function makeStarBadge() {
   const shape = new THREE.Shape();
   const outerRadius = 0.15;
@@ -799,6 +838,7 @@ export class SceneView {
     this.fbxLoader = new FBXLoader(this.loadingManager);
     this.vehicleViews = new Map();
     this.garageViews = new Map();
+    this.maglevSpotViews = new Map();
     this.valveViews = [];
     this.passengerViews = [];
     this.queuePassengerViews = [[], []];
@@ -809,6 +849,7 @@ export class SceneView {
     this.trainLocomotiveView = null;
     this.trainTrackPositions = [];
     this.trainSeatCountBoards = [];
+    this.capacitySpotMarkers = [];
     this.passengerMaterials = [];
     this.passengerColorTextures = [];
     this.vehicleMaterials = [];
@@ -1004,6 +1045,7 @@ export class SceneView {
     for (let i = 0; i < SCENE_TUNING.parkingSpots.count; i += 1) {
       const root = new THREE.Group();
       const board = this.createSeatCountBoard();
+      const marker = this.createCapacitySpotMarker();
       board.visible = false;
       board.renderOrder = 40;
       const fallback = new THREE.Mesh(
@@ -1011,10 +1053,11 @@ export class SceneView {
         new THREE.MeshStandardMaterial({ color: 0xb6a9cb, roughness: 0.76 })
       );
       fallback.position.y = 0.02;
-      root.add(fallback, board);
+      root.add(fallback, board, marker);
       this.spotRoots.push(root);
       this.spotPositions.push(new THREE.Vector3());
       this.seatCountBoards.push(board);
+      this.capacitySpotMarkers.push(marker);
       this.scene.add(root);
     }
   }
@@ -1288,6 +1331,105 @@ export class SceneView {
     this.trainDeparturePulseAt = null;
   }
 
+  createCapacitySpotMarker() {
+    const root = new THREE.Group();
+    root.visible = false;
+
+    const upgrade = new THREE.Group();
+    const upgradeRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.62, 0.04, 8, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0x24d7ff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    upgradeRing.rotation.x = Math.PI / 2;
+    upgradeRing.position.y = 0.07;
+    upgradeRing.renderOrder = 86;
+    const upgradeArrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.36, 4),
+      new THREE.MeshBasicMaterial({
+        color: 0x7cff9e,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    upgradeArrow.position.set(0, 0.52, -0.44);
+    upgradeArrow.rotation.y = Math.PI / 4;
+    upgradeArrow.renderOrder = 88;
+    const upgradeStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 0.36, 12),
+      new THREE.MeshBasicMaterial({
+        color: 0x7cff9e,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    upgradeStem.position.set(0, 0.3, -0.44);
+    upgradeStem.renderOrder = 87;
+    const upgradeLabel = makeSpotMarkerLabel('UP', {
+      fill: '#d7fff2',
+      stroke: '#006680',
+      scaleX: 0.66,
+      scaleY: 0.39
+    });
+    upgradeLabel.position.set(0, 0.82, -0.44);
+    upgrade.add(upgradeRing, upgradeStem, upgradeArrow, upgradeLabel);
+
+    const doubleGate = new THREE.Group();
+    const postMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff7a2f,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const doorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff3b30,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const beamMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      depthWrite: false,
+      toneMapped: false
+    });
+    for (const x of [-0.46, 0.46]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.78, 14), postMaterial);
+      post.position.set(x, 0.42, -0.5);
+      post.renderOrder = 88;
+      doubleGate.add(post);
+    }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.1, 0.12), beamMaterial);
+    beam.position.set(0, 0.8, -0.5);
+    beam.renderOrder = 89;
+    const leftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.46, 0.065), doorMaterial);
+    leftDoor.position.set(-0.23, 0.5, -0.5);
+    leftDoor.rotation.y = -0.36;
+    leftDoor.renderOrder = 90;
+    const rightDoor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.46, 0.065), doorMaterial);
+    rightDoor.position.set(0.23, 0.5, -0.5);
+    rightDoor.rotation.y = 0.36;
+    rightDoor.renderOrder = 90;
+    const doubleLabel = makeSpotMarkerLabel('x2', {
+      fill: '#fff1cc',
+      stroke: '#8f1f14',
+      scaleX: 0.78,
+      scaleY: 0.46
+    });
+    doubleLabel.position.set(0, 1.04, -0.5);
+    doubleGate.add(beam, leftDoor, rightDoor, doubleLabel);
+
+    upgrade.visible = false;
+    doubleGate.visible = false;
+    root.add(upgrade, doubleGate);
+    root.userData.upgradeSpotMarker = upgrade;
+    root.userData.doubleGateMarker = doubleGate;
+    return root;
+  }
 
   clearVehiclePathLines() {
     for (const line of [...this.vehiclePathLines, ...this.vehicleDeparturePathLines]) {
@@ -1332,6 +1474,7 @@ export class SceneView {
         });
         for (const vehicle of snapshot.vehicles) {
           if (vehicle.state !== 'parked') continue;
+          if (!game.canVehicleDispatch(vehicle)) continue;
           const blockers = game.getBlockers(vehicle.id);
           if (blockers.length && !tuning.showBlocked) continue;
           const points = buildToStationPoints(vehicle, target, tuning);
@@ -1551,6 +1694,56 @@ export class SceneView {
     return root;
   }
 
+  createMaglevSpotView() {
+    const root = new THREE.Group();
+    const platformMaterial = new THREE.MeshBasicMaterial({
+      color: 0x33485f,
+      transparent: true,
+      opacity: 0.64,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const rimMaterial = new THREE.MeshBasicMaterial({
+      color: 0x5de1ff,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const indicatorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.045, 0.76), platformMaterial);
+    platform.position.y = 0.022;
+    platform.renderOrder = 72;
+    const rim = new THREE.Group();
+    const horizontal = new THREE.BoxGeometry(0.82, 0.028, 0.035);
+    const vertical = new THREE.BoxGeometry(0.035, 0.028, 0.82);
+    for (const [x, z, geometry] of [
+      [0, -0.41, horizontal],
+      [0, 0.41, horizontal],
+      [-0.41, 0, vertical],
+      [0.41, 0, vertical]
+    ]) {
+      const edge = new THREE.Mesh(geometry, rimMaterial);
+      edge.position.set(x, 0.055, z);
+      edge.renderOrder = 73;
+      rim.add(edge);
+    }
+    const indicator = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.68, 12), indicatorMaterial);
+    indicator.position.set(0.34, 0.34, -0.34);
+    indicator.renderOrder = 74;
+    root.add(platform, rim, indicator);
+    root.userData.platformMaterial = platformMaterial;
+    root.userData.rimMaterial = rimMaterial;
+    root.userData.indicator = indicator;
+    root.userData.indicatorMaterial = indicatorMaterial;
+    this.scene.add(root);
+    return root;
+  }
+
   buildValveViews() {
     for (let index = 0; index < LEVEL_1.entryPercents.length; index += 1) {
       this.valveViews[index] = this.createValveView(index);
@@ -1609,6 +1802,51 @@ export class SceneView {
       if (activeIds.has(id)) continue;
       this.scene.remove(view);
       this.garageViews.delete(id);
+    }
+  }
+
+  updateMaglevSpots(snapshot) {
+    const maglevSpot = snapshot.maglevSpot;
+    if (!maglevSpot) {
+      for (const view of this.maglevSpotViews.values()) view.visible = false;
+      return;
+    }
+
+    const activeIds = new Set(maglevSpot.vehicleIds ?? []);
+    const elevatedIds = new Set(maglevSpot.elevatedVehicleIds ?? []);
+    for (const vehicleId of activeIds) {
+      const vehicle = snapshot.vehicles.find((candidate) => candidate.id === vehicleId);
+      if (!vehicle) continue;
+      let view = this.maglevSpotViews.get(vehicleId);
+      if (!view) {
+        view = this.createMaglevSpotView();
+        this.maglevSpotViews.set(vehicleId, view);
+      }
+      const mapped = mapVehicleAreaPoint(vehicle);
+      const isElevated = elevatedIds.has(vehicleId);
+      view.position.set(mapped.x, SCENE_TUNING.vehicleArea.y - 0.035, mapped.y);
+      view.rotation.y = mapVehicleAreaYaw(vehicle.yaw);
+      view.visible = ['parked', 'colliding'].includes(vehicle.state);
+      view.userData.rimMaterial.color.setHex(isElevated ? 0x65f0ff : 0xffd166);
+      view.userData.indicatorMaterial.color.setHex(isElevated ? 0x65f0ff : 0xffd166);
+      view.userData.indicator.scale.y = isElevated ? 1.28 : 0.42;
+      view.userData.indicator.position.y = isElevated ? 0.46 : 0.18;
+    }
+    for (const [vehicleId, view] of this.maglevSpotViews) {
+      if (activeIds.has(vehicleId)) continue;
+      view.visible = false;
+    }
+  }
+
+  updateCapacitySpotMarkers(snapshot) {
+    for (let index = 0; index < this.capacitySpotMarkers.length; index += 1) {
+      const marker = this.capacitySpotMarkers[index];
+      if (!marker) continue;
+      const isUpgradeSpot = snapshot.upgradeSpot?.spotIndex === index;
+      const isDoubleGate = snapshot.doubleGate?.spotIndex === index;
+      marker.visible = Boolean(isUpgradeSpot || isDoubleGate);
+      marker.userData.upgradeSpotMarker.visible = Boolean(isUpgradeSpot);
+      marker.userData.doubleGateMarker.visible = Boolean(isDoubleGate);
     }
   }
 
@@ -2114,8 +2352,9 @@ export class SceneView {
     for (let index = 0; index < this.spotRoots.length; index += 1) {
       const root = this.spotRoots[index];
       const board = this.seatCountBoards[index];
+      const marker = this.capacitySpotMarkers[index];
       root.clear();
-      root.add(this.parkingTemplate.clone(true), board);
+      root.add(this.parkingTemplate.clone(true), board, marker);
       board.userData.boardMesh.material.map = this.seatCountBoardTexture;
       board.userData.boardMesh.material.needsUpdate = true;
     }
@@ -2123,11 +2362,14 @@ export class SceneView {
 
 
   updateSeatCountBoard(board, vehicle, time = 0) {
-    const baseRemaining = Math.max(0, vehicle.seats - vehicle.boardedGroups) * LEVEL_1.groupSize;
+    const seatCapacity = vehicle.seatCapacity ?? vehicle.seats;
+    const baseRemaining = Math.max(0, seatCapacity - vehicle.boardedGroups) * LEVEL_1.groupSize;
     let boardingRemaining = 0;
     for (const entry of this.boardingViews) {
       if (entry.vehicleId !== vehicle.id) continue;
-      if (time < entry.startedAt + entry.delay + entry.duration) boardingRemaining += 1;
+      if (time < entry.startedAt + entry.delay + entry.duration) {
+        boardingRemaining += entry.seatCountContribution ?? 1;
+      }
     }
     const remaining = Math.max(0, baseRemaining + boardingRemaining);
     const visible = (
@@ -2484,9 +2726,11 @@ export class SceneView {
       board.visible = false;
     }
     this.updateGarages(snapshot);
+    this.updateMaglevSpots(snapshot);
     this.updateValves(snapshot);
     this.processTrainEvents(snapshot);
     this.updateTrainViews(snapshot);
+    this.updateCapacitySpotMarkers(snapshot);
     for (const vehicle of snapshot.vehicles) {
       const view = this.vehicleViews.get(vehicle.id);
       const layoutStart = mapVehicleAreaPoint(vehicle);
@@ -2589,10 +2833,15 @@ export class SceneView {
           view.rotation.y = mapMotionTangentYaw(sample.tangent);
         }
       }
+      if (snapshot.maglevSpot?.elevatedVehicleIds?.includes(vehicle.id)) {
+        view.position.y += snapshot.maglevSpot.elevation ?? 0.62;
+      }
       const boardingPulseScale = this.getVehicleBoardingPulseScale(vehicle.id, snapshot.time);
       view.scale.setScalar(vehicleScale * SCENE_TUNING.vehicleArea.modelScale * boardingPulseScale);
       this.applyVehicleHit(view, vehicle, snapshot.time);
-      const isMovable = vehicle.state === 'parked' && game.getBlockers(vehicle.id).length === 0;
+      const isMovable = vehicle.state === 'parked'
+        && game.canVehicleDispatch(vehicle)
+        && game.getBlockers(vehicle.id).length === 0;
       for (const mesh of view.userData.bodyMeshes ?? []) {
         if (!mesh.material.emissive) continue;
         mesh.material.emissive.setHex(isMovable ? 0x123a20 : 0x000000);
@@ -3159,6 +3408,7 @@ export class SceneView {
         root: visual,
         material: visual.userData.vatMaterial,
         vehicleId: event.vehicleId,
+        seatCountContribution: Math.max(1, event.boardingCost ?? 1),
         start,
         target: target.clone(),
         startedAt: event.startedAt,
