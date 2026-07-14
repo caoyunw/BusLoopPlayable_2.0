@@ -422,6 +422,19 @@ test('scene owns procedural train track carriage locomotive and capacity-board b
   assert.match(source, /userData\.vehicleId\s*=\s*vehicle\.id/);
 });
 
+test('train remaining-position boards anchor above the carriage roof', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+
+  assert.equal(typeof SceneView.prototype.getTrainSeatCountBoardPosition, 'function');
+  const position = SceneView.prototype.getTrainSeatCountBoardPosition(0);
+  const trackPosition = SceneView.prototype.getTrainTrackPosition(0);
+
+  assert.equal(position.x, trackPosition.x);
+  assert.equal(position.z, trackPosition.z);
+  assert.ok(position.y > SCENE_TUNING.train.trackY + 0.7);
+  assert.match(source, /board\.position\.copy\(this\.getTrainSeatCountBoardPosition\(index\)\)/);
+});
+
 test('train boarding events resolve to the rail position instead of a normal spot', () => {
   const view = Object.create(SceneView.prototype);
   view.spotPositions = [new THREE.Vector3(1, 0, 1)];

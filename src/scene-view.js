@@ -1028,6 +1028,13 @@ export class SceneView {
     );
   }
 
+  getTrainSeatCountBoardPosition(slotIndex) {
+    const position = this.getTrainTrackPosition(slotIndex);
+    const carriageRoofHeight = 0.82 * SCENE_TUNING.train.carriageScale;
+    position.y += carriageRoofHeight + 0.05;
+    return position;
+  }
+
   createTrainTrackView() {
     const train = SCENE_TUNING.train;
     const root = new THREE.Group();
@@ -1200,8 +1207,7 @@ export class SceneView {
       const board = this.createSeatCountBoard();
       board.visible = false;
       board.renderOrder = 45;
-      board.position.copy(this.trainTrackPositions[index]);
-      board.position.y = SCENE_TUNING.train.trackY + 0.03;
+      board.position.copy(this.getTrainSeatCountBoardPosition(index));
       this.trainSeatCountBoards.push(board);
       this.trainRoot.add(board);
     }
