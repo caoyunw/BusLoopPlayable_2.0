@@ -316,3 +316,13 @@ test('scene owns tunnel lifecycle geometry paired labels and feedback rendering'
   assert.match(source, /tunnel-exit-blocked/);
   assert.match(source, /reducedMotionQuery/);
 });
+
+test('scene maps tunnel transfer states and hides only the underground phase', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+  assert.match(source, /vehicle\.state === ['"]entering-tunnel['"]/);
+  assert.match(source, /vehicle\.state === ['"]exiting-tunnel['"]/);
+  assert.match(source, /hidden-in-tunnel/);
+  assert.match(source, /data\?\.from/);
+  assert.match(source, /data\?\.to/);
+  assert.match(source, /mapVehicleAreaYaw/);
+});

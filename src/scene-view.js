@@ -3013,7 +3013,7 @@ export class SceneView {
       view.userData.hitMeshes = useTrainCarriage
         ? [trainCarriageRoot].filter(Boolean)
         : (view.userData.normalHitMeshes ?? []);
-      view.visible = !['done', 'in-garage'].includes(vehicle.state);
+      view.visible = !['done', 'in-garage', 'hidden-in-tunnel'].includes(vehicle.state);
       let vehicleScale = vehicle.state === 'parked' || vehicle.state === 'colliding'
         ? 1 : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
       if (vehicle.state === 'parked') {
@@ -3049,6 +3049,22 @@ export class SceneView {
         };
         view.position.copy(mapMotionPoint(position));
         view.rotation.y = mapVehicleAreaYaw(THREE.MathUtils.lerp(from.yaw, to.yaw, t)) + vehicleYawOffset;
+      } else if (
+        vehicle.state === 'entering-tunnel'
+        || vehicle.state === 'exiting-tunnel'
+      ) {
+        const data = vehicle.motionData;
+        const from = data?.from ?? vehicle;
+        const to = data?.to ?? vehicle;
+        const t = THREE.MathUtils.smoothstep(vehicle.motion, 0, 1);
+        const position = {
+          x: THREE.MathUtils.lerp(from.x, to.x, t),
+          z: THREE.MathUtils.lerp(from.z, to.z, t)
+        };
+        view.position.copy(mapMotionPoint(position));
+        view.rotation.y = mapVehicleAreaYaw(
+          THREE.MathUtils.lerp(from.yaw, to.yaw, t)
+        ) + vehicleYawOffset;
       } else if (vehicle.state === 'moving-to-track') {
         const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
         if (trackPosition) {
