@@ -31,6 +31,14 @@ const GUIDE_HAND_TEXTURE_URL = '/assets/runtime/main-guide-hand_q80.webp';
 const QUESTION_PASSENGER_REVEAL_DURATION = 0.25;
 const LINKED_CONNECTOR_Y_OFFSET = 0.58;
 const LINKED_BADGE_Y_OFFSET = 0.88;
+const TRANSPORT_TUNNEL_VISUAL = Object.freeze({
+  wallThickness: 0.18,
+  depth: 0.36,
+  height: 0.76,
+  topThickness: 0.16,
+  borderThickness: 0.045,
+  feedbackDuration: 0.38
+});
 const linkedPassengerBadgeTextures = new Map();
 const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
   { baseColor: 0xffffff, emissionColor: 0x36a6ff },
@@ -130,6 +138,12 @@ function mapVehicleAreaPoint(vehicle) {
     unityX * area.unityToWorldScale + area.offsetX,
     unityZ * area.unityToWorldScale * (area.mirrorZ ? -1 : 1) + area.offsetZ
   );
+}
+
+function mapVehicleAreaDistance(distance) {
+  const origin = mapVehicleAreaPoint({ x: 0, z: 0 });
+  const endpoint = mapVehicleAreaPoint({ x: distance, z: 0 });
+  return origin.distanceTo(endpoint);
 }
 
 function mapMotionPoint(value, y = SCENE_TUNING.vehicleArea.y) {
@@ -838,6 +852,7 @@ export class SceneView {
     this.fbxLoader = new FBXLoader(this.loadingManager);
     this.vehicleViews = new Map();
     this.garageViews = new Map();
+    this.transportTunnelViews = new Map();
     this.maglevSpotViews = new Map();
     this.valveViews = [];
     this.passengerViews = [];
@@ -891,6 +906,7 @@ export class SceneView {
     this.destroyed = true;
     this.clearBoardingViews();
     this.disposeTrainViews();
+    this.disposeTransportTunnelViews();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     globalThis.window?.removeEventListener('resize', this.handleResize);
@@ -1549,6 +1565,251 @@ export class SceneView {
     group.userData.textCanvas = canvas;
     group.userData.textTexture = texture;
     return group;
+  }
+
+  createTransportTunnelBadge(pair, kind) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#182335';
+    context.strokeStyle = pair.color;
+    context.lineWidth = 10;
+    context.beginPath();
+    if (typeof context.roundRect === 'function') {
+      context.roundRect(8, 8, 240, 112, 24);
+    } else {
+      context.rect(8, 8, 240, 112);
+    }
+    context.fill();
+    context.stroke();
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#ffffff';
+    context.font = '900 50px Arial, sans-serif';
+    const marker = kind === 'entrance' ? '↓ 进' : '出 ↑';
+    context.fillText(`${marker} ${pair.label}`, 128, 64);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false
+    }));
+    badge.scale.set(0.92, 0.46, 1);
+    badge.position.set(0, TRANSPORT_TUNNEL_VISUAL.height + 0.3, 0);
+    badge.renderOrder = 70;
+    badge.userData.baseScale = badge.scale.clone();
+    return badge;
+  }
+
+  createTransportTunnelEndpointView(pair, kind) {
+    const endpoint = pair[kind];
+    const root = new THREE.Group();
+    root.name = `Transport Tunnel ${pair.id} ${kind}`;
+    const visual = TRANSPORT_TUNNEL_VISUAL;
+    const apertureWidth = mapVehicleAreaDistance(endpoint.width);
+    const wallThickness = mapVehicleAreaDistance(visual.wallThickness);
+    const depth = mapVehicleAreaDistance(visual.depth);
+    const bodyColor = 0x303a4d;
+    const leftMaterial = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.58 });
+    const rightMaterial = leftMaterial.clone();
+    const topMaterial = leftMaterial.clone();
+    const borderMaterials = [];
+    const makeBorderMaterial = () => {
+      const material = new THREE.MeshStandardMaterial({
+        color: pair.color,
+        emissive: pair.color,
+        emissiveIntensity: 0.72,
+        roughness: 0.3
+      });
+      borderMaterials.push(material);
+      return material;
+    };
+    const sideOffset = apertureWidth / 2 + wallThickness / 2;
+    const leftWall = new THREE.Mesh(
+      new THREE.BoxGeometry(wallThickness, visual.height, depth),
+      leftMaterial
+    );
+    leftWall.position.set(-sideOffset, visual.height / 2, 0);
+    const rightWall = new THREE.Mesh(
+      new THREE.BoxGeometry(wallThickness, visual.height, depth),
+      rightMaterial
+    );
+    rightWall.position.set(sideOffset, visual.height / 2, 0);
+    const top = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        apertureWidth + wallThickness * 2,
+        visual.topThickness,
+        depth
+      ),
+      topMaterial
+    );
+    top.position.set(0, visual.height - visual.topThickness / 2, 0);
+
+    const leftBorder = new THREE.Mesh(
+      new THREE.BoxGeometry(visual.borderThickness, visual.height, depth + 0.025),
+      makeBorderMaterial()
+    );
+    leftBorder.position.set(-apertureWidth / 2, visual.height / 2, 0);
+    const rightBorder = new THREE.Mesh(
+      new THREE.BoxGeometry(visual.borderThickness, visual.height, depth + 0.025),
+      makeBorderMaterial()
+    );
+    rightBorder.position.set(apertureWidth / 2, visual.height / 2, 0);
+    const topBorder = new THREE.Mesh(
+      new THREE.BoxGeometry(apertureWidth, visual.borderThickness, depth + 0.025),
+      makeBorderMaterial()
+    );
+    topBorder.position.set(0, visual.height - visual.topThickness, 0);
+
+    const arrowMaterial = new THREE.MeshBasicMaterial({
+      color: pair.color,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const arrow = new THREE.Group();
+    const arrowShaft = new THREE.Mesh(
+      new THREE.BoxGeometry(0.11, 0.035, 0.34),
+      arrowMaterial
+    );
+    const arrowHead = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.28, 3),
+      arrowMaterial
+    );
+    arrowHead.rotation.x = Math.PI / 2;
+    arrowHead.position.z = 0.28;
+    arrow.position.set(
+      0,
+      0.035,
+      kind === 'entrance' ? -depth / 2 - 0.3 : depth / 2 + 0.3
+    );
+    arrow.renderOrder = 69;
+    arrow.add(arrowShaft, arrowHead);
+
+    const badge = this.createTransportTunnelBadge(pair, kind);
+    root.add(leftWall, rightWall, top, leftBorder, rightBorder, topBorder, arrow, badge);
+    root.userData.leftWallMaterial = leftMaterial;
+    root.userData.rightWallMaterial = rightMaterial;
+    root.userData.topMaterial = topMaterial;
+    root.userData.borderMaterials = borderMaterials;
+    root.userData.badge = badge;
+    root.userData.baseBorderColor = new THREE.Color(pair.color);
+    root.userData.bodyColor = new THREE.Color(bodyColor);
+    return root;
+  }
+
+  createTransportTunnelPairView(pair) {
+    const root = new THREE.Group();
+    const entrance = this.createTransportTunnelEndpointView(pair, 'entrance');
+    const exit = this.createTransportTunnelEndpointView(pair, 'exit');
+    root.add(entrance, exit);
+    root.userData.entrance = entrance;
+    root.userData.exit = exit;
+    this.scene.add(root);
+    return root;
+  }
+
+  applyTransportTunnelFeedback(endpointView, {
+    pulse = 0,
+    redBorder = false,
+    wallSide = null,
+    reducedMotion = false
+  } = {}) {
+    const data = endpointView.userData;
+    data.leftWallMaterial.color.copy(data.bodyColor);
+    data.rightWallMaterial.color.copy(data.bodyColor);
+    data.topMaterial.color.copy(data.bodyColor);
+    for (const material of data.borderMaterials) {
+      if (redBorder) {
+        material.color.setHex(0xff4d55);
+        material.emissive.setHex(0xff222d);
+      } else {
+        material.color.copy(data.baseBorderColor);
+        material.emissive.copy(data.baseBorderColor);
+      }
+      material.emissiveIntensity = 0.72 + pulse * 1.1;
+    }
+    if (wallSide === 'left') data.leftWallMaterial.color.setHex(0xff4d55);
+    if (wallSide === 'right') data.rightWallMaterial.color.setHex(0xff4d55);
+    data.badge.scale.copy(data.badge.userData.baseScale);
+    if (!reducedMotion && pulse > 0) {
+      data.badge.scale.multiplyScalar(1 + pulse * 0.12);
+    }
+  }
+
+  updateTransportTunnelViews(snapshot) {
+    this.transportTunnelViews ??= new Map();
+    const activeIds = new Set();
+    const pairs = snapshot.transportTunnel?.pairs ?? [];
+    const reducedMotion = Boolean(this.reducedMotionQuery?.matches);
+    for (const pair of pairs) {
+      activeIds.add(pair.id);
+      let view = this.transportTunnelViews.get(pair.id);
+      if (!view) {
+        view = this.createTransportTunnelPairView(pair);
+        this.transportTunnelViews.set(pair.id, view);
+      }
+      for (const kind of ['entrance', 'exit']) {
+        const endpoint = pair[kind];
+        const endpointView = view.userData[kind];
+        const mapped = mapVehicleAreaPoint(endpoint);
+        endpointView.position.set(mapped.x, SCENE_TUNING.vehicleArea.y, mapped.y);
+        endpointView.rotation.y = mapVehicleAreaYaw(endpoint.yaw);
+      }
+
+      const feedback = pair.feedback;
+      const elapsed = feedback ? snapshot.time - feedback.startedAt : Infinity;
+      const active = elapsed >= 0 && elapsed < TRANSPORT_TUNNEL_VISUAL.feedbackDuration;
+      const wave = active
+        ? 0.5 + 0.5 * Math.sin(
+            elapsed / TRANSPORT_TUNNEL_VISUAL.feedbackDuration * Math.PI * 4
+          )
+        : 0;
+      const reason = active ? feedback.reason : null;
+      this.applyTransportTunnelFeedback(view.userData.entrance, {
+        pulse: reason === 'tunnel-busy' ? wave : 0,
+        redBorder: reason === 'tunnel-exit-blocked',
+        wallSide: reason === 'tunnel-wall-blocked' ? feedback.wallSide : null,
+        reducedMotion
+      });
+      this.applyTransportTunnelFeedback(view.userData.exit, {
+        redBorder: reason === 'tunnel-exit-blocked',
+        reducedMotion
+      });
+    }
+
+    for (const [id, view] of this.transportTunnelViews) {
+      if (activeIds.has(id)) continue;
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material?.map?.dispose?.();
+          material?.dispose?.();
+        }
+      });
+      this.scene.remove(view);
+      this.transportTunnelViews.delete(id);
+    }
+  }
+
+  disposeTransportTunnelViews() {
+    for (const view of this.transportTunnelViews?.values?.() ?? []) {
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material?.map?.dispose?.();
+          material?.dispose?.();
+        }
+      });
+      this.scene?.remove?.(view);
+    }
+    this.transportTunnelViews?.clear?.();
   }
 
   createGarageCountLabel() {
@@ -2726,6 +2987,7 @@ export class SceneView {
       board.visible = false;
     }
     this.updateGarages(snapshot);
+    this.updateTransportTunnelViews(snapshot);
     this.updateMaglevSpots(snapshot);
     this.updateValves(snapshot);
     this.processTrainEvents(snapshot);

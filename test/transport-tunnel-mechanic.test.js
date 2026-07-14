@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
+import { SceneView } from '../src/scene-view.js';
 import {
   classifyTransportTunnelApproach,
   createTransportTunnelRuntime,
@@ -293,4 +295,24 @@ test('selected transport tunnel runtime composes with automatic level garages', 
   assert.equal(game.getMechanicId(), 'transport-tunnel');
   assert.equal(snapshot.transportTunnel.pairs.length, 2);
   assert.ok(snapshot.garages.length > 0);
+});
+
+test('scene owns tunnel lifecycle geometry paired labels and feedback rendering', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+  for (const method of [
+    'createTransportTunnelEndpointView',
+    'createTransportTunnelPairView',
+    'updateTransportTunnelViews',
+    'disposeTransportTunnelViews'
+  ]) {
+    assert.equal(typeof SceneView.prototype[method], 'function', `${method} must exist`);
+  }
+  assert.match(source, /transportTunnelViews/);
+  assert.match(source, /pair\.label/);
+  assert.match(source, /pair\.color/);
+  assert.match(source, /new THREE\.ConeGeometry/);
+  assert.match(source, /tunnel-wall-blocked/);
+  assert.match(source, /tunnel-busy/);
+  assert.match(source, /tunnel-exit-blocked/);
+  assert.match(source, /reducedMotionQuery/);
 });
