@@ -1035,6 +1035,12 @@ export class SceneView {
     return position;
   }
 
+  configureTrainSeatCountBoard(board) {
+    const tuning = SCENE_TUNING.train.seatCountBoard;
+    board.userData.boardMesh.scale.set(tuning.width, tuning.depth, 1);
+    board.userData.textSprite.scale.set(0.42 * tuning.textScale, 0.26 * tuning.textScale, 1);
+  }
+
   createTrainTrackView() {
     const train = SCENE_TUNING.train;
     const root = new THREE.Group();
@@ -1205,6 +1211,7 @@ export class SceneView {
     this.trainRoot.add(this.trainLocomotiveView);
     for (let index = 0; index < SCENE_TUNING.train.slotCount; index += 1) {
       const board = this.createSeatCountBoard();
+      this.configureTrainSeatCountBoard(board);
       board.visible = false;
       board.renderOrder = 45;
       board.position.copy(this.getTrainSeatCountBoardPosition(index));

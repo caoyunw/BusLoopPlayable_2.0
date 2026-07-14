@@ -118,6 +118,11 @@ export const SCENE_TUNING = {
     "slotSpacing": 1.25,
     "slotCount": 4,
     "carriageScale": 0.82,
+    "seatCountBoard": {
+      "width": 0.46,
+      "depth": 0.34,
+      "textScale": 0.76
+    },
     "dispatchDuration": 0.9,
     "departureDuration": 1.4,
     "locomotiveEntryDuration": 1.2,

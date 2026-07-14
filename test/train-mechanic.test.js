@@ -435,6 +435,26 @@ test('train remaining-position boards anchor above the carriage roof', () => {
   assert.match(source, /board\.position\.copy\(this\.getTrainSeatCountBoardPosition\(index\)\)/);
 });
 
+test('train remaining-position boards stay compact enough to expose the carriage roof', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+  const board = new THREE.Group();
+  board.userData.boardMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1));
+  board.userData.textSprite = new THREE.Sprite();
+
+  assert.equal(typeof SceneView.prototype.configureTrainSeatCountBoard, 'function');
+  SceneView.prototype.configureTrainSeatCountBoard(board);
+
+  assert.deepEqual(SCENE_TUNING.train.seatCountBoard, {
+    width: 0.46,
+    depth: 0.34,
+    textScale: 0.76
+  });
+  assert.deepEqual(board.userData.boardMesh.scale.toArray(), [0.46, 0.34, 1]);
+  assert.deepEqual(board.userData.textSprite.scale.toArray(), [0.42 * 0.76, 0.26 * 0.76, 1]);
+  assert.ok(board.userData.boardMesh.scale.x < 0.72 * SCENE_TUNING.train.carriageScale);
+  assert.match(source, /this\.configureTrainSeatCountBoard\(board\)/);
+});
+
 test('train boarding events resolve to the rail position instead of a normal spot', () => {
   const view = Object.create(SceneView.prototype);
   view.spotPositions = [new THREE.Vector3(1, 0, 1)];
