@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "level.rotary.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "documentId",
+    "target",
+    "coordinates",
+    "vehicles",
+    "rotaryLanes",
+    "context"
+  ],
+  "properties": {
+    "format": { "const": "level.rotary.v1" },
+    "documentId": { "type": "string", "minLength": 1 },
+    "target": { "$ref": "#/$defs/target" },
+    "coordinates": { "$ref": "#/$defs/coordinates" },
+    "vehicles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/vehicle" }
+    },
+    "rotaryLanes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/lane" }
+    },
+    "context": { "$ref": "#/$defs/context" }
+  },
+  "$defs": {
+    "pose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "z", "yaw"],
+      "properties": {
+        "x": { "type": "number" },
+        "z": { "type": "number" },
+        "yaw": { "type": "number" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["levelId", "adapter", "contextFingerprint"],
+      "properties": {
+        "levelId": { "type": "string", "minLength": 1 },
+        "adapter": { "const": "busloop-level-data.v1" },
+        "contextFingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "coordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plane", "unit", "yaw", "geometryProfile"],
+      "properties": {
+        "plane": { "const": "xz" },
+        "unit": { "const": "level-unit" },
+        "yaw": { "const": "degrees" },
+        "geometryProfile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "placement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "x", "z", "yaw"],
+          "properties": {
+            "kind": { "const": "field" },
+            "x": { "type": "number" },
+            "z": { "type": "number" },
+            "yaw": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "laneId", "slotId"],
+          "properties": {
+            "kind": { "const": "rotary-slot" },
+            "laneId": { "type": "string", "minLength": 1 },
+            "slotId": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "garageId", "stockOrder", "storedPose"],
+          "properties": {
+            "kind": { "const": "garage" },
+            "garageId": { "type": "number" },
+            "stockOrder": { "type": "integer", "minimum": 0 },
+            "storedPose": { "$ref": "#/$defs/pose" }
+          }
+        }
+      ]
+    },
+    "vehicle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "colorIndex", "seats", "placement"],
+      "properties": {
+        "id": { "type": "number" },
+        "colorIndex": { "type": "integer", "minimum": 0 },
+        "seats": { "enum": [4, 6, 10] },
+        "placement": { "$ref": "#/$defs/placement" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "x", "z", "yaw"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "z": { "type": "number" },
+        "yaw": { "type": "number" }
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "slots"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "slots": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "$ref": "#/$defs/slot" }
+        }
+      }
+    },
+    "footprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "length"],
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "length": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "garageContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "x", "z", "yaw", "width", "length"],
+      "properties": {
+        "id": { "type": "number" },
+        "x": { "type": "number" },
+        "z": { "type": "number" },
+        "yaw": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "length": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "contextObb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "x",
+        "z",
+        "yaw",
+        "width",
+        "length",
+        "protected"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "z": { "type": "number" },
+        "yaw": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "length": { "type": "number", "exclusiveMinimum": 0 },
+        "protected": { "type": "boolean" }
+      }
+    },
+    "readOnlySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "count"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "garages",
+        "parkingSpots",
+        "conveyors",
+        "passengerQueues",
+        "protectedGeometry",
+        "vehicleFootprints",
+        "rotaryRoadWidth",
+        "allowedColorIndexes"
+      ],
+      "properties": {
+        "garages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/garageContext" }
+        },
+        "parkingSpots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextObb" }
+        },
+        "conveyors": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/contextObb" },
+              { "$ref": "#/$defs/readOnlySummary" }
+            ]
+          }
+        },
+        "passengerQueues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/readOnlySummary" }
+        },
+        "protectedGeometry": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextObb" }
+        },
+        "vehicleFootprints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["4", "6", "10"],
+          "properties": {
+            "4": { "$ref": "#/$defs/footprint" },
+            "6": { "$ref": "#/$defs/footprint" },
+            "10": { "$ref": "#/$defs/footprint" }
+          }
+        },
+        "rotaryRoadWidth": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "allowedColorIndexes": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
