@@ -207,6 +207,48 @@ export const LEVEL_1 = Object.freeze({
         Object.freeze([32, 42, 43, 45]),
         Object.freeze([33, 47, 48, 55])
       ])
+    }),
+    'transport-tunnel': Object.freeze({
+      pairs: Object.freeze([
+        Object.freeze({
+          id: 'purple-1',
+          label: '1',
+          color: '#9a67ff',
+          entrance: Object.freeze({
+            x: 1.62,
+            z: 1.09,
+            yaw: 90,
+            width: 0.5,
+            approachDistance: 3
+          }),
+          exit: Object.freeze({
+            x: -1.62,
+            z: -0.82,
+            yaw: -90,
+            width: 0.5,
+            spawnDistance: 0.78
+          })
+        }),
+        Object.freeze({
+          id: 'cyan-2',
+          label: '2',
+          color: '#31d6e8',
+          entrance: Object.freeze({
+            x: -1.62,
+            z: -2,
+            yaw: -90,
+            width: 0.5,
+            approachDistance: 3
+          }),
+          exit: Object.freeze({
+            x: 1.62,
+            z: -0.1,
+            yaw: 90,
+            width: 0.5,
+            spawnDistance: 0.78
+          })
+        })
+      ])
     })
   }),
   assets: {

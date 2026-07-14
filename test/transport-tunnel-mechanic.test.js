@@ -269,3 +269,28 @@ test('snapshot decoration clones pair endpoints and feedback state', () => {
     'tunnel-wall-blocked'
   );
 });
+
+test('level18 authors two frozen independent diagonal tunnel pairs', () => {
+  const config = LEVEL_1.mechanics['transport-tunnel'];
+  assert.equal(Object.isFrozen(config), true);
+  assert.equal(Object.isFrozen(config.pairs), true);
+  assert.equal(config.pairs.length, 2);
+  assert.deepEqual(config.pairs.map(({ id, label }) => ({ id, label })), [
+    { id: 'purple-1', label: '1' },
+    { id: 'cyan-2', label: '2' }
+  ]);
+  assert.equal(new Set(config.pairs.map(({ id }) => id)).size, 2);
+  for (const pair of config.pairs) {
+    assert.equal(Object.isFrozen(pair), true);
+    assert.equal(Object.isFrozen(pair.entrance), true);
+    assert.equal(Object.isFrozen(pair.exit), true);
+  }
+});
+
+test('selected transport tunnel runtime composes with automatic level garages', () => {
+  const game = new BusLoopGame(LEVEL_1, { mechanicId: 'transport-tunnel' });
+  const snapshot = game.snapshot();
+  assert.equal(game.getMechanicId(), 'transport-tunnel');
+  assert.equal(snapshot.transportTunnel.pairs.length, 2);
+  assert.ok(snapshot.garages.length > 0);
+});

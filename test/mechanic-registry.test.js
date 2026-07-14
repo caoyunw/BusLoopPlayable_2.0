@@ -38,6 +38,7 @@ const MECHANIC_IDS_AFTER_BASE = [
   'order-passenger',
   'valve',
   'train',
+  'transport-tunnel',
   'locked-garage',
   'count-garage',
   'rotating-spots',
@@ -59,6 +60,7 @@ const PLAYABLE_MECHANIC_IDS = new Set([
   'count-garage',
   'linked-passengers',
   'train',
+  'transport-tunnel',
   'upgrade-spot',
   'double-gate',
   'maglev-spot'
@@ -79,6 +81,7 @@ const EXPECTED_SUMMARIES = {
   'order-passenger': '接完订单上的红色、黄色、棕色乘客即可完成关卡。',
   valve: '玩家手动控制左右哪边乘客进入。',
   train: '车厢移至轨道，集齐4节并上满乘客后开走。',
+  'transport-tunnel': '车辆驶入配对入口后，从对应出口按设定方向驶出。',
   'locked-garage': '带钥匙车辆开走后解锁上锁停车场。',
   'count-garage': '开走指定数量车辆后解锁车库。',
   'rotating-spots': '每点击一次车辆，车位上的车顺时针旋转90°。',
@@ -1078,9 +1081,9 @@ test('question passenger chance input previews, change commits, and destroy deta
   }
 });
 
-test('registry contains base plus seventeen unique mechanic entries', () => {
-  assert.equal(MECHANICS.length, 18);
-  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 18);
+test('registry contains base plus eighteen unique mechanic entries', () => {
+  assert.equal(MECHANICS.length, 19);
+  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 19);
   assert.deepEqual(
     MECHANICS.map(({ id }) => id),
     ['base', ...MECHANIC_IDS_AFTER_BASE]
@@ -1127,10 +1130,12 @@ test('implemented mechanic presets are playable while remaining presets are plan
   assert.equal(getMechanicById('count-garage').status, 'playable');
   assert.equal(getMechanicById('linked-passengers').status, 'playable');
   assert.equal(getMechanicById('train').status, 'playable');
+  assert.equal(getMechanicById('transport-tunnel').status, 'playable');
+  assert.equal(resolvePlayableMechanicId('transport-tunnel'), 'transport-tunnel');
   assert.equal(getMechanicById('upgrade-spot').status, 'playable');
   assert.equal(getMechanicById('double-gate').status, 'playable');
   assert.equal(getMechanicById('maglev-spot').status, 'playable');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 12);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 13);
   assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 6);
   assert.equal(PLANNED_MECHANIC_IDS.length, 6);
 });
@@ -1150,6 +1155,7 @@ test('filterMechanics searches names, summaries, and categories', () => {
   );
   assert.deepEqual(filterMechanics('订单').map(({ id }) => id), ['order-passenger']);
   assert.deepEqual(filterMechanics('火车').map(({ id }) => id), ['train']);
+  assert.deepEqual(filterMechanics('隧道').map(({ id }) => id), ['transport-tunnel']);
   assert.deepEqual(filterMechanics('磁悬浮').map(({ id }) => id), ['maglev-spot']);
   assert.deepEqual(
     filterMechanics('信息隐藏').map(({ id }) => id),
