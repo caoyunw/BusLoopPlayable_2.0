@@ -188,6 +188,23 @@ test('level18 authors one frozen six-slot rotary lane', () => {
   );
 });
 
+test('level18 keeps the rotary lane in a dedicated band above ordinary parked vehicles', () => {
+  const slots = LEVEL_1.mechanics['rotary-lane'].lanes[0].slots;
+  const laneVehicleIds = new Set(
+    slots.map(({ vehicleId }) => vehicleId).filter((vehicleId) => vehicleId != null)
+  );
+  const ordinaryVehicles = LEVEL_1.vehicles.filter((vehicle) => (
+    vehicle.containerType == null && !laneVehicleIds.has(vehicle.id)
+  ));
+  const laneMinZ = Math.min(...slots.map(({ z }) => z));
+  const ordinaryMaxZ = Math.max(...ordinaryVehicles.map(({ z }) => z));
+
+  assert.ok(
+    laneMinZ - ordinaryMaxZ >= 0.55,
+    `expected a dedicated rotary-lane band, got ${laneMinZ - ordinaryMaxZ}`
+  );
+});
+
 test('selected rotary lane runtime composes with automatic level garages', () => {
   const game = new BusLoopGame(LEVEL_1, {
     mechanicId: 'rotary-lane',
