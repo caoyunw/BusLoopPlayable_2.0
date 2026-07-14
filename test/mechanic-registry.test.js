@@ -41,6 +41,7 @@ const MECHANIC_IDS_AFTER_BASE = [
   'locked-garage',
   'count-garage',
   'rotating-spots',
+  'upgrade-spot',
   'double-gate',
   'maglev-spot'
 ];
@@ -53,11 +54,13 @@ const PLAYABLE_MECHANIC_IDS = new Set([
   'order-passenger',
   'valve',
   'count-garage',
-  'linked-passengers'
+  'linked-passengers',
+  'upgrade-spot',
+  'double-gate',
+  'maglev-spot'
 ]);
 const PLANNED_MECHANIC_IDS = ['base', ...MECHANIC_IDS_AFTER_BASE].filter((id) => (
   !PLAYABLE_MECHANIC_IDS.has(id)
-));
 ));
 
 const EXPECTED_SUMMARIES = {
@@ -75,8 +78,9 @@ const EXPECTED_SUMMARIES = {
   'locked-garage': '带钥匙车辆开走后解锁上锁停车场。',
   'count-garage': '开走指定数量车辆后解锁车库。',
   'rotating-spots': '每点击一次车辆，车位上的车顺时针旋转90°。',
-  'double-gate': '乘客经过闸门时数量翻倍。',
-  'maglev-spot': '点击切换车位升降，升起时不阻挡地面车辆。'
+  'upgrade-spot': '第一个车位会把驶入车辆的可载乘客组数变为两倍。',
+  'double-gate': '第一个车位的车门会让每组上车乘客按双倍数量占用座位。',
+  'maglev-spot': '每次成功开走车辆后，磁悬浮车位上的车辆在升起和降落之间切换。'
 };
 
 EXPECTED_SUMMARIES.valve = '传送带左右阀门自动轮流放行同色乘客段。';
@@ -1002,9 +1006,9 @@ test('question passenger chance input previews, change commits, and destroy deta
   }
 });
 
-test('registry contains base plus sixteen unique mechanic entries', () => {
-  assert.equal(MECHANICS.length, 17);
-  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 17);
+test('registry contains base plus seventeen unique mechanic entries', () => {
+  assert.equal(MECHANICS.length, 18);
+  assert.equal(new Set(MECHANICS.map(({ id }) => id)).size, 18);
   assert.deepEqual(
     MECHANICS.map(({ id }) => id),
     ['base', ...MECHANIC_IDS_AFTER_BASE]
@@ -1038,11 +1042,8 @@ test('every mechanic has complete Chinese metadata and the expected summary', ()
   }
 });
 
-test('base, question passenger, garage, star passenger, order passenger, valve, count garage, and linked passengers are playable while remaining presets are planned', () => {
+test('implemented mechanics are playable while remaining presets are planned', () => {
   assert.equal(getMechanicById('base').status, 'playable');
-  assert.equal(getMechanicById('question-passenger').status, 'playable');
-  assert.equal(getMechanicById('garage').status, 'playable');
-  assert.equal(getMechanicById('star-passenger').status, 'playable');
   assert.equal(getMechanicById('question-passenger').status, 'playable');
   assert.equal(getMechanicById('garage').status, 'playable');
   assert.equal(getMechanicById('star-passenger').status, 'playable');
@@ -1051,9 +1052,12 @@ test('base, question passenger, garage, star passenger, order passenger, valve, 
   assert.equal(getMechanicById('count-garage').status, 'playable');
   assert.equal(getMechanicById('linked-passengers').status, 'playable');
   assert.equal(resolvePlayableMechanicId('linked-passengers'), 'linked-passengers');
-  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 8);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 9);
-  assert.equal(PLANNED_MECHANIC_IDS.length, 9);
+  assert.equal(getMechanicById('upgrade-spot').status, 'playable');
+  assert.equal(getMechanicById('double-gate').status, 'playable');
+  assert.equal(getMechanicById('maglev-spot').status, 'playable');
+  assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 11);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 7);
+  assert.equal(PLANNED_MECHANIC_IDS.length, 7);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {

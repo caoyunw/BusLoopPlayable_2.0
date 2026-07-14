@@ -4,12 +4,8 @@
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. After recent merges the registry contains 17 definitions: 8 playable (`base`, `question-passenger`, `garage`, `star-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`) and 9 planned.
-- Each `src/mechanics/*/index.js` owns its mechanic identity, metadata, and status; `src/mechanics/index.js` is the assembled module source of truth. `src/mechanic-registry.js` derives the frozen metadata collection and provides lookup, fallback, and search.
-=======
-- The active product is a mechanic design and experience lab. The registry contains 17 definitions: 4 playable (`base`, `garage`, `star-passenger`, `valve`) and 13 planned.
-- `src/mechanic-registry.js` is the source of truth for mechanism identity, metadata, state, lookup, fallback, and search.
->>>>>>> Stashed changes
+- The active product is a mechanic design and experience lab. After recent merges the registry contains 18 definitions: 11 playable (`base`, `question-passenger`, `garage`, `star-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`, `upgrade-spot`, `double-gate`, `maglev-spot`) and 7 planned.
+- Each `src/mechanics/*/index.js` owns its mechanic identity, metadata, status, and optional runtime/detail hooks; `src/mechanics/index.js` is the assembled module source of truth. `src/mechanic-registry.js` derives the frozen metadata collection and provides lookup, fallback, and search.
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
 - New mechanism behavior should live behind an isolated module boundary and reuse base runtime contracts. Do not grow a large mechanism switch inside `src/main.js`.
@@ -124,6 +120,15 @@
 - The base model exposes a mechanic runtime `hasWon(game)` hook. `order-passenger` uses it to end the level as soon as all three order targets reach zero, even if unrelated vehicles/passengers remain.
 - The order HUD lives in `src/mechanics/order-passenger/view.js` and renders a top stage panel with color passenger icons plus remaining passenger counts. It only appears while the selected mechanic is `order-passenger`.
 - Browser QA on 2026-07-13 confirmed the selected order-passenger card, top order HUD, level18 counts `184/224/176`, nonblank canvas, collapsed mobile drawers at 390x844, and no console errors.
+
+### Web Capacity Mechanics Implementation
+
+- `upgrade-spot` and `double-gate` are now separate playable mechanisms fixed to the first parking spot.
+- `upgrade-spot` doubles the effective passenger-group capacity for the vehicle assigned to the first spot while preserving the original vehicle model sizing.
+- `double-gate` keeps vehicle capacity unchanged, but each passenger group boarding through the first spot consumes two capacity groups. A 10-seat vehicle therefore departs after boarding 5 groups there.
+- Seat-count boards read mechanic-adjusted effective capacity and boarding-cost contribution, so upgraded capacity and double-cost boarding display remaining passengers correctly.
+- Scene feedback is distinct: upgrade spot uses a cyan ring, upward green marker, and `UP` label; double gate uses orange/red gate posts, doors, and an `x2` label.
+- Browser QA on 2026-07-14 confirmed both markers on desktop and 390x844 mobile, nonblank canvas, selected playable cards, collapsed mobile drawer, hidden planned overlay, and no page error logs.
 
 ## Historical Advertising Packaging - Removed
 

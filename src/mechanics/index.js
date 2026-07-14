@@ -13,6 +13,7 @@ import train from './train/index.js';
 import lockedGarage from './locked-garage/index.js';
 import countGarage from './count-garage/index.js';
 import rotatingSpots from './rotating-spots/index.js';
+import upgradeSpot from './upgrade-spot/index.js';
 import doubleGate from './double-gate/index.js';
 import maglevSpot from './maglev-spot/index.js';
 
@@ -32,6 +33,7 @@ const modules = [
   lockedGarage,
   countGarage,
   rotatingSpots,
+  upgradeSpot,
   doubleGate,
   maglevSpot
 ];
@@ -108,6 +110,14 @@ export function createCompositeRuntime(runtimes) {
       return changed;
     },
 
+    canVehicleDispatch(context) {
+      return runtimes.every((runtime) => runtime.canVehicleDispatch?.(context) ?? true);
+    },
+
+    isVehicleBlocking(context) {
+      return runtimes.every((runtime) => runtime.isVehicleBlocking?.(context) ?? true);
+    },
+
     createQueueItemData(context) {
       return mergeObjects(runtimes, 'createQueueItemData', [context]);
     },
@@ -182,6 +192,22 @@ export function createCompositeRuntime(runtimes) {
           }) ?? {};
         })
       );
+    },
+
+    getVehicleSeatCapacity(context) {
+      let capacity = context.vehicle?.seats ?? 0;
+      for (const runtime of runtimes) {
+        capacity = runtime.getVehicleSeatCapacity?.({ ...context, capacity }) ?? capacity;
+      }
+      return capacity;
+    },
+
+    getPassengerBoardingCost(context) {
+      let cost = 1;
+      for (const runtime of runtimes) {
+        cost = runtime.getPassengerBoardingCost?.({ ...context, cost }) ?? cost;
+      }
+      return cost;
     },
 
     clearSlotData(context) {

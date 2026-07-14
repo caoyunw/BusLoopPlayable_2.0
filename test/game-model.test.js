@@ -960,8 +960,9 @@ test('Unity bus hit clips retain their authored directional keys', () => {
 
 test('seat count board displays remaining passengers, not remaining groups', () => {
   const viewSource = readFileSync(join('src', 'scene-view.js'), 'utf8');
-  assert.match(viewSource, /baseRemaining = Math\.max\(0, vehicle\.seats - vehicle\.boardedGroups\) \* LEVEL_1\.groupSize/);
-  assert.match(viewSource, /boardingRemaining \+= 1/);
+  assert.match(viewSource, /seatCapacity = vehicle\.seatCapacity \?\? vehicle\.seats/);
+  assert.match(viewSource, /baseRemaining = Math\.max\(0, seatCapacity - vehicle\.boardedGroups\) \* LEVEL_1\.groupSize/);
+  assert.match(viewSource, /boardingRemaining \+= entry\.seatCountContribution \?\? 1/);
   assert.match(viewSource, /snapshot\.spots\[vehicle\.spotIndex\]\?\.vehicleId === vehicle\.id/);
 });
 
