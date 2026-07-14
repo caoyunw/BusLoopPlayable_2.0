@@ -67,14 +67,14 @@ function escapePattern(value) {
 export function inlineStylesheet(html, css, cssUrl) {
   const pattern = new RegExp(`\\s*<link\\b(?=[^>]*href=["']${escapePattern(cssUrl)}["'])[^>]*>\\s*`, 'u');
   if (!pattern.test(html)) throw new Error(`Unable to inline stylesheet ${cssUrl}.`);
-  return html.replace(pattern, `\n<style>\n${css}\n</style>\n`);
+  return html.replace(pattern, () => `\n<style>\n${css}\n</style>\n`);
 }
 
 export function inlineEntryModule(html, source, jsUrl) {
   const pattern = new RegExp(`\\s*<script\\b(?=[^>]*src=["']${escapePattern(jsUrl)}["'])[^>]*><\\/script>\\s*`, 'u');
   if (!pattern.test(html)) throw new Error(`Unable to inline module ${jsUrl}.`);
   const moduleSource = `${DATA_URL_FETCH_COMPAT_SCRIPT}${source}`.replaceAll('</script', '<\\/script');
-  return html.replace(pattern, `\n<script type="module">\n${moduleSource}\n</script>\n`);
+  return html.replace(pattern, () => `\n<script type="module">\n${moduleSource}\n</script>\n`);
 }
 
 export function validateStandaloneHtml(html) {

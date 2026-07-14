@@ -43,10 +43,11 @@ test('single-html helpers inline entries and replace root and relative Vite URLs
   );
 
   let output = inlineStylesheet(html, 'body{color:white}', entries.cssUrl);
-  output = inlineEntryModule(output, 'console.log("ready")', entries.jsUrl);
+  output = inlineEntryModule(output, 'console.log("$&")', entries.jsUrl);
   assert.match(output, /<style>\s*body\{color:white\}/);
   assert.match(output, /<script type="module">/);
   assert.doesNotMatch(output, /src="\/assets\/app\.js"/);
+  assert.match(output, /console\.log\("\$&"\)/);
   assert.deepEqual(validateStandaloneHtml(output), []);
 });
 
