@@ -821,6 +821,8 @@ export class SceneView {
     this.initialEntryPathStates = new Map();
     this.queueEntryPathStates = new Map();
     this.lastBoardingEventId = 0;
+    this.lastTrainFullKey = '';
+    this.trainDeparturePulseAt = null;
     this.vehicleEffects = null;
     this.guideHand = null;
     this.guideHandMaterial = null;
@@ -1212,7 +1214,33 @@ export class SceneView {
     if (!this.trainRoot) return;
     this.trainRoot.visible = Boolean(train);
     if (!train) return;
-    this.trainLocomotiveView.visible = train.locomotive?.phase !== 'complete';
+    const locomotive = train.locomotive ?? { phase: 'ready', motion: 1 };
+    this.trainLocomotiveView.visible = locomotive.phase !== 'complete';
+    let locomotiveX = SCENE_TUNING.train.headX;
+    if (locomotive.phase === 'entering') {
+      locomotiveX = THREE.MathUtils.lerp(
+        SCENE_TUNING.train.entryX,
+        SCENE_TUNING.train.headX,
+        THREE.MathUtils.smoothstep(locomotive.motion ?? 0, 0, 1)
+      );
+    } else if (locomotive.phase === 'departing') {
+      locomotiveX = THREE.MathUtils.lerp(
+        SCENE_TUNING.train.headX,
+        SCENE_TUNING.train.exitX,
+        THREE.MathUtils.smoothstep(locomotive.motion ?? 0, 0, 1)
+      );
+    }
+    this.trainLocomotiveView.position.set(
+      locomotiveX,
+      SCENE_TUNING.train.trackY,
+      SCENE_TUNING.train.trackZ
+    );
+    const pulseProgress = this.trainDeparturePulseAt == null
+      ? 1
+      : THREE.MathUtils.clamp((snapshot.time - this.trainDeparturePulseAt) / 0.3, 0, 1);
+    this.trainLocomotiveView.scale.setScalar(
+      pulseProgress >= 1 ? 1 : 1 + Math.sin(Math.PI * pulseProgress) * 0.08
+    );
     for (let index = 0; index < this.trainSeatCountBoards.length; index += 1) {
       const board = this.trainSeatCountBoards[index];
       board.visible = false;
@@ -1243,6 +1271,8 @@ export class SceneView {
     this.trainLocomotiveView = null;
     this.trainTrackPositions = [];
     this.trainSeatCountBoards = [];
+    this.lastTrainFullKey = '';
+    this.trainDeparturePulseAt = null;
   }
 
 
@@ -2442,6 +2472,7 @@ export class SceneView {
     }
     this.updateGarages(snapshot);
     this.updateValves(snapshot);
+    this.processTrainEvents(snapshot);
     this.updateTrainViews(snapshot);
     for (const vehicle of snapshot.vehicles) {
       const view = this.vehicleViews.get(vehicle.id);
@@ -2499,12 +2530,31 @@ export class SceneView {
         };
         view.position.copy(mapMotionPoint(position));
         view.rotation.y = mapVehicleAreaYaw(THREE.MathUtils.lerp(from.yaw, to.yaw, t)) + vehicleYawOffset;
+      } else if (vehicle.state === 'moving-to-track') {
+        const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
+        if (trackPosition) {
+          const t = THREE.MathUtils.smoothstep(vehicle.motion, 0, 1);
+          view.position.lerpVectors(start, trackPosition, t);
+          view.rotation.y = THREE.MathUtils.lerp(startYaw, Math.PI / 2, t);
+        }
       } else if (vehicle.state === 'at-spot' || vehicle.state === 'boarding-final') {
         view.position.copy(spot);
         view.rotation.y = deg(SCENE_TUNING.facing.parkingSpotYawDegrees + 180) + vehicleYawOffset;
       } else if (vehicle.state === 'at-track' || vehicle.state === 'train-full') {
         const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
         if (trackPosition) view.position.copy(trackPosition);
+        view.rotation.y = Math.PI / 2;
+      } else if (vehicle.state === 'train-departing') {
+        const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
+        if (trackPosition) {
+          const departureOffset = THREE.MathUtils.lerp(
+            0,
+            SCENE_TUNING.train.exitX - SCENE_TUNING.train.headX,
+            THREE.MathUtils.smoothstep(vehicle.motion, 0, 1)
+          );
+          view.position.copy(trackPosition);
+          view.position.x += departureOffset;
+        }
         view.rotation.y = Math.PI / 2;
       } else if (vehicle.state === 'departing') {
         const data = vehicle.motionData;
@@ -3047,8 +3097,28 @@ export class SceneView {
     }
   }
 
+  resolveBoardingTarget(event) {
+    if (event.trainTrackSlotIndex != null) {
+      return this.trainTrackPositions[event.trainTrackSlotIndex];
+    }
+    return this.spotPositions[event.spotIndex];
+  }
+
+  processTrainEvents(snapshot) {
+    const event = snapshot.lastEvent;
+    if (event?.type !== 'train-full') return;
+    const key = `${snapshot.resetVersion ?? 0}:${event.cycle ?? 0}`;
+    if (key === this.lastTrainFullKey) return;
+    this.lastTrainFullKey = key;
+    this.trainDeparturePulseAt = snapshot.time;
+    const leadVehicleId = event.vehicleIds?.[0];
+    if (leadVehicleId == null) return;
+    this.triggerVehicleBoardingPulse(leadVehicleId, snapshot.time);
+    this.vehicleEffects?.spawnAboardSmoke(leadVehicleId);
+  }
+
   spawnBoardingGroup(event) {
-    const spot = this.spotPositions[event.spotIndex];
+    const spot = this.resolveBoardingTarget(event);
     if (!spot) return;
     const startCenter = this.curve.getPointAt(event.progress);
     startCenter.y += SCENE_TUNING.passengers.heightAbovePath;
@@ -3086,7 +3156,7 @@ export class SceneView {
   }
 
   spawnLinkedBoardingBatch(event) {
-    const spot = this.spotPositions[event.spotIndex];
+    const spot = this.resolveBoardingTarget(event);
     const groupCount = Math.max(0, Math.trunc(event.groupCount ?? 0));
     if (!spot || groupCount <= 1 || !event.linkedPassenger) return;
 

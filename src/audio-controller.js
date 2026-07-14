@@ -1,6 +1,7 @@
 const AUDIO_EVENT_NAMES = Object.freeze({
   'vehicle-collision-contact': 'bus_hit',
   'vehicle-full': 'bus_full',
+  'train-full': 'bus_full',
   'garage-out': 'garage_out',
   'garage-clear': 'garage_clear'
 });
@@ -17,6 +18,7 @@ function getEventKey(event, time = '') {
     return `${event.type}:${event.vehicleId}:${event.targetId}:${timeKey}`;
   }
   if (event.type === 'vehicle-full') return `${event.type}:${event.vehicleId}:${timeKey}`;
+  if (event.type === 'train-full') return `${event.type}:${event.cycle ?? 0}:${timeKey}`;
   if (event.type === 'garage-out' || event.type === 'garage-clear') {
     return `${event.type}:${event.garageId}:${event.vehicleId ?? ''}:${timeKey}`;
   }

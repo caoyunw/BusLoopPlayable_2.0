@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 
+import { GameAudioController } from '../src/audio-controller.js';
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
 import { SceneView } from '../src/scene-view.js';
@@ -381,4 +383,61 @@ test('scene owns procedural train track carriage locomotive and capacity-board b
   assert.match(source, /trainSeatCountBoards/);
   assert.match(source, /vehicle\.trainCarriage/);
   assert.match(source, /userData\.vehicleId\s*=\s*vehicle\.id/);
+});
+
+test('train boarding events resolve to the rail position instead of a normal spot', () => {
+  const view = Object.create(SceneView.prototype);
+  view.spotPositions = [new THREE.Vector3(1, 0, 1)];
+  view.trainTrackPositions = [new THREE.Vector3(4, 0, 4)];
+
+  assert.equal(
+    view.resolveBoardingTarget({ spotIndex: 0, trainTrackSlotIndex: 0 }),
+    view.trainTrackPositions[0]
+  );
+  assert.equal(view.resolveBoardingTarget({ spotIndex: 0 }), view.spotPositions[0]);
+});
+
+test('train full feedback deduplicates smoke and the full-vehicle audio by train cycle', () => {
+  const view = Object.create(SceneView.prototype);
+  const smokeVehicleIds = [];
+  view.lastTrainFullKey = '';
+  view.vehicleBoardingPulses = new Map();
+  view.vehicleEffects = {
+    spawnAboardSmoke(vehicleId) {
+      smokeVehicleIds.push(vehicleId);
+    }
+  };
+  const snapshot = {
+    resetVersion: 4,
+    time: 3,
+    lastEvent: {
+      type: 'train-full',
+      cycle: 2,
+      vehicleIds: [28, 29, 31, 39]
+    }
+  };
+
+  view.processTrainEvents(snapshot);
+  view.processTrainEvents(snapshot);
+  assert.deepEqual(smokeVehicleIds, [28]);
+  assert.equal(view.vehicleBoardingPulses.get(28).length, 1);
+
+  const controller = new GameAudioController({
+    bus_full: { clips: ['full.wav'], volume: 1 }
+  });
+  const played = [];
+  controller.play = (name) => played.push(name);
+  controller.handleGameEvent(snapshot.lastEvent, snapshot.time);
+  controller.handleGameEvent(snapshot.lastEvent, snapshot.time);
+  assert.deepEqual(played, ['bus_full']);
+});
+
+test('scene maps train motion states and locomotive entry from snapshot progress', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+
+  assert.match(source, /vehicle\.state === ['"]moving-to-track['"]/);
+  assert.match(source, /vehicle\.state === ['"]train-departing['"]/);
+  assert.match(source, /locomotive\.phase === ['"]entering['"]/);
+  assert.match(source, /SCENE_TUNING\.train\.entryX/);
+  assert.match(source, /SCENE_TUNING\.train\.exitX/);
 });
