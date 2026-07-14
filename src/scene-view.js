@@ -39,6 +39,16 @@ const TRANSPORT_TUNNEL_VISUAL = Object.freeze({
   borderThickness: 0.045,
   feedbackDuration: 0.38
 });
+const ROTARY_LANE_VISUAL = Object.freeze({
+  roadWidth: 0.42,
+  roadHeight: 0.025,
+  separatorWidth: 0.025,
+  arrowLength: 0.24,
+  feedbackDuration: 0.42,
+  roadColor: 0x465066,
+  lineColor: 0xdce8ff,
+  arrowColor: 0x55f0c2
+});
 const linkedPassengerBadgeTextures = new Map();
 const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
   { baseColor: 0xffffff, emissionColor: 0x36a6ff },
@@ -853,6 +863,7 @@ export class SceneView {
     this.vehicleViews = new Map();
     this.garageViews = new Map();
     this.transportTunnelViews = new Map();
+    this.rotaryLaneViews = new Map();
     this.maglevSpotViews = new Map();
     this.valveViews = [];
     this.passengerViews = [];
@@ -907,6 +918,7 @@ export class SceneView {
     this.clearBoardingViews();
     this.disposeTrainViews();
     this.disposeTransportTunnelViews();
+    this.disposeRotaryLaneViews();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     globalThis.window?.removeEventListener('resize', this.handleResize);
@@ -1810,6 +1822,137 @@ export class SceneView {
       this.scene?.remove?.(view);
     }
     this.transportTunnelViews?.clear?.();
+  }
+
+  createRotaryLaneView(lane) {
+    const root = new THREE.Group();
+    root.name = `Rotary Lane ${lane.id}`;
+    const glowMaterials = [];
+    const arrowMaterials = [];
+    for (let index = 0; index < lane.slots.length; index += 1) {
+      const current = mapVehicleAreaPoint(lane.slots[index]);
+      const next = mapVehicleAreaPoint(lane.slots[(index + 1) % lane.slots.length]);
+      const dx = next.x - current.x;
+      const dz = next.y - current.y;
+      const length = Math.hypot(dx, dz);
+      const roadMaterial = new THREE.MeshStandardMaterial({
+        color: ROTARY_LANE_VISUAL.roadColor,
+        emissive: ROTARY_LANE_VISUAL.arrowColor,
+        emissiveIntensity: 0,
+        roughness: 0.8
+      });
+      glowMaterials.push(roadMaterial);
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          ROTARY_LANE_VISUAL.roadWidth,
+          ROTARY_LANE_VISUAL.roadHeight,
+          length
+        ),
+        roadMaterial
+      );
+      road.position.set(
+        (current.x + next.x) / 2,
+        SCENE_TUNING.vehicleArea.y - 0.035,
+        (current.y + next.y) / 2
+      );
+      road.rotation.y = Math.atan2(dx, dz);
+
+      const lineMaterial = new THREE.MeshBasicMaterial({
+        color: ROTARY_LANE_VISUAL.lineColor,
+        toneMapped: false
+      });
+      const separator = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          ROTARY_LANE_VISUAL.roadWidth * 0.9,
+          0.01,
+          ROTARY_LANE_VISUAL.separatorWidth
+        ),
+        lineMaterial
+      );
+      separator.position.set(
+        current.x,
+        SCENE_TUNING.vehicleArea.y - 0.015,
+        current.y
+      );
+      separator.rotation.y = mapVehicleAreaYaw(lane.slots[index].yaw);
+
+      const arrowMaterial = new THREE.MeshBasicMaterial({
+        color: ROTARY_LANE_VISUAL.arrowColor,
+        transparent: true,
+        opacity: 0.72,
+        toneMapped: false
+      });
+      arrowMaterials.push(arrowMaterial);
+      const arrow = new THREE.Mesh(
+        new THREE.ConeGeometry(0.09, ROTARY_LANE_VISUAL.arrowLength, 3),
+        arrowMaterial
+      );
+      arrow.rotation.x = Math.PI / 2;
+      arrow.rotation.z = -Math.PI / 2;
+      arrow.position.set(
+        (current.x + next.x) / 2,
+        SCENE_TUNING.vehicleArea.y - 0.005,
+        (current.y + next.y) / 2
+      );
+      arrow.rotation.y = Math.atan2(dx, dz);
+      root.add(road, separator, arrow);
+    }
+    root.userData.glowMaterials = glowMaterials;
+    root.userData.arrowMaterials = arrowMaterials;
+    root.userData.lastTriggerVersion = -1;
+    this.scene.add(root);
+    return root;
+  }
+
+  updateRotaryLaneViews(snapshot) {
+    this.rotaryLaneViews ??= new Map();
+    const activeIds = new Set();
+    const reducedMotion = Boolean(this.reducedMotionQuery?.matches);
+    for (const lane of snapshot.rotaryLane?.lanes ?? []) {
+      activeIds.add(lane.id);
+      let view = this.rotaryLaneViews.get(lane.id);
+      if (!view) {
+        view = this.createRotaryLaneView(lane);
+        this.rotaryLaneViews.set(lane.id, view);
+      }
+      const elapsed = snapshot.rotaryLane.startedAt == null
+        ? Infinity
+        : snapshot.time - snapshot.rotaryLane.startedAt;
+      const active = elapsed >= 0 && elapsed < ROTARY_LANE_VISUAL.feedbackDuration;
+      const pulse = active
+        ? (reducedMotion ? 0.75 : 0.5 + 0.5 * Math.sin(elapsed * 24))
+        : 0;
+      for (const material of view.userData.glowMaterials) {
+        material.emissiveIntensity = pulse * 1.25;
+      }
+      for (const material of view.userData.arrowMaterials) {
+        material.opacity = 0.72 + pulse * 0.28;
+      }
+      view.userData.lastTriggerVersion = snapshot.rotaryLane.triggerVersion;
+    }
+
+    for (const [id, view] of this.rotaryLaneViews) {
+      if (activeIds.has(id)) continue;
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) material?.dispose?.();
+      });
+      this.scene.remove(view);
+      this.rotaryLaneViews.delete(id);
+    }
+  }
+
+  disposeRotaryLaneViews() {
+    for (const view of this.rotaryLaneViews?.values?.() ?? []) {
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) material?.dispose?.();
+      });
+      this.scene?.remove?.(view);
+    }
+    this.rotaryLaneViews?.clear?.();
   }
 
   createGarageCountLabel() {
@@ -2988,6 +3131,7 @@ export class SceneView {
     }
     this.updateGarages(snapshot);
     this.updateTransportTunnelViews(snapshot);
+    this.updateRotaryLaneViews(snapshot);
     this.updateMaglevSpots(snapshot);
     this.updateValves(snapshot);
     this.processTrainEvents(snapshot);

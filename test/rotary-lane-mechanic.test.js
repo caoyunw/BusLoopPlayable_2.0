@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
@@ -197,4 +198,19 @@ test('selected rotary lane runtime composes with automatic level garages', () =>
   assert.match(game.mechanicRuntime.id, /garage/);
   assert.equal(snapshot.rotaryLane.lanes.length, 1);
   assert.equal(snapshot.garages.length, 2);
+});
+
+test('scene owns rotary lane geometry lifecycle arrows separators and trigger glow', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+  for (const token of [
+    'rotaryLaneViews',
+    'createRotaryLaneView',
+    'updateRotaryLaneViews',
+    'disposeRotaryLaneViews',
+    'triggerVersion',
+    'reducedMotionQuery'
+  ]) assert.match(source, new RegExp(token));
+  assert.match(source, /BoxGeometry/);
+  assert.match(source, /ConeGeometry/);
+  assert.match(source, /emissiveIntensity/);
 });
