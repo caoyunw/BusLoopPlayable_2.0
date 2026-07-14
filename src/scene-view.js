@@ -1281,6 +1281,7 @@ export class SceneView {
   }
 
   updateValves(snapshot) {
+    this.valveViews ??= [];
     const valve = snapshot.valve;
     if (!valve) {
       for (const view of this.valveViews) {

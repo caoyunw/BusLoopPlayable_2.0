@@ -508,23 +508,22 @@ export class BusLoopGame {
     for (const slot of this.slots) {
       slot.previousProgress = slot.progress;
       slot.progress = wrap01(slot.progress + progressDelta);
-      if (slot.colorIndex === null) {
-        const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
-        if (!entry) continue;
-        if (!this.canPassengerEnterBelt(entry)) continue;
-        const passenger = this.dequeuePassenger(entry.index, true);
-        if (passenger === null) {
-          if (this.initialFillActive) {
-            const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
-            const clamp = wrap01(slot.progress - holdProgress);
-            if (clamp > initialFillClamp) {
-              initialFillClamp = clamp;
-              initialFillHoldSlot = slot;
-              initialFillHoldProgress = holdProgress;
-            }
-          }
-        }
-        continue;
+    }
+
+    for (const slot of this.slots) {
+      if (slot.colorIndex !== null) continue;
+      const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
+      if (!entry) continue;
+      if (!this.canPassengerEnterBelt(entry)) continue;
+      const waitingBatch = this.peekPassengerBatch(entry.index);
+      if (!waitingBatch) {
+        if (this.initialFillActive) {
+          const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
+          const clamp = wrap01(slot.progress - holdProgress);
+          if (clamp > initialFillClamp) {
+            initialFillClamp = clamp;
+            initialFillHoldSlot = slot;
+            initialFillHoldProgress = holdProgress;
           }
         }
         continue;

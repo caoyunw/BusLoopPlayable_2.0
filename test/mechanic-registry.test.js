@@ -58,7 +58,6 @@ const PLAYABLE_MECHANIC_IDS = new Set([
 const PLANNED_MECHANIC_IDS = ['base', ...MECHANIC_IDS_AFTER_BASE].filter((id) => (
   !PLAYABLE_MECHANIC_IDS.has(id)
 ));
-));
 
 const EXPECTED_SUMMARIES = {
   'question-passenger': '左右队列不可见颜色，进入传送带后显示。',
