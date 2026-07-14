@@ -1,3 +1,6 @@
+import { createTrainRuntime } from './model.js';
+import { createTrainDetailView } from './view.js';
+
 export const definition = {
   id: 'train',
   name: '火车',
@@ -9,4 +12,7 @@ export const definition = {
   difficulty: '高'
 };
 
-export default { definition };
+export const createRuntime = createTrainRuntime;
+export const createDetailView = createTrainDetailView;
+
+export default { definition, createRuntime, createDetailView };

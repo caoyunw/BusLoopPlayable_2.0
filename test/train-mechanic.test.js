@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
@@ -330,4 +331,14 @@ test('open train destinations and locomotive transitions prevent premature deadl
   game.mechanicState.train.locomotive.phase = 'entering';
   game.checkEndState();
   assert.equal(game.status, 'playing');
+});
+
+test('main keeps train settings page-local with a fresh thirty-percent default', () => {
+  const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(
+    source,
+    /train:\s*\{\s*mode:\s*['"]chance['"],\s*chance:\s*0\.3\s*\}/
+  );
+  assert.match(source, /mechanicSessionOptions\[id\]\s*=\s*\{/);
 });

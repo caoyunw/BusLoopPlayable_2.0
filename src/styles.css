@@ -1,5 +1,6 @@
 @import './mechanics/question-passenger/styles.css';
 @import './mechanics/linked-passengers/styles.css';
+@import './mechanics/train/styles.css';
 
 :root {
   font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;

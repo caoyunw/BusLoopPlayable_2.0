@@ -400,6 +400,17 @@ test('linked passenger detail styles stay mechanic-owned and load after question
   assert.match(linkedCss, /@media\s*\(max-width:\s*860px\)/);
 });
 
+test('train detail styles stay mechanic-owned and load after linked settings', () => {
+  const css = readFileSync(join('src', 'styles.css'), 'utf8');
+  const trainCss = readFileSync(join('src', 'mechanics', 'train', 'styles.css'), 'utf8');
+
+  assert.match(
+    css,
+    /@import ['"]\.\/mechanics\/linked-passengers\/styles\.css['"];\s*\n@import ['"]\.\/mechanics\/train\/styles\.css['"];/
+  );
+  assert.match(trainCss, /\[data-train-settings\]/);
+});
+
 test('createMechanicLibrary renders unique groups with textContent and rerenders search states', () => {
   const fixture = createLibraryFixture();
   const mechanics = [
@@ -760,10 +771,67 @@ test('detail extension factory delegates optional mechanic views without id bran
     });
     assert.ok(linkedExtension?.element.matches('[data-linked-passenger-settings]'));
     assert.equal(typeof linkedExtension.destroy, 'function');
+    const trainExtension = createMechanicDetailView('train', {
+      document: fixture.document,
+      state: { train: { authoredGroupCount: 3, authoredCarriageCount: 12 } }
+    });
+    assert.ok(trainExtension?.element.matches('[data-train-settings]'));
+    assert.equal(typeof trainExtension.destroy, 'function');
     assert.equal(createMechanicDetailView('base', { document: fixture.document }), null);
     assert.equal(createMechanicDetailView('missing', { document: fixture.document }), null);
     extension.destroy();
     linkedExtension.destroy();
+    trainExtension.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('train detail view keeps chance and authored settings independent', () => {
+  const fixture = createLibraryFixture();
+  const commits = [];
+
+  try {
+    const extension = createMechanicDetailView('train', {
+      document: fixture.document,
+      options: { mode: 'chance', chance: 0.3 },
+      state: {
+        train: {
+          authoredGroupCount: 3,
+          authoredCarriageCount: 12,
+          invalidAuthoredGroupCount: 0
+        }
+      },
+      onCommit: (options) => commits.push(options)
+    });
+    const mode = extension.element.querySelector('[data-train-mode]');
+    const chance = extension.element.querySelector('[data-train-chance]');
+    const output = extension.element.querySelector('[data-train-chance-output]');
+    const chanceRow = extension.element.querySelector('[data-train-chance-row]');
+    const summary = extension.element.querySelector('[data-train-authored-summary]');
+
+    assert.equal(mode.value, 'chance');
+    assert.equal(chance.value, '30');
+    assert.equal(output.textContent, '30%');
+    assert.equal(chance.getAttribute('min'), '0');
+    assert.equal(chance.getAttribute('max'), '100');
+    assert.equal(chance.getAttribute('step'), '1');
+    assert.equal(chanceRow.hidden, false);
+    assert.equal(summary.hidden, true);
+    assert.equal(summary.textContent, '固定标记：3 列火车，12 节车厢');
+
+    mode.value = 'authored';
+    mode.dispatchEvent({ type: 'change' });
+    assert.equal(chanceRow.hidden, true);
+    assert.equal(summary.hidden, false);
+    assert.deepEqual(commits, [{ mode: 'authored', chance: 0.3 }]);
+
+    chance.value = '47';
+    chance.dispatchEvent({ type: 'input' });
+    assert.equal(output.textContent, '47%');
+    chance.dispatchEvent({ type: 'change' });
+    assert.deepEqual(commits.at(-1), { mode: 'authored', chance: 0.47 });
+    extension.destroy();
   } finally {
     fixture.restore();
   }

@@ -130,7 +130,8 @@ function startRuntime() {
   const initialMechanicId = getMechanicIdFromSearch(location.search);
   const mechanicSessionOptions = {
     'question-passenger': { mode: 'chance', chance: 0.3 },
-    'linked-passengers': { mode: 'chance', chance: 0.3, maxLength: 10 }
+    'linked-passengers': { mode: 'chance', chance: 0.3, maxLength: 10 },
+    train: { mode: 'chance', chance: 0.3 }
   };
   const game = new BusLoopGame(LEVEL_1, {
     mechanicId: initialMechanicId,
