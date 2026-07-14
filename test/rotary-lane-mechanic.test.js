@@ -214,3 +214,12 @@ test('scene owns rotary lane geometry lifecycle arrows separators and trigger gl
   assert.match(source, /ConeGeometry/);
   assert.match(source, /emissiveIntensity/);
 });
+
+test('scene interpolates rotary lane shifting vehicles and uses shortest degree yaw', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+  assert.match(source, /vehicle\.state === 'rotary-lane-shifting'/);
+  assert.match(source, /shortestYawDelta/);
+  assert.match(source, /THREE\.MathUtils\.smoothstep/);
+  assert.match(source, /reducedMotionQuery\?\.matches/);
+  assert.match(source, /usesFieldScale/);
+});

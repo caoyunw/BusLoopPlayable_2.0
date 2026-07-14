@@ -173,6 +173,10 @@ function mapVehicleAreaYaw(yawDegrees) {
   return mirroredYaw + deg(SCENE_TUNING.vehicleArea.rotationDegrees);
 }
 
+function shortestYawDelta(fromDegrees, toDegrees) {
+  return ((toDegrees - fromDegrees + 540) % 360) - 180;
+}
+
 function toWorldPoint([x, z]) {
   const tuning = SCENE_TUNING.path;
   return new THREE.Vector3(
@@ -3158,8 +3162,11 @@ export class SceneView {
         ? [trainCarriageRoot].filter(Boolean)
         : (view.userData.normalHitMeshes ?? []);
       view.visible = !['done', 'in-garage', 'hidden-in-tunnel'].includes(vehicle.state);
-      let vehicleScale = vehicle.state === 'parked' || vehicle.state === 'colliding'
-        ? 1 : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
+      const usesFieldScale = ['parked', 'colliding', 'rotary-lane-shifting']
+        .includes(vehicle.state);
+      let vehicleScale = usesFieldScale
+        ? 1
+        : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
       if (vehicle.state === 'parked') {
         view.position.copy(start);
         view.rotation.y = startYaw;
@@ -3171,6 +3178,20 @@ export class SceneView {
         };
         view.position.copy(mapMotionPoint(position));
         view.rotation.y = startYaw;
+      } else if (vehicle.state === 'rotary-lane-shifting') {
+        const data = vehicle.motionData;
+        const from = data?.from ?? vehicle;
+        const to = data?.to ?? vehicle;
+        const reducedMotion = Boolean(this.reducedMotionQuery?.matches);
+        const rawProgress = reducedMotion && vehicle.motion > 0 ? 1 : vehicle.motion;
+        const t = THREE.MathUtils.smoothstep(rawProgress, 0, 1);
+        const position = {
+          x: THREE.MathUtils.lerp(from.x, to.x, t),
+          z: THREE.MathUtils.lerp(from.z, to.z, t)
+        };
+        const yaw = from.yaw + shortestYawDelta(from.yaw, to.yaw) * t;
+        view.position.copy(mapMotionPoint(position));
+        view.rotation.y = mapVehicleAreaYaw(yaw) + vehicleYawOffset;
       } else if (vehicle.state === 'moving-to-spot') {
         const data = vehicle.motionData;
         const curveValue = evaluateUnityCurve(data.curve, vehicle.motion);
