@@ -384,6 +384,22 @@ export class BusLoopGame {
       this.emit();
       return { ok: false, reason: 'blocked', blockers };
     }
+    const mechanicDispatch = this.mechanicRuntime.dispatchVehicle?.({
+      game: this,
+      vehicle
+    });
+    if (mechanicDispatch?.handled) {
+      if (mechanicDispatch.event) this.lastEvent = mechanicDispatch.event;
+      if (mechanicDispatch.result?.ok) {
+        this.mechanicRuntime.onVehicleDispatched?.({
+          game: this,
+          vehicle,
+          destination: mechanicDispatch.destination
+        });
+      }
+      this.emit();
+      return mechanicDispatch.result;
+    }
     const spot = this.spots.find((candidate) => candidate.vehicleId === null);
     if (!spot) {
       this.lastEvent = { type: 'spots-full', vehicleId: id };

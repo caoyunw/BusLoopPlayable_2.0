@@ -89,6 +89,8 @@ export function createTrainRuntime({
   options = {},
   random = Math.random
 } = {}) {
+  const dispatchDuration = Math.max(0.1, Number(options.dispatchDuration) || 0.9);
+
   return {
     id: 'train',
 
@@ -133,6 +135,49 @@ export function createTrainRuntime({
           trackSlots: train.trackSlots.map(cloneTrackSlot),
           locomotive: { ...train.locomotive }
         }
+      };
+    },
+
+    dispatchVehicle({ game, vehicle }) {
+      if (!vehicle.trainCarriage) return null;
+      const train = game.mechanicState.train;
+      if (train.locomotive.phase !== 'ready') {
+        return {
+          handled: true,
+          result: { ok: false, reason: 'train-transition' },
+          event: { type: 'train-transition', vehicleId: vehicle.id }
+        };
+      }
+      const trackSlotIndex = train.trackSlots.findIndex((slot) => slot === null);
+      if (trackSlotIndex < 0) {
+        return {
+          handled: true,
+          result: { ok: false, reason: 'train-track-full' },
+          event: { type: 'train-track-full', vehicleId: vehicle.id }
+        };
+      }
+
+      train.trackSlots[trackSlotIndex] = {
+        index: trackSlotIndex,
+        vehicleId: vehicle.id
+      };
+      Object.assign(vehicle, {
+        state: 'moving-to-track',
+        spotIndex: null,
+        trackSlotIndex,
+        motion: 0,
+        motionData: { duration: dispatchDuration }
+      });
+      const event = {
+        type: 'vehicle-dispatched',
+        vehicleId: vehicle.id,
+        trackSlotIndex
+      };
+      return {
+        handled: true,
+        result: { ok: true, trackSlotIndex },
+        destination: { kind: 'train-track', trackSlotIndex },
+        event
       };
     }
   };

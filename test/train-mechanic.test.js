@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
+import { createCompositeRuntime } from '../src/mechanics/index.js';
 import {
   createTrainRuntime,
   planTrainCarriages
@@ -150,4 +152,75 @@ test('train runtime creates isolated track state and marks only selected vehicle
   assert.deepEqual(game.mechanicState.train.trackSlots, [null, null, null, null]);
   assert.equal(game.mechanicState.train.carriageVehicleIds.length, 12);
   assert.equal(game.mechanicState.train.locomotive.phase, 'ready');
+});
+
+function createAuthoredTrainGame() {
+  const level = {
+    ...LEVEL_1,
+    containers: [],
+    vehicleDepthes: {},
+    mechanics: LEVEL_1.mechanics
+  };
+  const game = new BusLoopGame(level, { random: () => 0 });
+  const runtime = createTrainRuntime({
+    level,
+    options: { mode: 'authored' },
+    random: () => 0
+  });
+  game.mechanicRuntime = runtime;
+  game.mechanicState = runtime.createState(game);
+  runtime.afterReset({ game });
+  return { game, runtime };
+}
+
+test('train carriage dispatch reserves the rail without consuming a normal parking spot', () => {
+  const { game } = createAuthoredTrainGame();
+  const result = game.clickVehicle(28);
+
+  assert.deepEqual(result, { ok: true, trackSlotIndex: 0 });
+  assert.equal(game.getVehicle(28).state, 'moving-to-track');
+  assert.equal(game.getVehicle(28).trackSlotIndex, 0);
+  assert.deepEqual(game.mechanicState.train.trackSlots[0], {
+    index: 0,
+    vehicleId: 28
+  });
+  assert.equal(game.spots.every(({ vehicleId }) => vehicleId === null), true);
+});
+
+test('ordinary vehicles still dispatch to normal spots while train destinations report their own limits', () => {
+  const { game } = createAuthoredTrainGame();
+  const ordinaryResult = game.clickVehicle(30);
+  assert.deepEqual(ordinaryResult, { ok: true, spotIndex: 0 });
+
+  for (const id of [28, 29, 31, 39]) {
+    assert.equal(game.clickVehicle(id).ok, true);
+  }
+  assert.deepEqual(game.clickVehicle(32), {
+    ok: false,
+    reason: 'train-track-full'
+  });
+
+  const second = createAuthoredTrainGame().game;
+  second.mechanicState.train.locomotive.phase = 'entering';
+  assert.deepEqual(second.clickVehicle(28), {
+    ok: false,
+    reason: 'train-transition'
+  });
+});
+
+test('composite runtimes forward train dispatch and notify sibling vehicle features once', () => {
+  const { game, runtime } = createAuthoredTrainGame();
+  let dispatchNotifications = 0;
+  const sibling = {
+    id: 'sibling',
+    createState: () => ({}),
+    onVehicleDispatched() {
+      dispatchNotifications += 1;
+    }
+  };
+  const composite = createCompositeRuntime([runtime, sibling]);
+  game.mechanicRuntime = composite;
+
+  assert.deepEqual(game.clickVehicle(28), { ok: true, trackSlotIndex: 0 });
+  assert.equal(dispatchNotifications, 1);
 });

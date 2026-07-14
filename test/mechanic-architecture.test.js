@@ -57,3 +57,11 @@ test('linked passenger owns model and detail files while game model stays generi
   assert.match(gameSource, /getBoardingBatch/);
   assert.doesNotMatch(gameSource, /linked-passengers/);
 });
+
+test('train owns vehicle destination policy while the game model stays mechanic agnostic', () => {
+  const gameSource = readFileSync(join('src', 'game-model.js'), 'utf8');
+  const trainSource = readFileSync(join('src', 'mechanics', 'train', 'model.js'), 'utf8');
+
+  assert.match(trainSource, /dispatchVehicle/);
+  assert.doesNotMatch(gameSource, /mechanicId\s*={2,3}\s*['"]train['"]/);
+});

@@ -108,6 +108,14 @@ export function createCompositeRuntime(runtimes) {
       return changed;
     },
 
+    dispatchVehicle(context) {
+      for (const runtime of runtimes) {
+        const dispatch = runtime.dispatchVehicle?.(context);
+        if (dispatch?.handled) return dispatch;
+      }
+      return null;
+    },
+
     createQueueItemData(context) {
       return mergeObjects(runtimes, 'createQueueItemData', [context]);
     },
