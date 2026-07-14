@@ -79,3 +79,61 @@ export function planTrainCarriages({
     invalidAuthoredGroupCount: 0
   };
 }
+
+function cloneTrackSlot(slot) {
+  return slot ? { ...slot } : null;
+}
+
+export function createTrainRuntime({
+  level = null,
+  options = {},
+  random = Math.random
+} = {}) {
+  return {
+    id: 'train',
+
+    createState(game) {
+      const activeLevel = game?.level ?? level ?? {};
+      const plan = planTrainCarriages({
+        vehicles: activeLevel.vehicles,
+        mode: options.mode,
+        chance: options.chance,
+        authoredGroups: activeLevel.mechanics?.train?.authoredGroups,
+        random
+      });
+      return {
+        train: {
+          mode: plan.mode,
+          chance: plan.chance,
+          carriageVehicleIds: [...plan.vehicleIds],
+          trackSlots: Array.from({ length: TRAIN_SIZE }, () => null),
+          locomotive: { phase: 'ready', motion: 1, cycle: 0 },
+          departurePendingAt: null,
+          authoredGroupCount: plan.authoredGroupCount,
+          authoredCarriageCount: plan.authoredCarriageCount,
+          invalidAuthoredGroupCount: plan.invalidAuthoredGroupCount
+        }
+      };
+    },
+
+    afterReset({ game }) {
+      const selectedIds = new Set(game.mechanicState.train.carriageVehicleIds);
+      for (const vehicle of game.vehicles) {
+        vehicle.trainCarriage = selectedIds.has(vehicle.id);
+        vehicle.trackSlotIndex = null;
+      }
+    },
+
+    decorateSnapshot(game) {
+      const train = game.mechanicState.train;
+      return {
+        train: {
+          ...train,
+          carriageVehicleIds: [...train.carriageVehicleIds],
+          trackSlots: train.trackSlots.map(cloneTrackSlot),
+          locomotive: { ...train.locomotive }
+        }
+      };
+    }
+  };
+}

@@ -200,6 +200,13 @@ export const LEVEL_1 = Object.freeze({
   mechanics: Object.freeze({
     'linked-passengers': Object.freeze({
       authoredStarts: LEVEL18_LINKED_PASSENGER_STARTS
+    }),
+    train: Object.freeze({
+      authoredGroups: Object.freeze([
+        Object.freeze([28, 29, 31, 39]),
+        Object.freeze([32, 42, 43, 45]),
+        Object.freeze([33, 47, 48, 55])
+      ])
     })
   }),
   assets: {
