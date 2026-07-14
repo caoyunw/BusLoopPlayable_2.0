@@ -172,6 +172,30 @@ test('active train selection composes with the level garage runtime', () => {
   assert.ok(snapshot.garages.length > 0);
 });
 
+test('chance runtime exposes the authored train summary without extra random draws', () => {
+  const game = new BusLoopGame(LEVEL_1, { random: () => 0 });
+  let randomCalls = 0;
+  const runtime = createTrainRuntime({
+    level: LEVEL_1,
+    random: () => {
+      randomCalls += 1;
+      return 0.5;
+    },
+    options: { mode: 'chance', chance: 0 }
+  });
+
+  game.mechanicState = runtime.createState(game);
+
+  assert.equal(game.mechanicState.train.mode, 'chance');
+  assert.equal(game.mechanicState.train.carriageVehicleIds.length, 0);
+  assert.equal(game.mechanicState.train.authoredGroupCount, 3);
+  assert.equal(game.mechanicState.train.authoredCarriageCount, 12);
+  assert.equal(
+    randomCalls,
+    game.vehicles.filter(({ seats }) => seats === 10).length
+  );
+});
+
 function createAuthoredTrainGame() {
   const level = {
     ...LEVEL_1,

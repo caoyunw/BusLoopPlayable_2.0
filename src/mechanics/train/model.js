@@ -109,13 +109,22 @@ export function createTrainRuntime({
 
     createState(game) {
       const activeLevel = game?.level ?? level ?? {};
+      const authoredGroups = activeLevel.mechanics?.train?.authoredGroups;
       const plan = planTrainCarriages({
         vehicles: activeLevel.vehicles,
         mode: options.mode,
         chance: options.chance,
-        authoredGroups: activeLevel.mechanics?.train?.authoredGroups,
+        authoredGroups,
         random
       });
+      const authoredSummary = plan.mode === 'authored'
+        ? plan
+        : planTrainCarriages({
+            vehicles: activeLevel.vehicles,
+            mode: 'authored',
+            chance: plan.chance,
+            authoredGroups
+          });
       return {
         train: {
           mode: plan.mode,
@@ -124,9 +133,9 @@ export function createTrainRuntime({
           trackSlots: Array.from({ length: TRAIN_SIZE }, () => null),
           locomotive: { phase: 'ready', motion: 1, cycle: 0 },
           departurePendingAt: null,
-          authoredGroupCount: plan.authoredGroupCount,
-          authoredCarriageCount: plan.authoredCarriageCount,
-          invalidAuthoredGroupCount: plan.invalidAuthoredGroupCount
+          authoredGroupCount: authoredSummary.authoredGroupCount,
+          authoredCarriageCount: authoredSummary.authoredCarriageCount,
+          invalidAuthoredGroupCount: authoredSummary.invalidAuthoredGroupCount
         }
       };
     },
