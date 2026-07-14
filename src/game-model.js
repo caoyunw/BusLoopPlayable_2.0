@@ -554,7 +554,6 @@ export class BusLoopGame {
         continue;
       }
       changed = true;
-      }
     }
 
     if (this.initialFillActive && initialFillClamp > 0) {

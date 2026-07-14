@@ -224,6 +224,8 @@ test('a reset-version change clears stale boarding ids before a new generation e
   fixture.view.spawnLinkedBoardingBatch = (event) => played.push(event.id);
   fixture.view.seatCountBoards = [];
   fixture.view.updateGarages = () => {};
+  fixture.view.maglevSpotViews = new Map();
+  fixture.view.capacitySpotMarkers = [];
   fixture.view.vehicleViews = new Map();
   fixture.view.spotPositions = [];
   fixture.view.pruneInitialEntryPathStates = () => {};

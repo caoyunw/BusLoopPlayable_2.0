@@ -1131,8 +1131,8 @@ test('implemented mechanic presets are playable while remaining presets are plan
   assert.equal(getMechanicById('double-gate').status, 'playable');
   assert.equal(getMechanicById('maglev-spot').status, 'playable');
   assert.equal(MECHANICS.filter(({ status }) => status === 'playable').length, 12);
-  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 5);
-  assert.equal(PLANNED_MECHANIC_IDS.length, 5);
+  assert.equal(MECHANICS.filter(({ status }) => status === 'planned').length, 6);
+  assert.equal(PLANNED_MECHANIC_IDS.length, 6);
 });
 
 test('registry and nested category arrays are deeply frozen', () => {
