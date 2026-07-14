@@ -96,6 +96,18 @@ export function createCompositeRuntime(runtimes) {
       return runtimes.some((runtime) => Boolean(runtime.hasPendingVehicles?.(game)));
     },
 
+    hasWon(game) {
+      return runtimes.some((runtime) => Boolean(runtime.hasWon?.(game)));
+    },
+
+    onVehicleDispatched(context) {
+      let changed = false;
+      for (const runtime of runtimes) {
+        changed = Boolean(runtime.onVehicleDispatched?.(context)) || changed;
+      }
+      return changed;
+    },
+
     createQueueItemData(context) {
       return mergeObjects(runtimes, 'createQueueItemData', [context]);
     },
@@ -118,6 +130,10 @@ export function createCompositeRuntime(runtimes) {
 
     onPassengerEnteredBelt(context) {
       for (const runtime of runtimes) runtime.onPassengerEnteredBelt?.(context);
+    },
+
+    canPassengerEnterBelt(context) {
+      return runtimes.every((runtime) => runtime.canPassengerEnterBelt?.(context) ?? true);
     },
 
     onPassengerExitPassed(context) {
@@ -195,7 +211,11 @@ export function createMechanicRuntime(id, context = {}) {
     : base.createRuntime(context);
   const featureRuntimes = [];
 
-  if (resolvedId !== garage.definition.id && hasGarageContainers(context.level)) {
+  if (
+    !selectedRuntime.handlesGarageContainers
+    && resolvedId !== garage.definition.id
+    && hasGarageContainers(context.level)
+  ) {
     featureRuntimes.push(garage.createRuntime({
       ...context,
       options: context.mechanicOptions?.[garage.definition.id] ?? {}

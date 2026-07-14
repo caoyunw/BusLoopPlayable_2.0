@@ -10,6 +10,8 @@ Use this file before code changes. Pick the closest change area, then read only 
 | Frozen mechanic collection, metadata lookup, fallback, and text filtering | `src/mechanic-registry.js` | `src/mechanics/index.js`, `test/mechanic-registry.test.js`, `src/mechanic-library.js` |
 | `?mechanic=` parsing/sync and safe storage removal | `src/mechanic-lab.js` | `test/mechanic-registry.test.js`, `src/main.js` |
 | Mechanic search, grouping, generic detail extensions, selection, mobile drawer | `src/mechanic-library.js` | `src/mechanics/index.js`, `test/mechanic-registry.test.js`, `src/styles.css`, `index.html` |
+| Garage hidden stock, one-at-a-time release, and count state | `src/mechanics/garage/model.js` | `src/mechanics/garage/index.js`, `src/game-model.js`, `src/scene-view.js`, `test/garage-mechanic.test.js` |
+| Count-garage unlock thresholds and dispatch-count gated garage release | `src/mechanics/count-garage/model.js` | `src/mechanics/count-garage/index.js`, `src/mechanics/garage/model.js`, `src/game-model.js`, `test/count-garage-mechanic.test.js` |
 | Star-passenger lifetime, cyclic charge, and boarding/expiration rules | `src/mechanics/star-passenger/model.js` | `src/mechanics/star-passenger/index.js`, `test/star-passenger-mechanic.test.js` |
 | Question-passenger assignment modes, chance normalization, authored masks, and state metadata | `src/mechanics/question-passenger/model.js` | `src/mechanics/question-passenger/index.js`, `test/question-passenger-mechanic.test.js` |
 | Question-passenger detail mode/chance controls and authored summary | `src/mechanics/question-passenger/view.js` | `src/mechanics/question-passenger/styles.css`, `src/mechanics/question-passenger/index.js`, `src/mechanic-library.js`, `src/main.js`, `test/mechanic-registry.test.js`, `test/game-model.test.js` |
@@ -18,8 +20,10 @@ Use this file before code changes. Pick the closest change area, then read only 
 | Linked-passenger detail mode/chance/maximum-length controls and authored summary | `src/mechanics/linked-passengers/view.js` | `src/mechanics/linked-passengers/styles.css`, `src/main.js`, `src/mechanic-library.js`, `test/linked-passengers-mechanic.test.js` |
 | Linked-passenger connector/badge rendering and aggregate boarding feedback | `src/scene-view.js` | `src/game-model.js`, `src/mechanics/linked-passengers/model.js`, `test/linked-passengers-mechanic.test.js` |
 | Star-passenger HUD, celebration, and reduced-motion feedback | `src/mechanics/star-passenger/view.js` | `src/mechanics/star-passenger/styles.css`, `src/scene-view.js`, `test/star-passenger-mechanic.test.js` |
+| Order-passenger target counts, top order HUD, and mechanic-owned win condition | `src/mechanics/order-passenger/model.js` | `src/mechanics/order-passenger/index.js`, `src/mechanics/order-passenger/view.js`, `src/mechanics/order-passenger/styles.css`, `src/game-model.js`, `test/order-passenger-mechanic.test.js` |
 | Lab bootstrap, base runtime assembly, mechanic pause/select, page-session mechanic options, generic detail wiring, tuning storage, QA API | `src/main.js` | `src/mechanics/index.js`, `src/mechanic-library.js`, `src/mechanic-lab.js`, `src/mechanic-registry.js`, `index.html`, `test/game-model.test.js` |
-| Core gameplay rules, generic batch admission/entry/boarding hooks, reset-generation snapshots, blockers, spots, queues, boarding, win/fail | `src/game-model.js` | `src/mechanics/index.js`, `src/level-data.js`, `src/vehicle-motion.js`, `test/game-model.test.js`, `test/linked-passengers-mechanic.test.js` |
+| Valve side gating, automatic side switching, and entrance markers | `src/mechanics/valve/model.js` | `src/mechanics/valve/index.js`, `src/game-model.js`, `src/scene-view.js`, `test/valve-mechanic.test.js` |
+| Core gameplay rules, generic batch admission/entry/boarding hooks, reset-generation snapshots, blockers, spots, queues, boarding, mechanic-owned win hooks, win/fail | `src/game-model.js` | `src/mechanics/index.js`, `src/level-data.js`, `src/vehicle-motion.js`, `test/game-model.test.js`, `test/order-passenger-mechanic.test.js`, `test/linked-passengers-mechanic.test.js` |
 | Level constants, fixed passenger sequence, linked authored starts, vehicles, spots, runtime asset URLs | `src/level-data.js` | `src/game-model.js`, `src/scene-view.js`, `test/game-model.test.js`, `test/linked-passengers-mechanic.test.js` |
 | Three.js rendering, picking, assets, vehicles, passengers, shadows | `src/scene-view.js` | `src/scene-tuning.js`, `src/scene-layout.js`, `test/game-model.test.js` |
 | Runtime audio events and WebAudio playback | `src/audio-controller.js` | `src/main.js`, `src/level-data.js`, `test/game-model.test.js` |
@@ -55,10 +59,14 @@ Use this file before code changes. Pick the closest change area, then read only 
 - `src/mechanic-registry.js`: derives an immutable metadata collection from `src/mechanics/index.js` and owns exact lookup, fallback to `base`, and text filtering; it does not own mechanic definitions.
 - `src/mechanic-lab.js`: pure lab helpers. Owns query parsing, same-origin query replacement/sync, unknown-ID fallback through the registry, and exception-safe storage removal.
 - `src/mechanic-library.js`: mechanism browser UI. Owns search, unique primary-category grouping, status labels, detail rendering with `textContent`, generic detail-extension mounting/cleanup, host-first selection with an idempotent active-state fallback, mobile collapse/focus behavior, viewport synchronization, and listener cleanup.
-- `src/mechanics/index.js`: assembles and freezes the 17-module catalog (5 playable and 12 planned), then owns exact module lookup, playable-runtime resolution, composite-runtime forwarding for scalar and generic batch hooks, and optional generic detail-view factory delegation.
-- `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; owns page-local question/linked mechanic option defaults, generic detail-view commits from the current runtime snapshot, active-mechanic reset/queue reinitialization, and inactive-option HUD synchronization; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
+- `src/mechanics/index.js`: assembles and freezes the 17-module catalog (8 playable and 9 planned), then owns exact module lookup, playable-runtime resolution, composite runtime hooks, and optional generic detail-view factory delegation.
+- `src/main.js`: browser entry and current base runtime adapter. Wires the registry/library to `BusLoopGame`, `SceneView`, audio, and editor; owns page-local mechanic option defaults, generic detail-view commits from the current runtime snapshot, active-mechanic reset/queue reinitialization, and inactive-option HUD synchronization; freezes input for planned mechanisms; owns loading/end states, URL selection, tuning migration/save/reset, animation loop, and `window.__busLoop`.
 - `src/mechanics/star-passenger/`: completed star-passenger mechanic. `model.js` owns lifetime and charge state; `view.js` and `styles.css` own HUD, celebration, and reduced-motion feedback.
 - `src/mechanics/question-passenger/`: playable question-passenger module. `index.js` owns its definition/status and runtime/detail exports; `model.js` owns chance/authored assignment normalization and state metadata; `view.js` and `styles.css` own persistence-free detail mode/chance controls, normalized commit payloads, and authored-count summary.
+- `src/mechanics/garage/`: playable garage mechanic. `model.js` owns hidden garage stock, optional unlock-threshold gates, blocker-gated release, exiting vehicle state, counter values, and clear events. Rendering is in `src/scene-view.js`.
+- `src/mechanics/count-garage/`: playable count-garage mechanic. `model.js` wraps the garage runtime with per-garage dispatch thresholds.
+- `src/mechanics/valve/`: playable valve mechanic. `model.js` owns the active queue side, active color run, side switching, and valve snapshot data. Entrance markers render in `src/scene-view.js`.
+- `src/mechanics/order-passenger/`: playable order-passenger mechanic. `model.js` owns red/yellow/brown order counts and completion state; `view.js` and `styles.css` own the top order HUD.
 - `src/mechanics/linked-passengers/`: playable linked-passenger module. `model.js` owns chance/authored chain planning, chain metadata, and runtime batch policy; `view.js` and `styles.css` own page-session mode/chance/maximum-length controls and authored-chain summary.
 
 ### Base Runtime
@@ -78,7 +86,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 
 - `public/assets/runtime/`: neutral, web-optimized assets used directly by the lab, including compressed background, loop art, guide hand, color textures, and selected effects. Runtime URLs use `/assets/runtime/...`; do not reintroduce platform names.
 - `public/assets/unity/`: original or directly exported Unity models, textures, effects, fonts, and audio used for fidelity and tooling.
-- `src/level-data.js` is the main URL inventory; `src/scene-view.js` also directly references the runtime guide-hand asset.
+- `src/level-data.js` is the main URL inventory, including the garage `Truck_01.fbx` model; `src/scene-view.js` also directly references the runtime guide-hand asset.
 - `artifacts/scene-tuning.json` is an editor tuning handoff, not an automatically loaded runtime asset.
 
 ### Tests
@@ -86,16 +94,18 @@ Use this file before code changes. Pick the closest change area, then read only 
 - `test/mechanic-registry.test.js`: lab shell, CSS breakpoint contracts, library rendering/interactions, host-first selection/fallback ordering, detail-extension state and cleanup, mechanic detail-view factory and question settings controls, playable-resolution/status totals, registry completeness/freezing/filtering, URL helpers, and safe storage removal.
 - `test/question-passenger-mechanic.test.js`: question-passenger assignment/state, authored-mask bounds, reset rerolls, base gameplay invariance, hidden material transitions, badge/cache reuse, one-shot reveal timing and reduced-motion behavior, tuning, and scene-wiring contracts.
 - `test/linked-passengers-mechanic.test.js`: linked-passenger chance/authored planning, immutable level18 starts, atomic queue/belt/boarding behavior, composite batch forwarding and scalar fallback, detail controls, connector/aggregate feedback, reduced-motion, and activation contracts.
+- `test/garage-mechanic.test.js`: garage registry status, hidden stock, blocker-gated release, release order, counter timing, and scene-view source contracts.
+- `test/count-garage-mechanic.test.js`: count-garage registry status, per-garage unlock thresholds, locked display counts, and delayed garage release.
 - `test/star-passenger-mechanic.test.js`: star-passenger registry status, reward lifetime, cyclic charge, boarding/expiration behavior, UI wiring, and reduced-motion contracts.
+- `test/valve-mechanic.test.js`: valve registry/runtime status, side gating, automatic switch after a same-color run enters the belt, closed-side entry blocking, and scene-view source contracts.
+- `test/order-passenger-mechanic.test.js`: order-passenger registry status, target counting, mechanic-owned win condition, and top HUD source contracts.
 - `test/game-model.test.js`: base gameplay plus reset-version behavior, active question-passenger startup/reconfiguration, source/runtime contracts, page-session mechanic detail/apply wiring, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
 - `test/vehicle-effects.test.js`: ribbon, smoke, hit effects, particle motion, and editor-driven effect tuning.
 
 ## Known Test Baseline
 
-As of 2026-07-13, the linked-passenger and shared-architecture gate passes 34/34. The full suite executes 155 tests: 148 pass and 7 retain the user-approved question/garage/registry baseline failures (composite runtime ID, missing level18 question authored masks, the registry test's undefined expected-ID fixture, and question matching/boarding/departure/win-deadlock assertions). There are no linked-passenger failures. Production build and advertising packaging are explicitly outside the mechanic-lab gate.
-
-Linked-passenger browser QA passed at desktop 1280x720 and mobile 390x844 with page-session settings, authored summary, atomic capacity behavior, readable connectors/`xN` badges, aggregate boarding feedback, zero horizontal overflow, and no error-level logs. A temporary exact source override exercised the live reduced-motion branch and was restored cleanly; existing FBXLoader warnings remain non-blocking.
+As of 2026-07-13, focused verification was performed across mechanics: linked-passenger focused tests passed, and focused garage/valve/order-passenger/count-garage and question-passenger checks passed in their respective focused gates. The project retains a conservative test/run policy: `pnpm run build` historically passed with a known non-blocking chunk-size warning and full-suite runs should only be triggered when explicitly requested. Historical full-suite results are recorded in the progress docs; focused verification records are listed alongside each mechanic.
 
 ## Historical Material
 

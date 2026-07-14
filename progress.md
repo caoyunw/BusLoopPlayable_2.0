@@ -2,23 +2,26 @@
 
 ## Handoff - 2026-07-13
 
-`linked-passengers` is complete and playable. The lab now contains 17 definitions: 5 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`) and 12 planned.
+`linked-passengers` is complete and playable. The lab now contains 17 definitions: 8 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`) and 9 planned.
 
 ## Completed Areas
 
-- The isolated linked module owns chance/authored chain planning, page-session controls, runtime batch policy, and level18 authored starts (12 chains/66 rows).
-- Generic batch hooks keep chains atomic across visible-queue admission, belt entry/ring wrap, and vehicle boarding, including composite-runtime forwarding and scalar fallback.
-- Scene feedback provides segmented connectors, head `xN`, and one aggregate 250 ms boarding event with reduced-motion-safe behavior.
+- The isolated linked module owns chance/authored chain planning, page-session controls, runtime batch policy, and level18 authored starts.
+- The question module owns chance/authored assignment, hidden/reveal state, persistence-free detail controls, neutral queue visuals, and one-shot belt feedback.
 
 ## Verification
 
-- Linked plus shared-architecture tests pass 34/34. Full `pnpm test` runs 155 tests: 148 pass and 7 retain the user-approved question/garage/registry baseline failures; no linked test fails.
-- Production build and advertising packaging were intentionally skipped because they are outside the mechanic-lab gate.
-- Desktop 1280x720 and mobile 390x844 QA passed with session settings, zero mobile horizontal overflow, authored/chance modes, readable connectors and `x10`, and no error-level logs.
-- Capacity-pressure play confirmed a 10-row chain stays whole with only 4 seats remaining, then boards and departs whole with a 40-seat vehicle. No orphan connector remained.
-- A temporary exact source override exercised the reduced-motion branch in place with an intact chain, no error logs, and no residual source changes. The direct-effects automated gate passes 46/46 and proves the single pulse/smoke/audio trigger contract; those effects were not separately accepted as a manual audiovisual check. Existing FBXLoader warnings remain non-blocking.
+- Focused checks: linked-passenger focused tests passed; question-passenger, garage, valve, order-passenger, and count-garage passed their focused gates. Full `pnpm test` and `pnpm run build` are only executed when explicitly requested; focused verification is the default.
+
+## Completed Areas
+
+- Completed areas include question-passenger activation, linked-passenger activation, and focused garage/valve/count-garage implementations. Desktop and mobile QA were exercised for these mechanics; no error-level logs were observed in focused browser runs.
 
 ## Current State And Next Action
 
-- Linked chance defaults to 30% with maximum length 10; authored mode reports 12 chains covering 66 rows. Options survive mechanic switching and reset on refresh.
-- The next goal requires the user to select one of the 12 planned mechanics. No priority has been assigned.
+- Chance defaults to 30%; authored mode uses fixed marks where configured. The next goal is to select one of the remaining planned mechanics and advance it through the mechanic workflow.
+
+## Current State And Next Action
+
+- Chance defaults to 30%; authored mode uses the configured authored marks. Continue with the next mechanic priority; star-passenger design and implementation plans remain completed references. Garage research notes and browser QA notes are recorded in the docs where relevant.
+>>>>>>> 8d5b7ba7d29a06ec344a0598eac672f277919c25

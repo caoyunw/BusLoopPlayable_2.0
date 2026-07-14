@@ -1,0 +1,125 @@
+.order-passenger-hud {
+  position: absolute;
+  z-index: 7;
+  top: 14px;
+  left: 50%;
+  width: min(286px, calc(100% - 104px));
+  padding: 8px 10px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(62, 79, 76, .22);
+  border-radius: 6px;
+  background: rgba(250, 252, 247, .94);
+  box-shadow: 0 10px 24px rgba(28, 39, 38, .15);
+  pointer-events: none;
+}
+
+.order-passenger-hud[hidden] { display: none; }
+
+.order-passenger-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.order-passenger-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 6px;
+  border: 1px solid rgba(58, 73, 70, .16);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .76);
+}
+
+.order-passenger-item.is-complete {
+  opacity: .58;
+}
+
+.order-passenger-count[hidden],
+.order-passenger-check[hidden] {
+  display: none;
+}
+
+.order-passenger-icon {
+  position: relative;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 24px;
+}
+
+.order-passenger-icon-head,
+.order-passenger-icon-body {
+  position: absolute;
+  left: 50%;
+  display: block;
+  transform: translateX(-50%);
+  background: var(--order-passenger-color);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .14), 0 1px 2px rgba(0, 0, 0, .16);
+}
+
+.order-passenger-icon-head {
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.order-passenger-icon-body {
+  bottom: 1px;
+  width: 16px;
+  height: 14px;
+  border-radius: 8px 8px 5px 5px;
+}
+
+.order-passenger-count {
+  min-width: 2ch;
+  color: #1f2f2b;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
+.order-passenger-check {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #21b15b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 16px;
+  text-align: center;
+  animation: order-passenger-check-pop .34s ease-out both;
+  box-shadow: 0 2px 5px rgba(16, 103, 55, .24);
+}
+
+@keyframes order-passenger-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(.45);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-passenger-check {
+    animation: none;
+  }
+}

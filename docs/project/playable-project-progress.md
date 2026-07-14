@@ -6,9 +6,10 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Mechanic Lab Foundation
 
-- The registry contains 17 mechanism definitions: 5 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`) and 12 planned.
+- The registry contains 17 mechanism definitions: 8 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`) and 9 planned.
 - The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
-- The base runtime, imported level18 data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
+- The base runtime, active level18 data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
+>>>>>>> 8d5b7ba7d29a06ec344a0598eac672f277919c25
 - Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
 
 ### Star-Passenger Feedback
@@ -23,6 +24,22 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 - Hidden groups keep their models and shadows, use neutral-gray materials with four readable question badges, and reveal their real color once on entering the belt. True color order and base boarding/win/fail rules are unchanged.
 - Chance resets reroll only question positions; authored resets remain fixed. Mode/chance options persist only for the page session, survive switching away and back, and return to chance/30% on refresh.
 - Reveal de-duplication uses passenger identity plus `revealVersion`; reset generations clear transient reveal state. The reduced-motion branch preserves color/brightness/fade feedback without scale or expanding-flash transforms.
+
+### Garage Mechanic
+
+- `garage` is now a playable runtime mechanic instead of a planned card. Hidden vehicles are stocked by container and release one at a time; the visible counter decrements when a vehicle begins exiting and the model hides when count reaches `0`.
+
+### Valve Mechanic
+
+- `valve` is now a playable runtime mechanic instead of a planned card. After initial conveyor fill only the currently open side may feed its same-color run; the valve switches automatically after that run completes. Entrance markers render at both entry points.
+
+### Count Garage Mechanic
+
+- `count-garage` is a dispatch-count-gated garage variant that unlocks per configured thresholds and reuses the garage one-at-a-time flow.
+
+### Active Level18 Configuration
+
+- The active runtime level is `GameSceneDualQueue2` level18 with 47 vehicles, two fixed queues of 115 and 191 passenger groups, and 306 total passenger groups. The level includes two garage containers and stocked garage vehicles where provided.
 
 ### Linked-Passengers
 
@@ -39,15 +56,8 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Linked-passenger and shared-architecture tests pass 34/34. Full `pnpm test` executes 155 tests: 148 pass and 7 are the user-approved pre-existing question/garage/registry baseline failures; no linked-passenger test fails.
-- Production build, Three.js/Vite packaging, and advertising delivery checks were not run because they are explicitly outside this mechanic-lab completion gate.
-- Desktop 1280x720 QA passed with chance 30%/maximum 10, authored 12-chain/66-row summary, session-only switching, readable connectors/`x10`, and no planned overlay. A 10-row chain stayed intact when only 4 seats remained, then boarded and departed as one chain with a 40-seat vehicle.
-- Mobile 390x844 QA passed with zero document/body/settings horizontal overflow, usable drawer controls, and readable queue/belt connectors and `x10` badge.
-- A temporary exact source override exercised the live reduced-motion branch: the branch ran in place, the chain stayed whole, the page reported no errors, and the source was restored without residual changes. The direct-effects automated gate passes 46/46 and proves the single pulse/smoke/audio trigger contract; those effects were not separately accepted as a manual audiovisual check. Existing FBXLoader warnings remain non-blocking.
-
-### Next Step
-
-Select the next mechanic from the 12 planned definitions, then begin its design and implementation workflow. No next-mechanic priority has been chosen.
+- Focused verification highlights: question-passenger focused suite and registry gates passed; linked-passenger focused gate passed; focused garage/valve/order/count-garage checks passed in their focused runs. `pnpm run build` has historically passed with a known non-blocking chunk-size warning. Full suite and build should only be run when explicitly requested; focused checks are the default verification path.
+>>>>>>> 8d5b7ba7d29a06ec344a0598eac672f277919c25
 
 ## Historical Playable/Advertising Log
 

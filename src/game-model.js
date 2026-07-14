@@ -400,6 +400,7 @@ export class BusLoopGame {
       motionData: { path, duration: stationMotion.duration, curve: stationMotion.curve }
     });
     this.lastEvent = { type: 'vehicle-dispatched', vehicleId: id, spotIndex: spot.index };
+    this.mechanicRuntime.onVehicleDispatched?.({ game: this, vehicle, spot });
     this.emit();
     return { ok: true, spotIndex: spot.index };
   }
@@ -507,21 +508,23 @@ export class BusLoopGame {
     for (const slot of this.slots) {
       slot.previousProgress = slot.progress;
       slot.progress = wrap01(slot.progress + progressDelta);
-    }
-
-    for (const slot of this.slots) {
-      if (slot.colorIndex !== null) continue;
-      const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
-      if (!entry) continue;
-      const waitingBatch = this.peekPassengerBatch(entry.index);
-      if (!waitingBatch) {
-        if (this.initialFillActive) {
-          const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
-          const clamp = wrap01(slot.progress - holdProgress);
-          if (clamp > initialFillClamp) {
-            initialFillClamp = clamp;
-            initialFillHoldSlot = slot;
-            initialFillHoldProgress = holdProgress;
+      if (slot.colorIndex === null) {
+        const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
+        if (!entry) continue;
+        if (!this.canPassengerEnterBelt(entry)) continue;
+        const passenger = this.dequeuePassenger(entry.index, true);
+        if (passenger === null) {
+          if (this.initialFillActive) {
+            const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
+            const clamp = wrap01(slot.progress - holdProgress);
+            if (clamp > initialFillClamp) {
+              initialFillClamp = clamp;
+              initialFillHoldSlot = slot;
+              initialFillHoldProgress = holdProgress;
+            }
+          }
+        }
+        continue;
           }
         }
         continue;
@@ -783,6 +786,10 @@ export class BusLoopGame {
     return this.mechanicRuntime.decorateSnapshot?.(this) ?? {};
   }
 
+  canPassengerEnterBelt(entry) {
+    return this.mechanicRuntime.canPassengerEnterBelt?.({ game: this, entry }) ?? true;
+  }
+
   updateQueues(delta) {
     const speed = Math.max(0.01, this.level.passengerEntryMotion?.passengerSpeed ?? this.level.conveyorSpeed);
     const step = speed * Math.max(0, delta) * this.speedMultiplier;
@@ -919,6 +926,11 @@ export class BusLoopGame {
   }
 
   checkEndState() {
+    if (this.mechanicRuntime.hasWon?.(this)) {
+      this.status = 'won';
+      this.lastEvent = { type: 'win', reason: 'mechanic-goal-complete', mechanicId: this.mechanicId };
+      return;
+    }
     if (this.vehicles.every((vehicle) => vehicle.state === 'done')) {
       this.status = 'won';
       this.lastEvent = { type: 'win' };

@@ -25,9 +25,11 @@ test('mechanic modules own registry definitions and expose unique ids', () => {
 test('planned mechanics resolve to base runtime while playable mechanics keep their id', () => {
   assert.equal(resolvePlayableMechanicId('base'), 'base');
   assert.equal(resolvePlayableMechanicId('star-passenger'), 'star-passenger');
+  assert.equal(resolvePlayableMechanicId('valve'), 'valve');
   assert.equal(resolvePlayableMechanicId('train'), 'base');
   assert.equal(createMechanicRuntime('train').id, 'base');
   assert.equal(createMechanicRuntime('star-passenger', { random: () => 1 }).id, 'star-passenger');
+  assert.equal(createMechanicRuntime('valve').id, 'valve');
 });
 
 test('star passenger owns its model and view implementation files', () => {

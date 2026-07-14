@@ -4,8 +4,12 @@
 
 ### Mechanic Lab Boundaries
 
-- The active product is a mechanic design and experience lab. After linked-passenger activation, the registry contains 17 definitions: 5 playable (`base`, `question-passenger`, `garage`, `star-passenger`, `linked-passengers`) and 12 planned.
+- The active product is a mechanic design and experience lab. After recent merges the registry contains 17 definitions: 8 playable (`base`, `question-passenger`, `garage`, `star-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`) and 9 planned.
 - Each `src/mechanics/*/index.js` owns its mechanic identity, metadata, and status; `src/mechanics/index.js` is the assembled module source of truth. `src/mechanic-registry.js` derives the frozen metadata collection and provides lookup, fallback, and search.
+=======
+- The active product is a mechanic design and experience lab. The registry contains 17 definitions: 4 playable (`base`, `garage`, `star-passenger`, `valve`) and 13 planned.
+- `src/mechanic-registry.js` is the source of truth for mechanism identity, metadata, state, lookup, fallback, and search.
+>>>>>>> Stashed changes
 - `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
 - `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
 - New mechanism behavior should live behind an isolated module boundary and reuse base runtime contracts. Do not grow a large mechanism switch inside `src/main.js`.
@@ -57,11 +61,7 @@
 
 ### Active Level Layout
 
-- The base mechanism now targets imported level18 `GameSceneDualQueue2` data rather than the earlier level12-style or original six-vehicle prototype.
-- The merged level18 data has two fixed queues with 115 and 191 groups, a largest vehicle capacity of 10 groups, authored garage containers, and authored `vehicleDepthes` blocker data.
-- The duplicate `})` introduced at the `LEVEL18_VEHICLE_DEPTHES` merge boundary was removed; `src/level-data.js` now passes syntax checking and imports level18 with queues 115/191 and 47 vehicles.
-- The post-fix `test/game-model.test.js` run executes 40 tests: 38 pass and 2 pre-existing garage-merge baseline assertions fail. They expect scalar runtime ID `question-passenger` instead of `question-passenger+garage`, and the removed level12 authored question mask instead of the current level18 zero-mask state.
-- Vehicle seat totals match fixed passenger queue totals by color. Initial movable vehicles are `1, 4, 34, 51`.
+- The base mechanism now targets imported level18 `GameSceneDualQueue2` data rather than earlier prototypes. Active data includes 47 vehicles, two fixed queues (115 and 191 groups), CSV-sourced `vehicleDepthes` blocker relationships, and two garage containers with stocked vehicles. A duplicate `})` introduced during the merge was removed and `src/level-data.js` now passes syntax checks.
 
 ### Conveyor And Passenger Entry
 
@@ -82,6 +82,48 @@
 - Current authored camera behavior keeps configured visible height across viewport aspects; wider screens reveal more horizontal content.
 - Phone preview framing is an editor tool and must not be confused with the actual responsive stage dimensions during browser QA.
 - Vehicle arrows move with the vehicle hit root. Collision and station paths remain owned by `src/vehicle-motion.js` and tuning.
+
+### Unity Garage Mechanic Extraction
+
+- Unity garage behavior is owned by `VehicleContainerGarage`, `StateOutGarage`, and `GarageContainerCollideInfo`; the prefab provides `InitPos`, `BusObject`, `uiPos`, `ParkPos`, an animator, and a feedback player.
+- Garage stock is built from level vehicles with `containerType == Garage` and matching `containerId`; vehicles are stored hidden and released one at a time when the door/front is clear.
+- The displayed garage count subtracts the currently driving-out vehicle immediately, before the out animation completes.
+- Unity models garage blocking through five graph nodes: head, tail, door, out path, and body. A web first pass can approximate this through the existing blocker model, but the durable rule is that the garage door and out path must block/release sequentially.
+- Full extraction notes are recorded in `docs/superpowers/specs/2026-07-13-garage-unity-extraction.md`.
+
+### Web Garage Implementation
+
+- `garage` is now playable in the web mechanic lab. The first pass stores matching garage vehicles as hidden `in-garage` vehicles, releases them through `leaving-garage`, and returns them to normal `parked` state after the out duration.
+- Garage containers are also treated as an automatic level feature. Any level with `type: 2` garage containers enables the garage runtime alongside the selected playable mechanic, so the default `base` view still hides stocked garage vehicles and renders garage snapshots.
+- Garage release does not reuse the ordinary vehicle `vehicleDepthes` graph. That graph controls whether a visible vehicle can be clicked to leave the field; it must not stop the first hidden garage vehicle from spawning. On level18, the first stocked vehicles `38` and `60` enter `leaving-garage` on the first gameplay update. A full five-node garage collision graph remains a possible fidelity upgrade.
+- Garage drive-out uses Unity prefab anchors rather than hidden-stock layout coordinates: `BusObject` local `{ x: 0, z: -0.1748478 }` is the out animation start and `ParkPos` local `{ x: 0, z: 0.70000005 }` is the parking point after release. For level18 this parks vehicle `38` at `(-0.7070351, 0.33480565)` and vehicle `60` at approximately `(-0.03203511, 0.60617142)`. Released garage vehicles use dynamic collision blockers from their new position instead of stale authored `vehicleDepthes`.
+- Garage model visibility follows the displayed inside-stock count. When the last stocked vehicle begins `leaving-garage`, the counter reaches `0` and the garage snapshot is marked hidden, while the exiting vehicle continues its own drive-out animation.
+- The scene renders garage snapshots with the Unity `Truck_01.fbx` model. The web renderer preserves source material slot names, uses `Truck_Main_DarkBlue.png` for the body and `Truck_Metal_Matcap.png` through `MeshMatcapMaterial` for metal parts, and applies garage model axis correction before sizing. The simple geometry remains only as a no-asset fallback.
+- Garage container coordinates are still parsed from authored `containers[].position.x/z`, while container rotation is converted from the Unity quaternion to yaw. Rendering maps those through `vehicleArea` transforms; model pitch/roll correction is a local asset-orientation fix and should not be baked back into level data.
+- Garage audio events are named `garage_out` and `garage_clear`; they are silent unless future audio config provides matching clips.
+
+### Web Count Garage Implementation
+
+- `count-garage` is playable in the web mechanic lab. It reuses the garage hidden-stock/release runtime with per-garage unlock thresholds.
+- Successful `clickVehicle` dispatches increment the count-garage unlock counter. Garage id `1` unlocks after 10 successful vehicle dispatches; garage id `2` unlocks after 20.
+- Locked count garages keep their stocked vehicles hidden as `in-garage` and block release. Their garage label uses a dark lock-shaped badge and displays remaining unlock count; once unlocked, the label returns to the ordinary yellow stock-count badge and release follows the existing one-at-a-time garage rules.
+- The count-garage runtime declares that it handles garage containers, so selecting `count-garage` does not also stack the default auto-enabled `garage` feature runtime.
+
+### Web Valve Implementation
+
+- `valve` is playable in the web mechanic lab. It adds a model-level `canPassengerEnterBelt` gate so mechanic modules can decide whether an empty conveyor slot may receive a passenger from a side entry.
+- Valve state is side-based, not player-toggle based. During initial conveyor fill, both side queues can enter normally and switching has not started. After initial fill completes, the valve starts on entry `0` when that side still has supply, locks to that side's current queue-head color, and switches to the next side after that visible same-color run has entered the belt.
+- Closed side entries do not clamp initial conveyor fill because closed-side gating only applies after the initial-fill phase.
+- The scene renders lightweight valve markers at `LEVEL_1.entryPercents`, using open/closed door rotation and the current/head color as the marker color. No new art asset is required for this first playable pass.
+- Browser QA on 2026-07-13 confirmed the selected valve card, nonblank canvas, visible left/right entrance markers, collapsed mobile drawers at 390x844, and no console errors.
+
+### Web Order Passenger Implementation
+
+- `order-passenger` is playable in the web mechanic lab. It replaces the level-completion goal with a mechanic-owned order goal: finish all red, yellow, and brown passenger groups.
+- The order target counts are derived from the active level queues and displayed as passenger counts by multiplying group counts by `level.groupSize` (4 in level18). Current level18 order totals are red `184`, yellow `224`, and brown `176`.
+- The base model exposes a mechanic runtime `hasWon(game)` hook. `order-passenger` uses it to end the level as soon as all three order targets reach zero, even if unrelated vehicles/passengers remain.
+- The order HUD lives in `src/mechanics/order-passenger/view.js` and renders a top stage panel with color passenger icons plus remaining passenger counts. It only appears while the selected mechanic is `order-passenger`.
+- Browser QA on 2026-07-13 confirmed the selected order-passenger card, top order HUD, level18 counts `184/224/176`, nonblank canvas, collapsed mobile drawers at 390x844, and no console errors.
 
 ## Historical Advertising Packaging - Removed
 
