@@ -1,3 +1,5 @@
+import { LEVEL18_ROTARY_LAYOUT } from './levels/generated/level18-rotary-layout.js';
+
 export const COLORS = Object.freeze({
   0: { name: 'Blue', hex: 0x0061e8, css: '#0061e8' },
   1: { name: 'Green', hex: 0x118024, css: '#118024' },
@@ -154,55 +156,7 @@ export const LEVEL_1 = Object.freeze({
     spotApproachOffsetZ: 0.5,
     spotApproachDirection: 'screen-down'
   },
-  vehicles: [
-    { id: 28, seats: 10, colorIndex: 0, x: 0.27567083, z: 1.1003189, yaw: 89.999998 },
-    { id: 29, seats: 10, colorIndex: 5, x: -1.2571762, z: -0.23574443, yaw: -179.999995 },
-    { id: 30, seats: 4, colorIndex: 5, x: -1.1691761, z: -1.6416624, yaw: -89.999998 },
-    { id: 31, seats: 10, colorIndex: 4, x: 1.0436721, z: 1.0903189, yaw: 89.999998 },
-    { id: 32, seats: 10, colorIndex: 4, x: 0.9779671, z: -1.9973671, yaw: 89.999998 },
-    { id: 33, seats: 10, colorIndex: 4, x: -1.2571762, z: -1.0316133, yaw: -179.999995 },
-    { id: 34, seats: 6, colorIndex: 3, x: -0.54990786, z: -1.1520834, yaw: 0 },
-    { id: 35, seats: 6, colorIndex: 1, x: -1.1471763, z: 1.062319, yaw: 89.999998 },
-    { id: 36, seats: 6, colorIndex: 5, x: 0.91796625, z: -1.0053186, yaw: -179.999995 },
-    { id: 37, seats: 6, colorIndex: 4, x: 0.59796625, z: -0.9953187, yaw: -179.999995 },
-    { id: 39, seats: 10, colorIndex: 8, x: 1.2579668, z: 0.48251456, yaw: 0 },
-    { id: 40, seats: 6, colorIndex: 8, x: 0.23954469, z: -1.5303199, yaw: -179.999995 },
-    { id: 41, seats: 4, colorIndex: 8, x: 0.03446002, z: -1.0766943, yaw: -89.999998 },
-    { id: 42, seats: 10, colorIndex: 5, x: 0.02270221, z: -0.20331733, yaw: -89.999998 },
-    { id: 43, seats: 10, colorIndex: 1, x: 0.02270223, z: 0.1668058, yaw: -89.999998 },
-    { id: 44, seats: 6, colorIndex: 1, x: 0.7499656, z: -0.2111943, yaw: 89.999998 },
-    { id: 45, seats: 10, colorIndex: 0, x: 1.257967, z: -0.8534891, yaw: 0.000008 },
-    { id: 46, seats: 4, colorIndex: 0, x: 0.7592996, z: -0.5742679, yaw: 89.999998 },
-    { id: 47, seats: 10, colorIndex: 3, x: -1.2471762, z: 0.5242751, yaw: 0 },
-    { id: 48, seats: 10, colorIndex: 3, x: -0.47703415, z: 1.0903189, yaw: 89.999998 },
-    { id: 49, seats: 6, colorIndex: 1, x: 1.2699656, z: -1.5503194, yaw: 0 },
-    { id: 50, seats: 4, colorIndex: 1, x: 0.9179662, z: -1.560873, yaw: -179.999995 },
-    { id: 51, seats: 4, colorIndex: 8, x: 0.5979661, z: -1.560873, yaw: -179.999995 },
-    { id: 52, seats: 6, colorIndex: 5, x: -0.11832958, z: -1.5400832, yaw: -179.999995 },
-    { id: 53, seats: 4, colorIndex: 5, x: 0.7427551, z: 0.16680577, yaw: 89.999998 },
-    { id: 54, seats: 6, colorIndex: 3, x: 1.2579668, z: -0.18531734, yaw: 0 },
-    { id: 55, seats: 10, colorIndex: 3, x: 0.04270219, z: -1.990319, yaw: -89.999998 },
-    { id: 56, seats: 4, colorIndex: 0, x: -1.1519656, z: -2.000319, yaw: -89.999998 },
-    { id: 57, seats: 4, colorIndex: 1, x: 0.0423342, z: -0.64919424, yaw: -179.999995 },
-    { id: 58, seats: 4, colorIndex: 1, x: -0.5899078, z: -1.8811095, yaw: -179.999995 },
-    { id: 59, seats: 6, colorIndex: 5, x: -0.84717625, z: -1.1520834, yaw: 0.000002 },
-    { id: 38, seats: 4, colorIndex: 2, x: -1.3850003, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 61, seats: 4, colorIndex: 4, x: -0.8450003, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 62, seats: 6, colorIndex: 2, x: -0.3050003, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 63, seats: 10, colorIndex: 5, x: 0.23499972, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 64, seats: 6, colorIndex: 1, x: 0.77499974, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 65, seats: 4, colorIndex: 3, x: 1.3149998, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 66, seats: 10, colorIndex: 8, x: 1.8549998, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 67, seats: 6, colorIndex: 3, x: 2.3949997, z: 1.5028379, yaw: 0, containerType: 2, containerId: 1 },
-    { id: 60, seats: 6, colorIndex: 8, x: -2.7299998, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 68, seats: 6, colorIndex: 4, x: -2.1899998, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 69, seats: 4, colorIndex: 1, x: -1.6499999, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 70, seats: 6, colorIndex: 0, x: -1.1099999, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 71, seats: 4, colorIndex: 0, x: -0.5699999, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 72, seats: 4, colorIndex: 3, x: -0.02999985, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 73, seats: 6, colorIndex: 3, x: 0.51000017, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 },
-    { id: 74, seats: 4, colorIndex: 8, x: 1.0500002, z: 0.75783837, yaw: 0, containerType: 2, containerId: 2 }
-  ],
+  vehicles: LEVEL18_ROTARY_LAYOUT.vehicles,
   containers: [
     { id: 0, type: 1, x: 0, z: 0, yaw: 0 },
     { id: 1, type: 2, x: -0.7070351, z: -0.3651944, yaw: 0 },
@@ -266,21 +220,7 @@ export const LEVEL_1 = Object.freeze({
         })
       ])
     }),
-    'rotary-lane': Object.freeze({
-      lanes: Object.freeze([
-        Object.freeze({
-          id: 'outer-loop',
-          slots: Object.freeze([
-            Object.freeze({ x: -1.45, z: 1.75, yaw: 90, vehicleId: 56 }),
-            Object.freeze({ x: 0, z: 1.75, yaw: 90, vehicleId: 55 }),
-            Object.freeze({ x: 1.45, z: 1.75, yaw: 0, vehicleId: 32 }),
-            Object.freeze({ x: 1.45, z: 3, yaw: -90, vehicleId: 31 }),
-            Object.freeze({ x: 0, z: 3, yaw: -90, vehicleId: 28 }),
-            Object.freeze({ x: -1.45, z: 3, yaw: 180, vehicleId: 35 })
-          ])
-        })
-      ])
-    })
+    'rotary-lane': LEVEL18_ROTARY_LAYOUT.rotaryLane
   }),
   assets: {
     loopScene: '/assets/runtime/Loop_02_q80.webp',

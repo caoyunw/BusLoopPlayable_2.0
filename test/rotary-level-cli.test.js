@@ -7,10 +7,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { validateLevelDocument } from '../tools/rotary-level-contract/validate.js';
+import { applyDocument } from '../scripts/rotary-level.mjs';
 import {
+  convertDocumentToRuntimeLayout,
   exportLevel18Document,
   getCurrentLevel18ContextPayload
 } from '../scripts/rotary-level-adapters/level18.mjs';
+import { renderGeneratedLayout } from '../scripts/rotary-level-source.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const cliPath = fileURLToPath(
@@ -119,4 +122,61 @@ test('adapter source stays isolated from game and scene runtime modules', async 
     'utf8'
   );
   assert.match(sceneSource, /roadWidth:\s*0\.42/);
+});
+
+test('generated source is deterministic and deeply frozen', async () => {
+  const document = await exportLevel18Document();
+  const layout = convertDocumentToRuntimeLayout(document);
+  const source = renderGeneratedLayout(layout);
+  assert.match(source, /export const LEVEL18_ROTARY_LAYOUT/);
+  assert.match(source, /deepFreeze/);
+  assert.equal(source, renderGeneratedLayout(layout));
+});
+
+test('dry run and invalid apply leave target bytes unchanged', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'busloop-rotary-apply-'));
+  try {
+    const target = join(directory, 'layout.js');
+    const marker = 'export const marker = 1;\n';
+    await writeFile(target, marker, 'utf8');
+    const document = await exportLevel18Document();
+    const dryRun = await applyDocument(document, { target, dryRun: true });
+    assert.equal(dryRun.changed, true);
+    assert.equal(await readFile(target, 'utf8'), marker);
+
+    const invalid = structuredClone(document);
+    invalid.vehicles[1].id = invalid.vehicles[0].id;
+    await assert.rejects(
+      () => applyDocument(invalid, { target }),
+      /validation failed/
+    );
+    assert.equal(await readFile(target, 'utf8'), marker);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('same document applies idempotently', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'busloop-rotary-idempotent-'));
+  try {
+    const target = join(directory, 'layout.js');
+    await writeFile(target, '', 'utf8');
+    const document = await exportLevel18Document();
+    const first = await applyDocument(document, { target });
+    const second = await applyDocument(document, { target });
+    assert.equal(first.changed, true);
+    assert.equal(second.changed, false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('exported canonical level regenerates the checked-in runtime source byte-for-byte', async () => {
+  const document = await exportLevel18Document();
+  const expected = renderGeneratedLayout(convertDocumentToRuntimeLayout(document));
+  const actual = await readFile(
+    new URL('../src/levels/generated/level18-rotary-layout.js', import.meta.url),
+    'utf8'
+  );
+  assert.equal(actual, expected);
 });

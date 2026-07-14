@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
+import { LEVEL18_ROTARY_LAYOUT } from '../src/levels/generated/level18-rotary-layout.js';
 import { getMechanicById } from '../src/mechanic-registry.js';
 
 function createGarageLevel(overrides = {}) {
@@ -125,6 +126,22 @@ test('level18 garage first hidden vehicles 38 and 60 auto-release on entry', () 
   assert.deepEqual(state.garages.map((garage) => garage.exitingVehicleId), [38, 60]);
   assert.deepEqual(state.garages.map((garage) => garage.displayCount), [7, 7]);
   assert.deepEqual(state.garages.map((garage) => garage.hidden), [false, false]);
+});
+
+test('generated level18 layout preserves both garage release sequences', () => {
+  assert.equal(LEVEL_1.vehicles, LEVEL18_ROTARY_LAYOUT.vehicles);
+  const sequenceFor = (garageId) => LEVEL_1.vehicles
+    .filter(({ containerType, containerId }) => (
+      Number(containerType) === 2 && Number(containerId) === garageId
+    ))
+    .map(({ id }) => id);
+  assert.deepEqual(sequenceFor(1), [38, 61, 62, 63, 64, 65, 66, 67]);
+  assert.deepEqual(sequenceFor(2), [60, 68, 69, 70, 71, 72, 73, 74]);
+  assert.equal(LEVEL_1.vehicles.length, 47);
+  assert.deepEqual(
+    new Set(LEVEL_1.vehicles.map(({ id }) => id)),
+    new Set(LEVEL18_ROTARY_LAYOUT.vehicles.map(({ id }) => id))
+  );
 });
 
 test('garage vehicles park at the Unity ParkPos anchor after driving out', () => {

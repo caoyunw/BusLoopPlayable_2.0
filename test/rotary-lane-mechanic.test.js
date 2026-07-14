@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
+import { LEVEL18_ROTARY_LAYOUT } from '../src/levels/generated/level18-rotary-layout.js';
 import {
   createRotaryLaneRuntime,
   normalizeRotaryLanes,
@@ -184,6 +185,23 @@ test('level18 authors one frozen six-slot rotary lane', () => {
   assert.equal(config.lanes[0].slots.length, 6);
   assert.deepEqual(
     config.lanes[0].slots.map(({ vehicleId }) => vehicleId),
+    [56, 55, 32, 31, 28, 35]
+  );
+});
+
+test('level18 formal vehicles and rotary lane come from the generated frozen layout', () => {
+  assert.equal(LEVEL_1.vehicles, LEVEL18_ROTARY_LAYOUT.vehicles);
+  assert.equal(
+    LEVEL_1.mechanics['rotary-lane'],
+    LEVEL18_ROTARY_LAYOUT.rotaryLane
+  );
+  assert.equal(Object.isFrozen(LEVEL18_ROTARY_LAYOUT), true);
+  assert.equal(Object.isFrozen(LEVEL18_ROTARY_LAYOUT.vehicles), true);
+  assert.equal(Object.isFrozen(LEVEL18_ROTARY_LAYOUT.vehicles[0]), true);
+  assert.equal(Object.isFrozen(LEVEL18_ROTARY_LAYOUT.rotaryLane.lanes), true);
+  assert.deepEqual(
+    LEVEL18_ROTARY_LAYOUT.rotaryLane.lanes[0].slots
+      .map(({ vehicleId }) => vehicleId),
     [56, 55, 32, 31, 28, 35]
   );
 });

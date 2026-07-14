@@ -7,8 +7,15 @@ import { computeContextFingerprint } from '../tools/rotary-level-contract/finger
 import { validateLevelDocument } from '../tools/rotary-level-contract/validate.js';
 import {
   LEVEL18_ID,
-  exportLevel18Document
+  LEVEL18_OUTPUT,
+  convertDocumentToRuntimeLayout,
+  exportLevel18Document,
+  getCurrentLevel18ContextPayload
 } from './rotary-level-adapters/level18.mjs';
+import {
+  renderGeneratedLayout,
+  replaceFileSafely
+} from './rotary-level-source.mjs';
 
 const COMMAND_FLAGS = {
   export: new Set(['--level', '--out']),
@@ -84,6 +91,54 @@ export async function validateInputDocument(inputPath) {
   return { ok: true, document, ...validation };
 }
 
+export async function applyDocument(
+  document,
+  {
+    target = fileURLToPath(LEVEL18_OUTPUT),
+    dryRun = false,
+    fs
+  } = {}
+) {
+  const validation = validateLevelDocument(document);
+  if (validation.errors.length > 0) {
+    throw new Error(
+      `validation failed: ${validation.errors[0].code} ${validation.errors[0].path}`
+    );
+  }
+  const embeddedFingerprint = await computeContextFingerprint(document);
+  if (embeddedFingerprint !== document.target.contextFingerprint) {
+    throw new Error('validation failed: target.context-fingerprint-mismatch');
+  }
+  if (document.target.levelId !== LEVEL18_ID
+    || document.target.adapter !== 'busloop-level-data.v1') {
+    throw new Error('validation failed: unsupported target');
+  }
+  const currentPayload = getCurrentLevel18ContextPayload();
+  const currentFingerprint = await computeContextFingerprint(currentPayload);
+  if (currentFingerprint !== document.target.contextFingerprint) {
+    throw new Error('validation failed: target context is stale');
+  }
+
+  const layout = convertDocumentToRuntimeLayout(document);
+  const content = renderGeneratedLayout(layout);
+  let changed;
+  if (dryRun) {
+    const current = await (fs ?? { readFile }).readFile(target, 'utf8')
+      .catch(() => null);
+    changed = current !== content;
+  } else {
+    await (fs?.mkdir ?? mkdir)(dirname(target), { recursive: true });
+    ({ changed } = await replaceFileSafely(target, content, fs));
+  }
+  return {
+    changed,
+    dryRun,
+    target,
+    vehicleCount: layout.vehicles.length,
+    laneCount: layout.rotaryLane.lanes.length
+  };
+}
+
 export async function runCli(
   argv,
   {
@@ -119,11 +174,14 @@ export async function runCli(
       );
       return 0;
     }
-    if (parsed.values['--dry-run']) {
-      stdout.write(`Dry run valid for ${validation.document.documentId}\n`);
-      return 0;
-    }
-    throw new Error('Apply runtime integration is not available yet');
+    const applied = await applyDocument(validation.document, {
+      dryRun: Boolean(parsed.values['--dry-run'])
+    });
+    stdout.write(
+      `${applied.dryRun ? 'Dry run' : 'Apply'} ${applied.changed ? 'changed' : 'unchanged'}: `
+      + `${applied.vehicleCount} vehicles, ${applied.laneCount} lanes\n`
+    );
+    return 0;
   } catch (error) {
     stderr.write(`${error.message}\n`);
     return 1;
