@@ -159,6 +159,19 @@ test('train runtime creates isolated track state and marks only selected vehicle
   assert.equal(game.mechanicState.train.locomotive.phase, 'ready');
 });
 
+test('active train selection composes with the level garage runtime', () => {
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'train',
+    mechanics: { train: { mode: 'authored' } }
+  });
+  const snapshot = game.snapshot();
+
+  assert.equal(game.getMechanicId(), 'train');
+  assert.equal(snapshot.train.mode, 'authored');
+  assert.equal(snapshot.train.carriageVehicleIds.length, 12);
+  assert.ok(snapshot.garages.length > 0);
+});
+
 function createAuthoredTrainGame() {
   const level = {
     ...LEVEL_1,

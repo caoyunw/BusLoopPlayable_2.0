@@ -26,8 +26,8 @@ test('planned mechanics resolve to base runtime while playable mechanics keep th
   assert.equal(resolvePlayableMechanicId('base'), 'base');
   assert.equal(resolvePlayableMechanicId('star-passenger'), 'star-passenger');
   assert.equal(resolvePlayableMechanicId('valve'), 'valve');
-  assert.equal(resolvePlayableMechanicId('train'), 'base');
-  assert.equal(createMechanicRuntime('train').id, 'base');
+  assert.equal(resolvePlayableMechanicId('train'), 'train');
+  assert.equal(createMechanicRuntime('train').id, 'train');
   assert.equal(createMechanicRuntime('star-passenger', { random: () => 1 }).id, 'star-passenger');
   assert.equal(createMechanicRuntime('valve').id, 'valve');
 });
