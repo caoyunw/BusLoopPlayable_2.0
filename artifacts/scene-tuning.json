@@ -111,6 +111,19 @@
     "scaleX": 0.7,
     "scaleZ": 0.65
   },
+  "train": {
+    "trackY": 0.045,
+    "trackZ": 2.6,
+    "headX": 3.2,
+    "slotSpacing": 1.25,
+    "slotCount": 4,
+    "carriageScale": 0.82,
+    "dispatchDuration": 0.9,
+    "departureDuration": 1.4,
+    "locomotiveEntryDuration": 1.2,
+    "exitX": 9,
+    "entryX": -9
+  },
   "seatCountBoard": {
     "x": -0.17,
     "z": 1.37,

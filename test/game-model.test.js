@@ -1239,7 +1239,7 @@ test('main keeps mechanic settings page-local with independent fresh mechanic de
   assert.doesNotMatch(beforeStartRuntime, /mechanicSessionOptions/);
   assert.match(
     startRuntimeSource,
-    /const mechanicSessionOptions = \{\s*'question-passenger': \{ mode: 'chance', chance: 0\.3 \},\s*'linked-passengers': \{ mode: 'chance', chance: 0\.3, maxLength: 10 \}\s*\}/
+    /const mechanicSessionOptions = \{\s*'question-passenger': \{ mode: 'chance', chance: 0\.3 \},\s*'linked-passengers': \{ mode: 'chance', chance: 0\.3, maxLength: 10 \},\s*train: \{ mode: 'chance', chance: 0\.3 \}\s*\}/
   );
   assert.match(
     startRuntimeSource,
@@ -1247,14 +1247,15 @@ test('main keeps mechanic settings page-local with independent fresh mechanic de
   );
   assert.equal((mainSource.match(/'question-passenger'/g) ?? []).length, 1);
   assert.equal((mainSource.match(/'linked-passengers'/g) ?? []).length, 1);
+  assert.equal((mainSource.match(/\btrain:/g) ?? []).length, 1);
   assert.equal((mainSource.match(/const \w+_STORAGE_KEY\s*=/g) ?? []).length, 2);
   assert.doesNotMatch(
     mainSource,
-    /(?:localStorage\.(?:getItem|setItem)|safeRemoveStorageItem)\([^)]*(?:mechanicSessionOptions|question-passenger|linked-passengers)/
+    /(?:localStorage\.(?:getItem|setItem)|safeRemoveStorageItem)\([^)]*(?:mechanicSessionOptions|question-passenger|linked-passengers|train)/
   );
   assert.doesNotMatch(
     mainSource,
-    /(?:URLSearchParams|syncMechanicQuery)\([^)]*(?:mechanicSessionOptions|question-passenger|linked-passengers)/
+    /(?:URLSearchParams|syncMechanicQuery)\([^)]*(?:mechanicSessionOptions|question-passenger|linked-passengers|train)/
   );
 });
 
