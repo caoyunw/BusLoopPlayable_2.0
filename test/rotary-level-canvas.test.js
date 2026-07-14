@@ -9,6 +9,48 @@ import {
   screenToWorld,
   worldToScreen
 } from '../tools/rotary-level-editor/canvas-view.js';
+import { createCanvasController } from '../tools/rotary-level-editor/canvas-controller.js';
+import { createEditorStore } from '../tools/rotary-level-editor/editor-store.js';
+import * as documentCommands from '../tools/rotary-level-editor/document-commands.js';
+
+class FakeEventTarget {
+  constructor() {
+    this.listeners = new Map();
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatch(type, values = {}) {
+    const event = {
+      type,
+      button: 0,
+      pointerId: 1,
+      clientX: 0,
+      clientY: 0,
+      shiftKey: false,
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault() {},
+      ...values
+    };
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
+    return event;
+  }
+
+  listenerCount() {
+    return [...this.listeners.values()]
+      .reduce((count, listeners) => count + listeners.size, 0);
+  }
+}
 
 function baseDocument() {
   return {
@@ -79,6 +121,72 @@ function documentWithContext() {
   return document;
 }
 
+function interactionDocument({ vehicle = true } = {}) {
+  const document = baseDocument();
+  document.rotaryLanes = [];
+  document.context.protectedGeometry = [];
+  if (!vehicle) document.vehicles = [];
+  return document;
+}
+
+function createControllerHarness({ document = interactionDocument(), mode = 'select' } = {}) {
+  const canvas = new FakeEventTarget();
+  canvas.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 300,
+    height: 300
+  });
+  canvas.setPointerCapture = () => {};
+  canvas.releasePointerCapture = () => {};
+  canvas.focus = () => {};
+  const keyboard = new FakeEventTarget();
+  const store = createEditorStore(document);
+  let camera = {
+    centerX: 0,
+    centerZ: 0,
+    zoom: 100,
+    width: 300,
+    height: 300
+  };
+  const commandEvents = [];
+  const controller = createCanvasController({
+    canvas,
+    keyboardTarget: keyboard,
+    getSnapshot: store.snapshot,
+    getCamera: () => ({ ...camera }),
+    setCamera(next) {
+      camera = { ...next };
+    },
+    store,
+    commands: {
+      ...documentCommands,
+      onControllerCommand(event) {
+        commandEvents.push(event);
+      }
+    },
+    requestRender() {}
+  });
+  controller.setMode(mode);
+  const pointer = (type, values) => canvas.dispatch(type, values);
+  return {
+    canvas,
+    keyboard,
+    store,
+    controller,
+    commandEvents,
+    getCamera: () => camera,
+    pointerClick(values) {
+      pointer('pointerdown', values);
+      pointer('pointerup', values);
+    },
+    pointer,
+    key(type, values) {
+      keyboard.dispatch(type, values);
+    }
+  };
+}
+
 test('world and screen transforms round trip with pan and zoom', () => {
   const camera = {
     centerX: 1,
@@ -125,4 +233,108 @@ test('high-DPI resize sets backing pixels and logical transform', () => {
   assert.equal(canvas.style.width, '320px');
   assert.equal(canvas.style.height, '180px');
   assert.deepEqual(calls, [[2, 0, 0, 2, 0, 0]]);
+});
+
+test('click selection toggles with Shift and blank drag creates marquee selection', () => {
+  const harness = createControllerHarness();
+  harness.pointerClick({ clientX: 150, clientY: 150 });
+  assert.deepEqual(harness.store.snapshot().selection, [
+    { type: 'vehicle', id: 1 }
+  ]);
+  harness.pointerClick({ clientX: 150, clientY: 150, shiftKey: true });
+  assert.deepEqual(harness.store.snapshot().selection, []);
+
+  harness.pointer('pointerdown', { clientX: 100, clientY: 200 });
+  harness.pointer('pointermove', { clientX: 200, clientY: 100 });
+  harness.pointer('pointerup', { clientX: 200, clientY: 100 });
+  assert.deepEqual(harness.store.snapshot().selection, [
+    { type: 'vehicle', id: 1 }
+  ]);
+});
+
+test('selected drag is one preview command and Alt bypasses grid snap', () => {
+  const harness = createControllerHarness();
+  harness.pointerClick({ clientX: 150, clientY: 150 });
+  harness.pointer('pointerdown', { clientX: 150, clientY: 150 });
+  harness.pointer('pointermove', { clientX: 157, clientY: 150 });
+  harness.pointer('pointerup', { clientX: 157, clientY: 150 });
+  assert.equal(harness.store.snapshot().document.vehicles[0].placement.x, 0.05);
+  assert.equal(harness.store.snapshot().historyLength, 1);
+
+  harness.store.undo();
+  harness.pointer('pointerdown', { clientX: 150, clientY: 150 });
+  harness.pointer('pointermove', {
+    clientX: 157,
+    clientY: 150,
+    altKey: true
+  });
+  harness.pointer('pointerup', { clientX: 157, clientY: 150, altKey: true });
+  assert.ok(
+    Math.abs(harness.store.snapshot().document.vehicles[0].placement.x - 0.07)
+      < 1e-9
+  );
+});
+
+test('wheel anchors zoom, Space pans, and keyboard edits selection', () => {
+  const harness = createControllerHarness();
+  const beforeWorld = screenToWorld({ x: 220, y: 100 }, harness.getCamera());
+  harness.canvas.dispatch('wheel', {
+    clientX: 220,
+    clientY: 100,
+    deltaY: -120
+  });
+  const afterWorld = screenToWorld({ x: 220, y: 100 }, harness.getCamera());
+  assert.ok(Math.abs(beforeWorld.x - afterWorld.x) < 1e-9);
+  assert.ok(Math.abs(beforeWorld.z - afterWorld.z) < 1e-9);
+
+  const beforePan = { ...harness.getCamera() };
+  harness.key('keydown', { code: 'Space', key: ' ' });
+  harness.pointer('pointerdown', { clientX: 100, clientY: 100 });
+  harness.pointer('pointermove', { clientX: 120, clientY: 110 });
+  harness.pointer('pointerup', { clientX: 120, clientY: 110 });
+  harness.key('keyup', { code: 'Space', key: ' ' });
+  assert.notEqual(harness.getCamera().centerX, beforePan.centerX);
+
+  harness.pointerClick({
+    clientX: worldToScreen({ x: 0, z: 0 }, harness.getCamera()).x,
+    clientY: worldToScreen({ x: 0, z: 0 }, harness.getCamera()).y
+  });
+  harness.key('keydown', { key: 'e', code: 'KeyE' });
+  assert.equal(harness.store.snapshot().document.vehicles[0].placement.yaw, 15);
+  harness.key('keydown', { key: 'Delete', code: 'Delete' });
+  assert.equal(harness.store.snapshot().document.vehicles.length, 0);
+});
+
+test('lane mode closes only after three slots and start click', () => {
+  const harness = createControllerHarness({
+    document: interactionDocument({ vehicle: false }),
+    mode: 'lane'
+  });
+  harness.pointerClick({ clientX: 100, clientY: 100 });
+  harness.pointerClick({ clientX: 200, clientY: 100 });
+  harness.pointerClick({ clientX: 200, clientY: 200 });
+  harness.pointerClick({ clientX: 100, clientY: 100 });
+  assert.deepEqual(
+    harness.commandEvents.map(({ type }) => type),
+    ['start-lane', 'add-slot', 'add-slot', 'close-lane']
+  );
+  assert.equal(harness.store.snapshot().document.rotaryLanes.length, 1);
+  assert.equal(harness.store.snapshot().document.rotaryLanes[0].slots.length, 3);
+});
+
+test('Escape cancels a draft lane without history and dispose removes listeners', () => {
+  const harness = createControllerHarness({
+    document: interactionDocument({ vehicle: false }),
+    mode: 'lane'
+  });
+  harness.pointerClick({ clientX: 100, clientY: 100 });
+  harness.pointerClick({ clientX: 200, clientY: 100 });
+  harness.key('keydown', { key: 'Escape', code: 'Escape' });
+  assert.deepEqual(harness.controller.getDraftLane(), []);
+  assert.equal(harness.store.snapshot().historyLength, 0);
+  assert.ok(harness.canvas.listenerCount() > 0);
+  assert.ok(harness.keyboard.listenerCount() > 0);
+  harness.controller.dispose();
+  assert.equal(harness.canvas.listenerCount(), 0);
+  assert.equal(harness.keyboard.listenerCount(), 0);
 });
