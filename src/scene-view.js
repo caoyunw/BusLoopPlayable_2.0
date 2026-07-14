@@ -805,6 +805,10 @@ export class SceneView {
     this.spotRoots = [];
     this.spotPositions = [];
     this.seatCountBoards = [];
+    this.trainRoot = null;
+    this.trainLocomotiveView = null;
+    this.trainTrackPositions = [];
+    this.trainSeatCountBoards = [];
     this.passengerMaterials = [];
     this.passengerColorTextures = [];
     this.vehicleMaterials = [];
@@ -843,6 +847,7 @@ export class SceneView {
     if (this.destroyed) return;
     this.destroyed = true;
     this.clearBoardingViews();
+    this.disposeTrainViews();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     globalThis.window?.removeEventListener('resize', this.handleResize);
@@ -874,6 +879,7 @@ export class SceneView {
     this.buildPathCurves();
     this.buildValveViews();
     this.buildSpots();
+    this.buildTrainViews();
     this.buildGuideHand();
 
     for (const vehicle of LEVEL_1.vehicles) {
@@ -1009,6 +1015,234 @@ export class SceneView {
       this.seatCountBoards.push(board);
       this.scene.add(root);
     }
+  }
+
+  getTrainTrackPosition(slotIndex) {
+    const train = SCENE_TUNING.train;
+    return new THREE.Vector3(
+      train.headX - train.slotSpacing * (slotIndex + 1),
+      train.trackY,
+      train.trackZ
+    );
+  }
+
+  createTrainTrackView() {
+    const train = SCENE_TUNING.train;
+    const root = new THREE.Group();
+    root.name = 'Train Track';
+    const trackLength = train.slotSpacing * (train.slotCount + 1) + 1.15;
+    const trackCenterX = train.headX - trackLength / 2 + 0.55;
+    const railMaterial = new THREE.MeshStandardMaterial({
+      color: 0x46515d,
+      metalness: 0.72,
+      roughness: 0.34
+    });
+    const sleeperMaterial = new THREE.MeshStandardMaterial({
+      color: 0x65442f,
+      roughness: 0.86
+    });
+    const markerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd45e,
+      transparent: true,
+      opacity: 0.24,
+      depthWrite: false
+    });
+
+    for (const zOffset of [-0.34, 0.34]) {
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(trackLength, 0.055, 0.075),
+        railMaterial.clone()
+      );
+      rail.position.set(trackCenterX, train.trackY, train.trackZ + zOffset);
+      root.add(rail);
+    }
+    for (let index = 0; index < 14; index += 1) {
+      const sleeper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.045, 0.94),
+        sleeperMaterial.clone()
+      );
+      sleeper.position.set(
+        trackCenterX - trackLength / 2 + (index + 0.5) * trackLength / 14,
+        train.trackY - 0.025,
+        train.trackZ
+      );
+      root.add(sleeper);
+    }
+    for (let index = 0; index < train.slotCount; index += 1) {
+      const marker = new THREE.Mesh(
+        new THREE.BoxGeometry(1.02, 0.018, 0.74),
+        markerMaterial.clone()
+      );
+      marker.position.copy(this.getTrainTrackPosition(index));
+      marker.position.y = train.trackY + 0.025;
+      marker.userData.trainTrackSlotIndex = index;
+      root.add(marker);
+    }
+    return root;
+  }
+
+  createTrainLocomotiveView() {
+    const root = new THREE.Group();
+    root.name = 'Train Locomotive';
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x314252,
+      roughness: 0.48,
+      metalness: 0.16
+    });
+    const trimMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf3c950,
+      roughness: 0.45
+    });
+    const windowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xa8e5ff,
+      emissive: 0x18415b,
+      emissiveIntensity: 0.5,
+      roughness: 0.22
+    });
+    const wheelMaterial = new THREE.MeshStandardMaterial({
+      color: 0x20262d,
+      metalness: 0.62,
+      roughness: 0.38
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.44, 0.72), bodyMaterial);
+    body.position.y = 0.36;
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.52, 0.68), bodyMaterial.clone());
+    cabin.position.set(-0.22, 0.72, 0);
+    const window = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.7), windowMaterial);
+    window.position.set(-0.22, 0.78, 0);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 0.62), trimMaterial);
+    nose.position.set(0.62, 0.29, 0);
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.36, 18), bodyMaterial.clone());
+    chimney.position.set(0.28, 0.78, 0);
+    root.add(body, cabin, window, nose, chimney);
+    for (const x of [-0.36, 0.36]) {
+      for (const z of [-0.39, 0.39]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.09, 20), wheelMaterial.clone());
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(x, 0.17, z);
+        root.add(wheel);
+      }
+    }
+    root.userData.bodyMeshes = [body, cabin, nose, chimney];
+    return root;
+  }
+
+  createTrainCarriageView(vehicle) {
+    const root = new THREE.Group();
+    root.name = `Train Carriage ${vehicle.id}`;
+    const color = COLORS[vehicle.colorIndex]?.hex ?? COLORS[0].hex;
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.5,
+      metalness: 0.08
+    });
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0xf3f0e8, roughness: 0.72 });
+    const windowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xbcecff,
+      emissive: 0x164761,
+      emissiveIntensity: 0.42,
+      roughness: 0.18
+    });
+    const darkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x252b31,
+      metalness: 0.48,
+      roughness: 0.42
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.55, 1.08), bodyMaterial);
+    body.position.y = 0.43;
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.12, 1.12), roofMaterial);
+    roof.position.y = 0.76;
+    root.add(body, roof);
+    const bodyMeshes = [body];
+    for (const side of [-1, 1]) {
+      for (const z of [-0.3, 0.3]) {
+        const window = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.23, 0.32), windowMaterial.clone());
+        window.position.set(side * 0.375, 0.52, z);
+        root.add(window);
+      }
+    }
+    for (const side of [-1, 1]) {
+      for (const z of [-0.34, 0.34]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 18), darkMaterial.clone());
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(side * 0.38, 0.17, z);
+        root.add(wheel);
+      }
+    }
+    for (const z of [-0.64, 0.64]) {
+      const coupler = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.22), darkMaterial.clone());
+      coupler.position.set(0, 0.25, z);
+      root.add(coupler);
+    }
+    root.scale.setScalar(SCENE_TUNING.train.carriageScale);
+    root.traverse((object) => { object.userData.vehicleId = vehicle.id; });
+    root.userData.bodyMeshes = bodyMeshes;
+    root.visible = false;
+    return root;
+  }
+
+  buildTrainViews() {
+    this.trainTrackPositions = Array.from(
+      { length: SCENE_TUNING.train.slotCount },
+      (_, index) => this.getTrainTrackPosition(index)
+    );
+    this.trainRoot = this.createTrainTrackView();
+    this.trainLocomotiveView = this.createTrainLocomotiveView();
+    this.trainLocomotiveView.position.set(
+      SCENE_TUNING.train.headX,
+      SCENE_TUNING.train.trackY,
+      SCENE_TUNING.train.trackZ
+    );
+    this.trainRoot.add(this.trainLocomotiveView);
+    for (let index = 0; index < SCENE_TUNING.train.slotCount; index += 1) {
+      const board = this.createSeatCountBoard();
+      board.visible = false;
+      board.renderOrder = 45;
+      board.position.copy(this.trainTrackPositions[index]);
+      board.position.y = SCENE_TUNING.train.trackY + 0.03;
+      this.trainSeatCountBoards.push(board);
+      this.trainRoot.add(board);
+    }
+    this.trainRoot.visible = false;
+    this.scene.add(this.trainRoot);
+  }
+
+  updateTrainViews(snapshot) {
+    const train = snapshot.train;
+    if (!this.trainRoot) return;
+    this.trainRoot.visible = Boolean(train);
+    if (!train) return;
+    this.trainLocomotiveView.visible = train.locomotive?.phase !== 'complete';
+    for (let index = 0; index < this.trainSeatCountBoards.length; index += 1) {
+      const board = this.trainSeatCountBoards[index];
+      board.visible = false;
+      const trackSlot = train.trackSlots?.[index];
+      if (!trackSlot) continue;
+      const vehicle = snapshot.vehicles.find(({ id }) => id === trackSlot.vehicleId);
+      if (vehicle) this.updateSeatCountBoard(board, vehicle, snapshot.time);
+    }
+  }
+
+  disposeTrainViews() {
+    const disposeRoot = (root) => {
+      root?.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material?.map?.dispose?.();
+          material?.dispose?.();
+        }
+      });
+    };
+    disposeRoot(this.trainRoot);
+    for (const view of this.vehicleViews?.values?.() ?? []) {
+      disposeRoot(view.userData.trainCarriageRoot);
+    }
+    if (this.trainRoot) this.scene?.remove?.(this.trainRoot);
+    this.trainRoot = null;
+    this.trainLocomotiveView = null;
+    this.trainTrackPositions = [];
+    this.trainSeatCountBoards = [];
   }
 
 
@@ -1765,9 +1999,15 @@ export class SceneView {
       for (const child of [hitRoot, shadow]) {
         child.traverse((object) => { object.userData.vehicleId = vehicle.id; });
       }
-      view.add(shadow, hitRoot);
+      const trainCarriageRoot = this.createTrainCarriageView(vehicle);
+      storeHitBase(trainCarriageRoot);
+      view.add(shadow, hitRoot, trainCarriageRoot);
       view.userData.bodyMeshes = bodyMeshes;
+      view.userData.normalBodyMeshes = bodyMeshes;
       view.userData.hitMeshes = [hitRoot];
+      view.userData.normalHitMeshes = [hitRoot];
+      view.userData.normalRoots = [shadow, hitRoot];
+      view.userData.trainCarriageRoot = trainCarriageRoot;
       view.userData.modelRoot = model;
       view.userData.arrowRoot = arrow;
       view.userData.templateSize = size;
@@ -1849,7 +2089,12 @@ export class SceneView {
     const remaining = Math.max(0, baseRemaining + boardingRemaining);
     const visible = (
       remaining > 0 &&
-      (vehicle.state === 'at-spot' || vehicle.state === 'boarding-final')
+      (
+        vehicle.state === 'at-spot'
+        || vehicle.state === 'boarding-final'
+        || vehicle.state === 'at-track'
+        || vehicle.state === 'train-full'
+      )
     );
     const vehicleChanged = board.userData.vehicleId !== vehicle.id;
     board.visible = visible;
@@ -2197,6 +2442,7 @@ export class SceneView {
     }
     this.updateGarages(snapshot);
     this.updateValves(snapshot);
+    this.updateTrainViews(snapshot);
     for (const vehicle of snapshot.vehicles) {
       const view = this.vehicleViews.get(vehicle.id);
       const layoutStart = mapVehicleAreaPoint(vehicle);
@@ -2207,6 +2453,16 @@ export class SceneView {
         layoutStart.y
       );
       const spot = this.spotPositions[vehicle.spotIndex ?? 0];
+      const useTrainCarriage = Boolean(vehicle.trainCarriage);
+      const trainCarriageRoot = view.userData.trainCarriageRoot;
+      for (const root of view.userData.normalRoots ?? []) root.visible = !useTrainCarriage;
+      if (trainCarriageRoot) trainCarriageRoot.visible = useTrainCarriage;
+      view.userData.bodyMeshes = useTrainCarriage
+        ? (trainCarriageRoot?.userData.bodyMeshes ?? [])
+        : (view.userData.normalBodyMeshes ?? []);
+      view.userData.hitMeshes = useTrainCarriage
+        ? [trainCarriageRoot].filter(Boolean)
+        : (view.userData.normalHitMeshes ?? []);
       view.visible = !['done', 'in-garage'].includes(vehicle.state);
       let vehicleScale = vehicle.state === 'parked' || vehicle.state === 'colliding'
         ? 1 : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
@@ -2246,6 +2502,10 @@ export class SceneView {
       } else if (vehicle.state === 'at-spot' || vehicle.state === 'boarding-final') {
         view.position.copy(spot);
         view.rotation.y = deg(SCENE_TUNING.facing.parkingSpotYawDegrees + 180) + vehicleYawOffset;
+      } else if (vehicle.state === 'at-track' || vehicle.state === 'train-full') {
+        const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
+        if (trackPosition) view.position.copy(trackPosition);
+        view.rotation.y = Math.PI / 2;
       } else if (vehicle.state === 'departing') {
         const data = vehicle.motionData;
         const total = data.backwardDuration + data.forwardDuration;

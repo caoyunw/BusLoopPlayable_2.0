@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 
 import { BusLoopGame } from '../src/game-model.js';
 import { LEVEL_1 } from '../src/level-data.js';
+import { SceneView } from '../src/scene-view.js';
+import { SCENE_TUNING } from '../src/scene-tuning.js';
 import { createCompositeRuntime } from '../src/mechanics/index.js';
 import {
   createTrainRuntime,
@@ -341,4 +343,42 @@ test('main keeps train settings page-local with a fresh thirty-percent default',
     /train:\s*\{\s*mode:\s*['"]chance['"],\s*chance:\s*0\.3\s*\}/
   );
   assert.match(source, /mechanicSessionOptions\[id\]\s*=\s*\{/);
+});
+
+test('train scene tuning defines one horizontal four-car track below normal spots', () => {
+  assert.deepEqual(
+    {
+      trackZ: SCENE_TUNING.train.trackZ,
+      headX: SCENE_TUNING.train.headX,
+      slotSpacing: SCENE_TUNING.train.slotSpacing,
+      slotCount: SCENE_TUNING.train.slotCount
+    },
+    {
+      trackZ: 2.6,
+      headX: 3.2,
+      slotSpacing: 1.25,
+      slotCount: 4
+    }
+  );
+});
+
+test('scene owns procedural train track carriage locomotive and capacity-board builders', () => {
+  const source = readFileSync(new URL('../src/scene-view.js', import.meta.url), 'utf8');
+
+  for (const method of [
+    'createTrainTrackView',
+    'createTrainCarriageView',
+    'createTrainLocomotiveView',
+    'getTrainTrackPosition',
+    'updateTrainViews',
+    'disposeTrainViews'
+  ]) {
+    assert.equal(typeof SceneView.prototype[method], 'function', `${method} must exist`);
+  }
+  assert.match(source, /new THREE\.BoxGeometry/);
+  assert.match(source, /new THREE\.CylinderGeometry/);
+  assert.match(source, /trainTrackPositions/);
+  assert.match(source, /trainSeatCountBoards/);
+  assert.match(source, /vehicle\.trainCarriage/);
+  assert.match(source, /userData\.vehicleId\s*=\s*vehicle\.id/);
 });
