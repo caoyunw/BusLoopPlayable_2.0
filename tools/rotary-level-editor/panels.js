@@ -183,6 +183,40 @@ function findContextObject(document, selected) {
   return document.context?.[mapping[selected.kind]]?.find(({ id }) => id === selected.id);
 }
 
+function placementValue(placement) {
+  if (placement.kind === 'garage') return `garage|${placement.garageId}`;
+  if (placement.kind === 'rotary-slot') {
+    return `rotary-slot|${placement.laneId}|${placement.slotId}`;
+  }
+  return 'field';
+}
+
+function vehiclePlacementOptions(document, vehicle) {
+  const options = [{ value: 'field', label: '普通区域' }];
+  for (const garage of document.context?.garages ?? []) {
+    options.push({
+      value: `garage|${garage.id}`,
+      label: `车库 ${garage.id}`
+    });
+  }
+  for (const lane of document.rotaryLanes) {
+    for (const slot of lane.slots) {
+      const occupiedByAnother = document.vehicles.some((candidate) => (
+        candidate.id !== vehicle.id
+        && candidate.placement.kind === 'rotary-slot'
+        && candidate.placement.laneId === lane.id
+        && candidate.placement.slotId === slot.id
+      ));
+      if (occupiedByAnother) continue;
+      options.push({
+        value: `rotary-slot|${lane.id}|${slot.id}`,
+        label: `回转槽位 ${lane.id} / ${slot.id}`
+      });
+    }
+  }
+  return options;
+}
+
 export function buildPropertyModel(document, selection = []) {
   if (selection.length === 0) {
     return { kind: 'empty', title: '未选择对象', readonly: true, fields: [] };
@@ -247,9 +281,12 @@ export function buildPropertyModel(document, selection = []) {
       propertyField(
         'placement',
         '归属',
-        vehicle.placement.kind,
+        placementValue(vehicle.placement),
         { type: 'vehicle', id: vehicle.id },
-        { type: 'text', disabled: true }
+        {
+          type: 'select',
+          options: vehiclePlacementOptions(document, vehicle)
+        }
       ),
       ...poseFields(pose, poseTarget)
     ];
@@ -268,7 +305,11 @@ export function buildPropertyModel(document, selection = []) {
       note: vehicle.placement.kind === 'rotary-slot'
         ? '坐标与朝向来自所属槽位；修改会移动该真实槽位。'
         : null,
-      fields
+      fields,
+      actions: [
+        { id: 'duplicate', label: '复制车辆' },
+        { id: 'delete', label: '删除车辆', danger: true }
+      ]
     };
   }
 
@@ -404,7 +445,7 @@ function inputValue(field) {
 export function renderPropertyPanel(
   root,
   model,
-  { onCommit = () => {} } = {}
+  { onCommit = () => {}, onAction = () => {} } = {}
 ) {
   root.replaceChildren();
   const documentRef = root.ownerDocument;
@@ -463,6 +504,20 @@ export function renderPropertyPanel(
     note.className = 'property-note';
     note.textContent = model.note;
     root.append(note);
+  }
+  if (model.actions?.length) {
+    const actions = documentRef.createElement('div');
+    actions.className = 'property-actions';
+    model.actions.forEach((action) => {
+      const button = documentRef.createElement('button');
+      button.type = 'button';
+      button.dataset.propertyAction = action.id;
+      button.className = action.danger ? 'is-danger' : '';
+      button.textContent = action.label;
+      button.addEventListener('click', () => onAction(action));
+      actions.append(button);
+    });
+    root.append(actions);
   }
 }
 

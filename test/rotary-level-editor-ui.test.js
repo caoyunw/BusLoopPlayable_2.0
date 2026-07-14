@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { webcrypto } from 'node:crypto';
 
 import { computeContextFingerprint } from '../tools/rotary-level-contract/fingerprint.js';
@@ -332,6 +332,23 @@ test('rotary vehicle property coordinates target its referenced slot', () => {
   assert.deepEqual(x.target, { type: 'slot', laneId: 'outer', id: 'slot-a' });
 });
 
+test('vehicle property model exposes exclusive ownership targets and edit actions', () => {
+  const model = buildPropertyModel(
+    documentWithAllOwnerships(),
+    [{ type: 'vehicle', id: 1 }]
+  );
+  const placement = model.fields.find(({ key }) => key === 'placement');
+  assert.equal(placement.type, 'select');
+  assert.deepEqual(
+    placement.options.map(({ value }) => value),
+    ['field', 'garage|7', 'rotary-slot|outer|slot-b', 'rotary-slot|outer|slot-c']
+  );
+  assert.deepEqual(
+    model.actions.map(({ id }) => id),
+    ['duplicate', 'delete']
+  );
+});
+
 test('error row carries object focus target and JSON path', () => {
   const rows = buildValidationRows({
     errors: [{
@@ -475,6 +492,95 @@ test('application flow isolates import failure and wires new, export, Save As, d
   assert.equal(ui.nodes.get('#editor-canvas').listenerCount(), 0);
 });
 
+test('application keeps tool state visible and wires vehicle ownership, duplicate, and delete', async () => {
+  const template = await applicationTemplate();
+  const ui = createUiDocument();
+  const application = await createEditorApplication({
+    root: ui.root,
+    storage: createMemoryStorage(),
+    loadTemplate: async () => structuredClone(template),
+    download() {},
+    requestFrame: () => 1,
+    now: () => 1234
+  });
+
+  await ui.actions.get('add-vehicle').dispatchAsync('click');
+  assert.equal(ui.actions.get('add-vehicle').getAttribute('aria-pressed'), 'true');
+  const screen = worldToScreen({ x: 0, z: 0 }, application.snapshot().camera);
+  await ui.nodes.get('#editor-canvas').dispatchAsync('pointerdown', {
+    clientX: screen.x,
+    clientY: screen.y,
+    pointerId: 1
+  });
+  assert.equal(application.snapshot().document.vehicles.length, 1);
+  assert.equal(ui.actions.get('select').getAttribute('aria-pressed'), 'true');
+  assert.equal(ui.actions.get('add-vehicle').getAttribute('aria-pressed'), 'false');
+
+  await ui.actions.get('add-lane').dispatchAsync('click');
+  for (const point of [
+    { x: -2, z: -2 },
+    { x: 2, z: -2 },
+    { x: 2, z: 2 },
+    { x: -2, z: 2 },
+    { x: -2, z: -2 }
+  ]) {
+    const lanePoint = worldToScreen(point, application.snapshot().camera);
+    await ui.nodes.get('#editor-canvas').dispatchAsync('pointerdown', {
+      clientX: lanePoint.x,
+      clientY: lanePoint.y,
+      pointerId: 1
+    });
+  }
+  assert.equal(application.snapshot().document.rotaryLanes.length, 1);
+
+  const fieldSection = ui.nodes.get('#object-tree-content').children[0];
+  const vehicleButton = fieldSection.children[1];
+  await vehicleButton.dispatchAsync('click');
+  const propertyRoot = ui.nodes.get('#property-panel-content');
+  const placementRow = propertyRoot.children.find((child) => (
+    child.className === 'property-field'
+    && child.children[1]?.dataset.field === 'placement'
+  ));
+  let placementControl = placementRow.children[1];
+  placementControl.value = 'rotary-slot|lane-1|slot-1';
+  await placementControl.dispatchAsync('change');
+  assert.equal(
+    application.snapshot().document.vehicles[0].placement.kind,
+    'rotary-slot'
+  );
+
+  placementControl = propertyRoot.children.find((child) => (
+    child.className === 'property-field'
+    && child.children[1]?.dataset.field === 'placement'
+  )).children[1];
+  placementControl.value = 'garage|7';
+  await placementControl.dispatchAsync('change');
+  assert.equal(
+    application.snapshot().document.vehicles[0].placement.kind,
+    'garage'
+  );
+  assert.equal(application.snapshot().document.vehicles[0].placement.garageId, 7);
+
+  let actionRow = propertyRoot.children.find((child) => (
+    child.className === 'property-actions'
+  ));
+  await actionRow.children
+    .find(({ dataset }) => dataset.propertyAction === 'duplicate')
+    .dispatchAsync('click');
+  assert.equal(application.snapshot().document.vehicles.length, 2);
+  assert.equal(application.snapshot().document.vehicles[1].placement.kind, 'field');
+
+  actionRow = propertyRoot.children.find((child) => (
+    child.className === 'property-actions'
+  ));
+  await actionRow.children
+    .find(({ dataset }) => dataset.propertyAction === 'delete')
+    .dispatchAsync('click');
+  assert.equal(application.snapshot().document.vehicles.length, 1);
+  assert.deepEqual(application.snapshot().selection, []);
+  application.dispose();
+});
+
 test('cold start opens recovery choice for a changed isolated draft', async () => {
   const template = await applicationTemplate();
   const ui = createUiDocument();
@@ -505,4 +611,37 @@ test('cold start opens recovery choice for a changed isolated draft', async () =
   await ui.actions.get('restore-recovery').dispatchAsync('click');
   assert.equal(application.snapshot().document.vehicles.length, 1);
   application.dispose();
+});
+
+async function listFiles(directory) {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const url = new URL(entry.name, directory);
+    if (entry.isDirectory()) files.push(...await listFiles(new URL(`${entry.name}/`, directory)));
+    else files.push(url);
+  }
+  return files;
+}
+
+test('standalone editor never imports game source or mechanic runtimes', async () => {
+  const importViolation = /(?:from\s+|import\s*\()\s*['"][^'"]*(?:\/src\/|game-model|scene-view|mechanics\/)/;
+  for (const file of await listFiles(editorRoot)) {
+    const source = await readFile(file, 'utf8');
+    assert.doesNotMatch(source, importViolation, file.pathname);
+  }
+});
+
+test('game entry, model, and scene never load editor or contract modules', async () => {
+  for (const relativePath of [
+    '../src/main.js',
+    '../src/game-model.js',
+    '../src/scene-view.js'
+  ]) {
+    const source = await readFile(new URL(relativePath, import.meta.url), 'utf8');
+    assert.doesNotMatch(
+      source,
+      /rotary-level-editor|rotary-level-contract/,
+      relativePath
+    );
+  }
 });

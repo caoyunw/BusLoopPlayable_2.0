@@ -110,6 +110,50 @@ function applyPropertyChange(source, field, rawValue) {
     ? Number(rawValue)
     : rawValue;
   const target = field.target;
+  if (target.type === 'vehicle' && field.key === 'placement') {
+    const vehicle = source.vehicles.find(({ id }) => id === target.id);
+    if (!vehicle) throw new Error(`Unknown vehicle ${target.id}`);
+    const pose = getVehiclePose(vehicle, source);
+    const [kind, firstId, secondId] = String(rawValue).split('|');
+    if (kind === 'field') {
+      return documentCommands.assignVehicle(source, target.id, {
+        kind: 'field',
+        x: pose.x,
+        z: pose.z,
+        yaw: pose.yaw
+      });
+    }
+    if (kind === 'garage') {
+      const garage = source.context.garages.find(({ id }) => (
+        String(id) === firstId
+      ));
+      if (!garage) throw new Error(`Unknown garage ${firstId}`);
+      const stockOrder = source.vehicles.filter((candidate) => (
+        candidate.id !== target.id
+        && candidate.placement.kind === 'garage'
+        && candidate.placement.garageId === garage.id
+      )).length;
+      return documentCommands.assignVehicle(source, target.id, {
+        kind: 'garage',
+        garageId: garage.id,
+        stockOrder,
+        storedPose: { x: pose.x, z: pose.z, yaw: pose.yaw }
+      });
+    }
+    if (kind === 'rotary-slot') {
+      const lane = source.rotaryLanes.find(({ id }) => String(id) === firstId);
+      const slot = lane?.slots.find(({ id }) => String(id) === secondId);
+      if (!lane || !slot) {
+        throw new Error(`Unknown rotary slot ${firstId}/${secondId}`);
+      }
+      return documentCommands.assignVehicle(source, target.id, {
+        kind: 'rotary-slot',
+        laneId: lane.id,
+        slotId: slot.id
+      });
+    }
+    throw new Error(`Unknown vehicle placement ${rawValue}`);
+  }
   if (target.type === 'vehicle'
     && ['id', 'colorIndex', 'seats'].includes(field.key)) {
     return documentCommands.updateVehicle(source, target.id, {
@@ -362,6 +406,33 @@ export async function createEditorApplication({
     }
   }
 
+  function commitPropertyAction(action) {
+    const selection = store.snapshot().selection;
+    if (selection.length !== 1 || selection[0].type !== 'vehicle') return;
+    const vehicleId = selection[0].id;
+    if (action.id === 'duplicate') {
+      const previousIds = new Set(
+        store.snapshot().document.vehicles.map(({ id }) => id)
+      );
+      let duplicateId = null;
+      store.commit('Duplicate vehicle', (document) => {
+        const updated = documentCommands.duplicateVehicle(document, vehicleId);
+        duplicateId = updated.vehicles.find(({ id }) => !previousIds.has(id))?.id;
+        return updated;
+      });
+      if (duplicateId !== null) {
+        store.setSelection([{ type: 'vehicle', id: duplicateId }]);
+      }
+      return;
+    }
+    if (action.id === 'delete') {
+      store.commit('Delete vehicle', (document) => (
+        documentCommands.deleteVehicle(document, vehicleId)
+      ));
+      store.setSelection([]);
+    }
+  }
+
   function renderPanels(snapshot) {
     renderObjectTree(
       nodes.tree,
@@ -371,7 +442,7 @@ export async function createEditorApplication({
     renderPropertyPanel(
       nodes.properties,
       buildPropertyModel(snapshot.document, snapshot.selection),
-      { onCommit: commitProperty }
+      { onCommit: commitProperty, onAction: commitPropertyAction }
     );
     renderValidationPanel(
       nodes.validationRows,
@@ -410,6 +481,7 @@ export async function createEditorApplication({
     store,
     commands: documentCommands,
     requestRender: queueFrame,
+    onModeChange: () => updateToolbar(store.snapshot()),
     gridSize: 0.05,
     angleStep: 15
   });

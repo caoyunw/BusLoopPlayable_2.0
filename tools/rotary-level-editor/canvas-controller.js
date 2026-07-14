@@ -41,6 +41,7 @@ export function createCanvasController(options) {
     store,
     commands,
     requestRender,
+    onModeChange = () => {},
     keyboardTarget = globalThis.window ?? canvas,
     gridSize = 0.05,
     angleStep = 15
@@ -68,6 +69,11 @@ export function createCanvasController(options) {
 
   function controllerEvent(type, detail = {}) {
     commands.onControllerCommand?.({ type, ...detail });
+  }
+
+  function changeMode(nextMode) {
+    mode = nextMode;
+    onModeChange(nextMode);
   }
 
   function render() {
@@ -165,7 +171,7 @@ export function createCanvasController(options) {
     controllerEvent('close-lane', { points });
     draftLane = [];
     draftHover = null;
-    mode = 'select';
+    changeMode('select');
     render();
   }
 
@@ -214,7 +220,7 @@ export function createCanvasController(options) {
         yaw: 0
       }));
       controllerEvent('add-vehicle', { point });
-      mode = 'select';
+      changeMode('select');
       render();
       return;
     }
@@ -468,7 +474,7 @@ export function createCanvasController(options) {
       draftLane = [];
       draftHover = null;
     }
-    mode = nextMode;
+    changeMode(nextMode);
     render();
   }
 
