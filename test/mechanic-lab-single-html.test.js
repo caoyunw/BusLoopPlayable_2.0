@@ -13,6 +13,7 @@ import {
   replaceAssetReferences,
   validateStandaloneHtml
 } from '../scripts/mechanic-lab-single-html-core.mjs';
+import { inspectMechanicLabHtml } from '../scripts/check-mechanic-lab-single-html.mjs';
 import { packageMechanicLabSingleHtml } from '../scripts/package-mechanic-lab-single-html.mjs';
 
 test('single-html helpers resolve strict MIME types and Vite resource aliases', () => {
@@ -95,4 +96,15 @@ test('packager preserves the last good artifact when resource validation fails',
     /Unsupported asset extension/
   );
   assert.equal(await readFile(join(outputDir, 'index.html'), 'utf8'), 'last-good');
+});
+
+test('checker requires the full lab and rejects external paths or rotary editor links', () => {
+  const errors = inspectMechanicLabHtml(
+    '<canvas id="game-canvas"></canvas><script src="app.js"></script><a href="/tools/rotary-level-editor/">editor</a>',
+    ['base', 'rotary-lane']
+  );
+  assert.ok(errors.includes('Mechanic library is missing.'));
+  assert.ok(errors.includes('External script or stylesheet reference remains.'));
+  assert.ok(errors.includes('Rotary level editor entry must not be packaged.'));
+  assert.ok(errors.includes('Mechanic definition is missing from artifact: base'));
 });
