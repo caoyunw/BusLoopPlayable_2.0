@@ -224,3 +224,110 @@ test('composite runtimes forward train dispatch and notify sibling vehicle featu
   assert.deepEqual(game.clickVehicle(28), { ok: true, trackSlotIndex: 0 });
   assert.equal(dispatchNotifications, 1);
 });
+
+test('train runtime moves dispatched carriages to the track and prioritizes them for boarding', () => {
+  const { game, runtime } = createAuthoredTrainGame();
+  game.clickVehicle(28);
+
+  runtime.update({ game, delta: 1 });
+  const carriage = game.getVehicle(28);
+  assert.equal(carriage.state, 'at-track');
+  assert.equal(carriage.motionData, null);
+
+  const ordinary = game.getVehicle(45);
+  ordinary.state = 'at-spot';
+  ordinary.spotIndex = 0;
+  game.spots[0].vehicleId = ordinary.id;
+  assert.equal(ordinary.colorIndex, carriage.colorIndex);
+  assert.equal(game.findBoardableVehicle(carriage.colorIndex), carriage);
+});
+
+test('a full train carriage waits on the rail instead of departing by itself', () => {
+  const { game, runtime } = createAuthoredTrainGame();
+  game.clickVehicle(28);
+  runtime.update({ game, delta: 1 });
+  const carriage = game.getVehicle(28);
+  carriage.boardedGroups = 9;
+  const slot = game.slots[0];
+  slot.colorIndex = carriage.colorIndex;
+  slot.passengerId = 9001;
+
+  assert.equal(game.tryBoardPassengerBatch(slot), true);
+  assert.equal(carriage.boardedGroups, 10);
+  assert.equal(carriage.state, 'train-full');
+  assert.equal(game.mechanicState.train.departurePendingAt, null);
+  assert.equal(game.boardingEvents.at(-1).trainTrackSlotIndex, 0);
+});
+
+test('four full carriages depart atomically and a replacement locomotive enters', () => {
+  const level = {
+    ...LEVEL_1,
+    containers: [],
+    vehicleDepthes: {},
+    mechanics: LEVEL_1.mechanics
+  };
+  const game = new BusLoopGame(level, { random: () => 0 });
+  const runtime = createTrainRuntime({
+    level,
+    options: {
+      mode: 'authored',
+      fullLoadDelay: 0.01,
+      departureDuration: 0.1,
+      locomotiveEntryDuration: 0.1
+    },
+    random: () => 0
+  });
+  game.mechanicRuntime = runtime;
+  game.mechanicState = runtime.createState(game);
+  runtime.afterReset({ game });
+
+  for (const id of [28, 29, 31, 39]) {
+    assert.equal(game.clickVehicle(id).ok, true);
+    runtime.update({ game, delta: 1 });
+    const vehicle = game.getVehicle(id);
+    vehicle.boardedGroups = 10;
+    assert.equal(runtime.onVehicleFilled({ game, vehicle }), true);
+  }
+  assert.equal(game.mechanicState.train.departurePendingAt, 0.01);
+
+  game.time = 0.02;
+  runtime.update({ game, delta: 0 });
+  assert.equal(game.mechanicState.train.locomotive.phase, 'departing');
+  assert.equal(
+    [28, 29, 31, 39].every((id) => game.getVehicle(id).state === 'train-departing'),
+    true
+  );
+  assert.equal(game.lastEvent.type, 'train-full');
+
+  runtime.update({ game, delta: 0.1 });
+  assert.equal([28, 29, 31, 39].every((id) => game.getVehicle(id).state === 'done'), true);
+  assert.deepEqual(game.mechanicState.train.trackSlots, [null, null, null, null]);
+  assert.equal(game.mechanicState.train.locomotive.phase, 'entering');
+
+  runtime.update({ game, delta: 0.1 });
+  assert.deepEqual(game.mechanicState.train.locomotive, {
+    phase: 'ready',
+    motion: 1,
+    cycle: 1
+  });
+});
+
+test('open train destinations and locomotive transitions prevent premature deadlock loss', () => {
+  const { game } = createAuthoredTrainGame();
+  const ordinary = game.getVehicle(30);
+  ordinary.state = 'at-spot';
+  for (const spot of game.spots) spot.vehicleId = ordinary.id;
+  game.sourceQueues = [[], []];
+  game.queues = [[], []];
+  for (const slot of game.slots) {
+    slot.colorIndex = 2;
+    slot.passengerId = slot.index + 1;
+  }
+
+  game.checkEndState();
+  assert.equal(game.status, 'playing');
+
+  game.mechanicState.train.locomotive.phase = 'entering';
+  game.checkEndState();
+  assert.equal(game.status, 'playing');
+});

@@ -89,7 +89,20 @@ export function createTrainRuntime({
   options = {},
   random = Math.random
 } = {}) {
+  const duration = (value, fallback) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0.01, numeric) : fallback;
+  };
   const dispatchDuration = Math.max(0.1, Number(options.dispatchDuration) || 0.9);
+  const fullLoadDelay = duration(options.fullLoadDelay, 0.25);
+  const departureDuration = duration(options.departureDuration, 1.4);
+  const locomotiveEntryDuration = duration(options.locomotiveEntryDuration, 1.2);
+
+  function getTrackVehicles(game) {
+    return game.mechanicState.train.trackSlots
+      .map((slot) => slot && game.getVehicle(slot.vehicleId))
+      .filter(Boolean);
+  }
 
   return {
     id: 'train',
@@ -179,6 +192,166 @@ export function createTrainRuntime({
         destination: { kind: 'train-track', trackSlotIndex },
         event
       };
+    },
+
+    findBoardableVehicle({ game, colorIndex, requiredGroups = 1 }) {
+      for (const slot of game.mechanicState.train.trackSlots) {
+        if (!slot) continue;
+        const vehicle = game.getVehicle(slot.vehicleId);
+        const freeGroups = vehicle ? vehicle.seats - vehicle.boardedGroups : 0;
+        if (
+          vehicle?.state === 'at-track'
+          && vehicle.colorIndex === colorIndex
+          && freeGroups >= requiredGroups
+        ) return vehicle;
+      }
+      return null;
+    },
+
+    onPassengerBatchBoarded({ vehicle }) {
+      return vehicle.trainCarriage
+        ? { trainTrackSlotIndex: vehicle.trackSlotIndex }
+        : {};
+    },
+
+    onVehicleFilled({ game, vehicle }) {
+      if (!vehicle.trainCarriage || vehicle.trackSlotIndex == null) return false;
+      Object.assign(vehicle, { state: 'train-full', motion: 0, motionData: null });
+      game.lastEvent = {
+        type: 'train-carriage-full',
+        vehicleId: vehicle.id,
+        trackSlotIndex: vehicle.trackSlotIndex
+      };
+      const train = game.mechanicState.train;
+      const trackVehicles = getTrackVehicles(game);
+      if (
+        train.trackSlots.every(Boolean)
+        && trackVehicles.length === TRAIN_SIZE
+        && trackVehicles.every((candidate) => candidate.state === 'train-full')
+      ) {
+        train.departurePendingAt = game.time + fullLoadDelay;
+      }
+      return true;
+    },
+
+    hasOpenVehicleDestination(game) {
+      const train = game.mechanicState.train;
+      if (train.locomotive.phase !== 'ready' || train.trackSlots.every(Boolean)) return false;
+      return train.carriageVehicleIds.some((id) => game.getVehicle(id)?.state === 'parked');
+    },
+
+    hasPendingVehicles(game) {
+      const train = game.mechanicState.train;
+      return (
+        train.departurePendingAt != null
+        || train.locomotive.phase === 'departing'
+        || train.locomotive.phase === 'entering'
+        || train.trackSlots.some((slot) => (
+          slot && game.getVehicle(slot.vehicleId)?.state === 'moving-to-track'
+        ))
+      );
+    },
+
+    update({ game, delta }) {
+      const train = game.mechanicState.train;
+      let changed = false;
+      for (const vehicle of game.vehicles) {
+        if (vehicle.state !== 'moving-to-track') continue;
+        const travelDuration = Math.max(0.01, vehicle.motionData?.duration ?? dispatchDuration);
+        vehicle.motion = Math.min(1, vehicle.motion + Math.max(0, delta) / travelDuration);
+        if (vehicle.motion < 1) continue;
+        Object.assign(vehicle, { state: 'at-track', motion: 0, motionData: null });
+        game.lastEvent = {
+          type: 'vehicle-arrived',
+          vehicleId: vehicle.id,
+          trackSlotIndex: vehicle.trackSlotIndex
+        };
+        changed = true;
+      }
+
+      if (
+        train.departurePendingAt != null
+        && game.time >= train.departurePendingAt
+        && train.locomotive.phase === 'ready'
+      ) {
+        const vehicleIds = train.trackSlots.map((slot) => slot.vehicleId);
+        train.departurePendingAt = null;
+        train.locomotive = {
+          ...train.locomotive,
+          phase: 'departing',
+          motion: 0
+        };
+        for (const vehicle of getTrackVehicles(game)) {
+          Object.assign(vehicle, {
+            state: 'train-departing',
+            motion: 0,
+            motionData: { duration: departureDuration }
+          });
+        }
+        game.lastEvent = {
+          type: 'train-full',
+          cycle: train.locomotive.cycle,
+          vehicleIds
+        };
+        return true;
+      }
+
+      if (train.locomotive.phase === 'departing') {
+        train.locomotive.motion = Math.min(
+          1,
+          train.locomotive.motion + Math.max(0, delta) / departureDuration
+        );
+        for (const vehicle of getTrackVehicles(game)) {
+          vehicle.motion = train.locomotive.motion;
+        }
+        if (train.locomotive.motion >= 1) {
+          const departingVehicles = getTrackVehicles(game);
+          for (const vehicle of departingVehicles) {
+            Object.assign(vehicle, {
+              state: 'done',
+              motion: 0,
+              motionData: null,
+              trackSlotIndex: null
+            });
+          }
+          train.trackSlots = Array.from({ length: TRAIN_SIZE }, () => null);
+          const hasRemainingCarriages = train.carriageVehicleIds.some((id) => (
+            game.getVehicle(id)?.state !== 'done'
+          ));
+          train.locomotive = {
+            ...train.locomotive,
+            phase: hasRemainingCarriages ? 'entering' : 'complete',
+            motion: hasRemainingCarriages ? 0 : 1
+          };
+          game.lastEvent = {
+            type: 'train-finished',
+            cycle: train.locomotive.cycle,
+            vehicleIds: departingVehicles.map(({ id }) => id)
+          };
+        }
+        return true;
+      }
+
+      if (train.locomotive.phase === 'entering') {
+        train.locomotive.motion = Math.min(
+          1,
+          train.locomotive.motion + Math.max(0, delta) / locomotiveEntryDuration
+        );
+        if (train.locomotive.motion >= 1) {
+          train.locomotive = {
+            phase: 'ready',
+            motion: 1,
+            cycle: train.locomotive.cycle + 1
+          };
+          game.lastEvent = {
+            type: 'train-locomotive-arrived',
+            cycle: train.locomotive.cycle
+          };
+        }
+        return true;
+      }
+
+      return changed;
     }
   };
 }

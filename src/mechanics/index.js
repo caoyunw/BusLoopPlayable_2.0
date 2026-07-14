@@ -96,6 +96,10 @@ export function createCompositeRuntime(runtimes) {
       return runtimes.some((runtime) => Boolean(runtime.hasPendingVehicles?.(game)));
     },
 
+    hasOpenVehicleDestination(game) {
+      return runtimes.some((runtime) => Boolean(runtime.hasOpenVehicleDestination?.(game)));
+    },
+
     hasWon(game) {
       return runtimes.some((runtime) => Boolean(runtime.hasWon?.(game)));
     },
@@ -114,6 +118,21 @@ export function createCompositeRuntime(runtimes) {
         if (dispatch?.handled) return dispatch;
       }
       return null;
+    },
+
+    findBoardableVehicle(context) {
+      for (const runtime of runtimes) {
+        const vehicle = runtime.findBoardableVehicle?.(context);
+        if (vehicle) return vehicle;
+      }
+      return null;
+    },
+
+    onVehicleFilled(context) {
+      for (const runtime of runtimes) {
+        if (runtime.onVehicleFilled?.(context)) return true;
+      }
+      return false;
     },
 
     createQueueItemData(context) {

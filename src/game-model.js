@@ -909,13 +909,25 @@ export class BusLoopGame {
       ...mechanicBoardingEvent
     };
     if (vehicle.boardedGroups >= vehicle.seats) {
-      Object.assign(vehicle, { state: 'boarding-final', motion: 0 });
-      this.lastEvent = { type: 'vehicle-boarding-final', vehicleId: vehicle.id };
+      const handled = this.mechanicRuntime.onVehicleFilled?.({
+        game: this,
+        vehicle
+      }) ?? false;
+      if (!handled) {
+        Object.assign(vehicle, { state: 'boarding-final', motion: 0 });
+        this.lastEvent = { type: 'vehicle-boarding-final', vehicleId: vehicle.id };
+      }
     }
     return true;
   }
 
   findBoardableVehicle(colorIndex, requiredGroups = 1) {
+    const mechanicVehicle = this.mechanicRuntime.findBoardableVehicle?.({
+      game: this,
+      colorIndex,
+      requiredGroups
+    });
+    if (mechanicVehicle) return mechanicVehicle;
     for (const spot of this.spots) {
       if (spot.vehicleId === null) continue;
       const vehicle = this.getVehicle(spot.vehicleId);
@@ -952,7 +964,8 @@ export class BusLoopGame {
       return;
     }
     if (this.mechanicRuntime.hasPendingVehicles?.(this)) return;
-    const enabledSpotsFull = this.spots.every((spot) => spot.vehicleId !== null);
+    const enabledSpotsFull = this.spots.every((spot) => spot.vehicleId !== null)
+      && !this.mechanicRuntime.hasOpenVehicleDestination?.(this);
     const beltFull = this.slots.every((slot) => slot.colorIndex !== null);
     const upstreamEmpty = this.sourceQueues.every((queue) => queue.length === 0)
       && this.queues.every((queue) => queue.length === 0);
