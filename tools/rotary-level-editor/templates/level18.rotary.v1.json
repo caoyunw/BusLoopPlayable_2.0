@@ -1,0 +1,51 @@
+{
+  "coordinates": {
+    "geometryProfile": "busloop-level18-rotary.v1",
+    "plane": "xz",
+    "unit": "level-unit",
+    "yaw": "degrees"
+  },
+  "context": {
+    "allowedColorIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "conveyors": [],
+    "garages": [],
+    "parkingSpots": [],
+    "passengerQueues": [],
+    "protectedGeometry": [],
+    "rotaryRoadWidth": 0.42,
+    "vehicleFootprints": {
+      "10": {
+        "length": 0.6785897,
+        "width": 0.27
+      },
+      "4": {
+        "length": 0.4814318817567568,
+        "width": 0.27
+      },
+      "6": {
+        "length": 0.5639630614864864,
+        "width": 0.27
+      }
+    }
+  },
+  "documentId": "level18-template",
+  "format": "level.rotary.v1",
+  "rotaryLanes": [],
+  "target": {
+    "adapter": "busloop-level-data.v1",
+    "contextFingerprint": "sha256:896b07c67fa402d062351d6fd083646a6623c9531b032f932fbeb08ffbbaefba",
+    "levelId": "GameSceneDualQueue2/18"
+  },
+  "vehicles": []
+}
