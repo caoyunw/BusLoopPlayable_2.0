@@ -8,6 +8,8 @@
     "dev": "vite --host 127.0.0.1",
     "dev:rotary-editor": "vite --host 127.0.0.1 --open /tools/rotary-level-editor/",
     "build": "vite build",
+    "package:mechanic-lab": "pnpm run build && node scripts/package-mechanic-lab-single-html.mjs && node scripts/check-mechanic-lab-single-html.mjs",
+    "check:mechanic-lab": "node scripts/check-mechanic-lab-single-html.mjs",
     "apply:tuning": "node scripts/apply-scene-tuning.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "rotary:level": "node scripts/rotary-level.mjs",

@@ -482,7 +482,8 @@ test('neutral runtime assets replace playable ad delivery files', () => {
   assert.equal(existsSync(join('public', 'assets', 'applovin')), false);
   assert.equal(existsSync(join('scripts', 'package-applovin-single-html.mjs')), false);
   assert.equal(existsSync(join('scripts', 'check-applovin-package.mjs')), false);
-  assert.equal(existsSync(join('artifacts', 'applovin')), false);
+  assert.equal(existsSync(join('scripts', 'package-mechanic-lab-single-html.mjs')), true);
+  assert.equal(existsSync(join('scripts', 'check-mechanic-lab-single-html.mjs')), true);
   assert.equal(existsSync(join('artifacts', 'asset-compress-tests')), false);
   assert.deepEqual(
     readdirSync('artifacts').filter((name) => /^bg_q\d+\.jpg$/i.test(name)),
@@ -504,7 +505,17 @@ test('active runtime files contain no playable ad delivery markers', () => {
   const tuningArtifact = JSON.parse(readFileSync(join('artifacts', 'scene-tuning.json'), 'utf8'));
 
   assert.doesNotMatch(activeSource, ACTIVE_AD_DELIVERY_MARKERS);
-  assert.deepEqual(Object.keys(packageData.scripts).sort(), ['apply:tuning', 'build', 'dev', 'preview', 'test']);
+  assert.deepEqual(Object.keys(packageData.scripts).sort(), [
+    'apply:tuning',
+    'build',
+    'check:mechanic-lab',
+    'dev',
+    'dev:rotary-editor',
+    'package:mechanic-lab',
+    'preview',
+    'rotary:level',
+    'test'
+  ]);
   assert.equal('cta' in SCENE_TUNING, false);
   assert.equal('cta' in tuningArtifact, false);
 });

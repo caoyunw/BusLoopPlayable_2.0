@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -107,4 +108,22 @@ test('checker requires the full lab and rejects external paths or rotary editor 
   assert.ok(errors.includes('External script or stylesheet reference remains.'));
   assert.ok(errors.includes('Rotary level editor entry must not be packaged.'));
   assert.ok(errors.includes('Mechanic definition is missing from artifact: base'));
+});
+
+test('package metadata exposes only the neutral mechanic-lab single-html workflow', () => {
+  const packageJson = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  );
+  assert.equal(
+    packageJson.scripts['package:mechanic-lab'],
+    'pnpm run build && node scripts/package-mechanic-lab-single-html.mjs && node scripts/check-mechanic-lab-single-html.mjs'
+  );
+  assert.equal(
+    packageJson.scripts['check:mechanic-lab'],
+    'node scripts/check-mechanic-lab-single-html.mjs'
+  );
+  assert.equal(
+    existsSync(new URL('../scripts/package-applovin-single-html.mjs', import.meta.url)),
+    false
+  );
 });
