@@ -265,6 +265,21 @@ export const LEVEL_1 = Object.freeze({
           })
         })
       ])
+    }),
+    'rotary-lane': Object.freeze({
+      lanes: Object.freeze([
+        Object.freeze({
+          id: 'outer-loop',
+          slots: Object.freeze([
+            Object.freeze({ x: -1.45, z: -2.15, yaw: 90, vehicleId: 56 }),
+            Object.freeze({ x: 0, z: -2.15, yaw: 90, vehicleId: 55 }),
+            Object.freeze({ x: 1.45, z: -2.15, yaw: 0, vehicleId: 32 }),
+            Object.freeze({ x: 1.45, z: 1.2, yaw: -90, vehicleId: 31 }),
+            Object.freeze({ x: 0, z: 1.2, yaw: -90, vehicleId: 28 }),
+            Object.freeze({ x: -1.45, z: 1.2, yaw: 180, vehicleId: 35 })
+          ])
+        })
+      ])
     })
   }),
   assets: {

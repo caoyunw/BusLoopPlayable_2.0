@@ -11,6 +11,7 @@ import orderPassenger from './order-passenger/index.js';
 import valve from './valve/index.js';
 import train from './train/index.js';
 import transportTunnel from './transport-tunnel/index.js';
+import rotaryLane from './rotary-lane/index.js';
 import lockedGarage from './locked-garage/index.js';
 import countGarage from './count-garage/index.js';
 import rotatingSpots from './rotating-spots/index.js';
@@ -32,6 +33,7 @@ const modules = [
   valve,
   train,
   transportTunnel,
+  rotaryLane,
   lockedGarage,
   countGarage,
   rotatingSpots,

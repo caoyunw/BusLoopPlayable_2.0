@@ -173,3 +173,28 @@ test('reset restores authored occupancy positions yaw and idle state', () => {
     { x: 0, z: 0, yaw: 90 }
   );
 });
+
+test('level18 authors one frozen six-slot rotary lane', () => {
+  const config = LEVEL_1.mechanics['rotary-lane'];
+  assert.equal(Object.isFrozen(config), true);
+  assert.equal(config.lanes.length, 1);
+  assert.equal(Object.isFrozen(config.lanes[0]), true);
+  assert.equal(Object.isFrozen(config.lanes[0].slots), true);
+  assert.equal(config.lanes[0].slots.length, 6);
+  assert.deepEqual(
+    config.lanes[0].slots.map(({ vehicleId }) => vehicleId),
+    [56, 55, 32, 31, 28, 35]
+  );
+});
+
+test('selected rotary lane runtime composes with automatic level garages', () => {
+  const game = new BusLoopGame(LEVEL_1, {
+    mechanicId: 'rotary-lane',
+    random: () => 0
+  });
+  const snapshot = game.snapshot();
+  assert.match(game.mechanicRuntime.id, /rotary-lane/);
+  assert.match(game.mechanicRuntime.id, /garage/);
+  assert.equal(snapshot.rotaryLane.lanes.length, 1);
+  assert.equal(snapshot.garages.length, 2);
+});
