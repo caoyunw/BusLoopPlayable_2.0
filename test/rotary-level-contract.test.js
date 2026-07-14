@@ -9,6 +9,7 @@ import {
   normalizeYaw
 } from '../tools/rotary-level-contract/document.js';
 import { computeContextFingerprint } from '../tools/rotary-level-contract/fingerprint.js';
+import { validateLevelDocument } from '../tools/rotary-level-contract/validate.js';
 
 function emptyContext(allowedColorIndexes = [0, 1]) {
   return {
@@ -20,6 +21,39 @@ function emptyContext(allowedColorIndexes = [0, 1]) {
     vehicleFootprints: {},
     rotaryRoadWidth: 0.42,
     allowedColorIndexes
+  };
+}
+
+function validValidationDocument() {
+  return {
+    format: FORMAT,
+    documentId: 'strict-validation',
+    target: {
+      levelId: 'GameSceneDualQueue2/18',
+      adapter: 'busloop-level-data.v1',
+      contextFingerprint: `sha256:${'1'.repeat(64)}`
+    },
+    coordinates: {
+      plane: 'xz',
+      unit: 'level-unit',
+      yaw: 'degrees',
+      geometryProfile: 'busloop-level18-rotary.v1'
+    },
+    vehicles: [{
+      id: 1,
+      colorIndex: 0,
+      seats: 4,
+      placement: { kind: 'field', x: 0, z: 0, yaw: 0 }
+    }],
+    rotaryLanes: [],
+    context: {
+      ...emptyContext([0, 1]),
+      vehicleFootprints: {
+        4: { width: 0.27, length: 0.4814318817567568 },
+        6: { width: 0.27, length: 0.5639630614864864 },
+        10: { width: 0.27, length: 0.6785897 }
+      }
+    }
   };
 }
 
@@ -63,4 +97,53 @@ test('context fingerprint excludes editable vehicles and lanes', async () => {
 
   assert.equal(first, second);
   assert.match(first, /^sha256:[0-9a-f]{64}$/);
+});
+
+test('strict validation reports stable codes and paths', () => {
+  const cases = [
+    {
+      mutate(document) {
+        document.unexpected = true;
+      },
+      expected: ['document.unknown-key', '/unexpected']
+    },
+    {
+      mutate(document) {
+        document.vehicles[0].placement.extra = true;
+      },
+      expected: [
+        'vehicle.placement.unknown-key',
+        '/vehicles/0/placement/extra'
+      ]
+    },
+    {
+      mutate(document) {
+        document.vehicles[0].placement.x = Number.NaN;
+      },
+      expected: ['value.non-finite', '/vehicles/0/placement/x']
+    },
+    {
+      mutate(document) {
+        document.vehicles[0].colorIndex = 9;
+      },
+      expected: ['vehicle.color-not-allowed', '/vehicles/0/colorIndex']
+    },
+    {
+      mutate(document) {
+        document.vehicles[0].seats = 8;
+      },
+      expected: ['vehicle.unsupported-seats', '/vehicles/0/seats']
+    }
+  ];
+
+  for (const { mutate, expected: [code, path] } of cases) {
+    const document = validValidationDocument();
+    mutate(document);
+    assert.ok(
+      validateLevelDocument(document).errors.some((entry) => (
+        entry.code === code && entry.path === path
+      )),
+      `expected ${code} at ${path}`
+    );
+  }
 });
