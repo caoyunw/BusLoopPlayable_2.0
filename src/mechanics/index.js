@@ -124,6 +124,10 @@ export function createCompositeRuntime(runtimes) {
       return runtimes.every((runtime) => runtime.isVehicleBlocking?.(context) ?? true);
     },
 
+    hasVehicleDestination(context) {
+      return runtimes.some((runtime) => Boolean(runtime.hasVehicleDestination?.(context)));
+    },
+
     dispatchVehicle(context) {
       for (const runtime of runtimes) {
         const dispatch = runtime.dispatchVehicle?.(context);

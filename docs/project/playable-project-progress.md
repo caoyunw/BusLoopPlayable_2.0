@@ -46,6 +46,13 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 - The active runtime level is `GameSceneDualQueue2` level18 with 47 vehicles, two fixed queues of 115 and 191 passenger groups, and 306 total passenger groups. The level includes two garage containers and stocked garage vehicles where provided.
 
+### Unity Collision Parity
+
+- Vehicle dispatch now follows the Unity decision order: parked-state gate, available parking spot, mechanic/shape gate, collision-context decision, then spot reservation and station motion.
+- Runtime blocking no longer consumes the exported full-depth chain. An isolated collision context builds current 500-unit forward SAT edges from per-size vehicle footprints and returns direct collision candidates.
+- Collision feedback uses current rotated vehicle/container boxes and edge-contact geometry. Garage body/door/out-path helper nodes and optional conveyor lateral-interval/wall semantics participate in the same context.
+- Level18 exposes explicit 4/6/10-seat and garage collision footprints derived from existing authored web dimensions and validated against the known Unity initial movable set. The legacy `vehicleDepthes` data remains only for provenance/debug comparison.
+
 ### Linked-Passengers
 
 - Same-color passenger rows can form chains of 2 through the configured maximum length in independent 30% chance mode, or use level18-authored start arrays. The authored configuration contains 12 chains covering 66 rows.
@@ -61,7 +68,7 @@ The active project is now the BusLoop mechanic lab, not an advertising playable.
 
 ### Verification
 
-- Focused verification highlights: question-passenger focused suite and registry gates passed; linked-passenger focused gate passed; focused garage/valve/order/count-garage/capacity/maglev checks passed in their focused runs. `pnpm run build` has historically passed with a known non-blocking chunk-size warning. Full suite and build should only be run when explicitly requested; focused checks are the default verification path.
+- Focused verification highlights: collision parity 11/11, garage 7/7, maglev 4/4, capacity 4/4, count-garage 2/2, valve 5/5, and order-passenger 4/4 passed. The paired game-model collision assertions pass; that file retains three documented unrelated question/asset baseline failures. `pnpm run build` has historically passed with a known non-blocking chunk-size warning. Full suite and build should only be run when explicitly requested; focused checks are the default verification path.
 
 ## Historical Playable/Advertising Log
 

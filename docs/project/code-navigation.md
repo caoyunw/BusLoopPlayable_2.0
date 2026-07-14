@@ -25,6 +25,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 | Lab bootstrap, base runtime assembly, mechanic pause/select, page-session mechanic options, generic detail wiring, tuning storage, QA API | `src/main.js` | `src/mechanics/index.js`, `src/mechanic-library.js`, `src/mechanic-lab.js`, `src/mechanic-registry.js`, `index.html`, `test/game-model.test.js` |
 | Valve side gating, automatic side switching, and entrance markers | `src/mechanics/valve/model.js` | `src/mechanics/valve/index.js`, `src/game-model.js`, `src/scene-view.js`, `test/valve-mechanic.test.js` |
 | Core gameplay rules, generic batch admission/entry/boarding hooks, reset-generation snapshots, blockers, spots, queues, boarding, mechanic-owned win hooks, win/fail | `src/game-model.js` | `src/mechanics/index.js`, `src/level-data.js`, `src/vehicle-motion.js`, `test/game-model.test.js`, `test/order-passenger-mechanic.test.js`, `test/linked-passengers-mechanic.test.js` |
+| Unity-style vehicle collision graph, per-vehicle footprints, garage/conveyor container nodes, direct candidates, and oriented-edge contact | `src/vehicle-collision.js` | `src/game-model.js`, `src/level-data.js`, `src/mechanics/garage/model.js`, `test/vehicle-collision.test.js`, `test/game-model.test.js`, `test/garage-mechanic.test.js` |
 | Level constants, fixed passenger sequence, linked authored starts, vehicles, spots, runtime asset URLs | `src/level-data.js` | `src/game-model.js`, `src/scene-view.js`, `test/game-model.test.js`, `test/linked-passengers-mechanic.test.js` |
 | Three.js rendering, picking, assets, vehicles, passengers, shadows | `src/scene-view.js` | `src/scene-tuning.js`, `src/scene-layout.js`, `test/game-model.test.js` |
 | Runtime audio events and WebAudio playback | `src/audio-controller.js` | `src/main.js`, `src/level-data.js`, `test/game-model.test.js` |
@@ -76,6 +77,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 ### Base Runtime
 
 - `src/game-model.js`: pure gameplay state machine for vehicle clicks, reset-generation snapshots, blockers, station reservation, route progress, atomic runtime-defined queue/belt/boarding batches, departure, win/fail, and subscriptions.
+- `src/vehicle-collision.js`: pure Unity-style collision context. Owns state-signature graph caching, 500-unit forward SAT edges, per-vehicle footprint resolution, garage five-node and optional conveyor interval semantics, direct collision candidates, and current oriented-edge contact calculation.
 - `src/level-data.js`: authored level/color/gameplay constants, linked-passenger start arrays for level18, and all runtime asset URLs.
 - `src/scene-view.js`: Three.js scene construction, loading, camera/background fit, paths, models, passenger materials/question badges, linked connectors and aggregate boarding feedback, effects, picking, resize, and rendering.
 - `src/audio-controller.js`: WebAudio unlock/preload/playback and game-event audio de-duplication.
@@ -105,6 +107,7 @@ Use this file before code changes. Pick the closest change area, then read only 
 - `test/order-passenger-mechanic.test.js`: order-passenger registry status, target counting, mechanic-owned win condition, and top HUD source contracts.
 - `test/capacity-mechanics.test.js`: upgrade-spot and double-gate registry status plus first-parking-spot capacity and boarding-cost rules.
 - `test/game-model.test.js`: base gameplay plus reset-version behavior, active question-passenger startup/reconfiguration, source/runtime contracts, page-session mechanic detail/apply wiring, tuning/storage wiring, assets, VAT, paths, blockers, queues, boarding, collision, and win/fail behavior.
+- `test/vehicle-collision.test.js`: per-size footprint selection, runtime graph versus legacy depth data, reset/state/spot ordering, current edge contact, garage body/door behavior, conveyor interval/wall behavior, and blocked feedback.
 - `test/scene-layout.test.js`: camera/layout helper math and curve transforms.
 - `test/vehicle-effects.test.js`: ribbon, smoke, hit effects, particle motion, and editor-driven effect tuning.
 

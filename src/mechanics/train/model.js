@@ -160,6 +160,10 @@ export function createTrainRuntime({
       };
     },
 
+    hasVehicleDestination({ vehicle }) {
+      return Boolean(vehicle.trainCarriage);
+    },
+
     dispatchVehicle({ game, vehicle }) {
       if (!vehicle.trainCarriage) return null;
       const train = game.mechanicState.train;

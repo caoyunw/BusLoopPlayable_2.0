@@ -201,6 +201,12 @@ function createAuthoredTrainGame() {
     ...LEVEL_1,
     containers: [],
     vehicleDepthes: {},
+    vehicles: LEVEL_1.vehicles.map((vehicle, index) => ({
+      ...vehicle,
+      x: index * 2,
+      z: 0,
+      yaw: 0
+    })),
     mechanics: LEVEL_1.mechanics
   };
   const game = new BusLoopGame(level, { random: () => 0 });
@@ -215,8 +221,9 @@ function createAuthoredTrainGame() {
   return { game, runtime };
 }
 
-test('train carriage dispatch reserves the rail without consuming a normal parking spot', () => {
+test('train carriage dispatch reserves the rail without requiring or consuming a normal parking spot', () => {
   const { game } = createAuthoredTrainGame();
+  for (const spot of game.spots) spot.vehicleId = 999;
   const result = game.clickVehicle(28);
 
   assert.deepEqual(result, { ok: true, trackSlotIndex: 0 });
@@ -226,7 +233,7 @@ test('train carriage dispatch reserves the rail without consuming a normal parki
     index: 0,
     vehicleId: 28
   });
-  assert.equal(game.spots.every(({ vehicleId }) => vehicleId === null), true);
+  assert.equal(game.spots.every(({ vehicleId }) => vehicleId === 999), true);
 });
 
 test('ordinary vehicles still dispatch to normal spots while train destinations report their own limits', () => {
@@ -306,6 +313,12 @@ test('four full carriages depart atomically and a replacement locomotive enters'
     ...LEVEL_1,
     containers: [],
     vehicleDepthes: {},
+    vehicles: LEVEL_1.vehicles.map((vehicle, index) => ({
+      ...vehicle,
+      x: index * 2,
+      z: 0,
+      yaw: 0
+    })),
     mechanics: LEVEL_1.mechanics
   };
   const game = new BusLoopGame(level, { random: () => 0 });

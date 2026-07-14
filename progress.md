@@ -1,5 +1,28 @@
 # Progress
 
+## Local Conflict Resolution - 2026-07-14
+
+- Resolved the sole unmerged path, `src/game-model.js`, without dropping either the upstream mechanic-owned destination hook or the stashed Unity-style collision graph and station-capacity ordering.
+- Added a pure per-vehicle `hasVehicleDestination` runtime contract so train and transport-tunnel vehicles can bypass normal parking capacity without mutating state before collision clearance; normal station-bound vehicles still return `spots-full` before collision feedback.
+- Updated the focused train fixtures to isolate train behavior with explicit nonblocking geometry now that runtime collision decisions intentionally ignore the legacy `vehicleDepthes` table.
+- Verification passed: syntax checks for all four integration modules; conflict-marker scan and `git diff --check`; collision 11/11, train 22/22, transport tunnel 16/16, garage 7/7, maglev 4/4, mechanic architecture 5/5, and focused game-model dispatch/collision tests 9/9.
+- The initial `node --test` invocation hit the documented Windows sandbox `spawn EPERM`; single-process focused test execution completed successfully.
+
+## Vehicle Collision Method Comparison - 2026-07-14
+
+- Completed a read-only comparison of the web collision/dispatch path and Unity `CanMoveToStation` call chain using `.cs`-only Unity searches.
+- The main method-level gaps are recorded in `findings.md`: Unity runtime collision graph plus per-object geometry/container semantics versus the web's primarily authored depth-chain filtering and simplified uniform-size contact distance.
+- No runtime code or tests were changed or run.
+
+## Unity Collision Parity Implementation - 2026-07-14 (In Progress)
+
+- Added `src/vehicle-collision.js` with a runtime directed graph, per-vehicle size resolution, ordinary forward SAT edges, garage five-node wiring, direct candidate collection, and Unity-style oriented-edge contact calculation.
+- Rewired `BusLoopGame` to use a `StatePark`-equivalent gate, check station capacity before shape/mechanic/collision gates, resolve container-aware contacts, and stop consuming `level.vehicleDepthes` for dispatch decisions.
+- Numeric 4/6/10-seat and garage collision dimensions remain pending because Unity C# exposes only serialized fields, not their authored values.
+- Added garage door-box release gating and current-pose collision boxes for colliding/garage-exiting vehicles. Dedicated collision tests now pass 8/8; garage remains 7/7 and maglev remains 4/4.
+- The paired `game-model` file passes 36/41: three failures are the documented unrelated question/asset baseline, while two collision expectations remain pending exact Unity size values (not logic errors in the new explicit-size tests).
+- Added explicit level18 4/6/10-seat collision footprints derived from authored web model-depth ratios and validated against the known Unity initial movable set. Collision-related `game-model` regressions now pass; the file is 38/41 with only the three documented unrelated baseline failures remaining.
+
 ## Handoff - 2026-07-13
 
 `linked-passengers` is complete and playable. The lab now contains 18 definitions: 11 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`, `upgrade-spot`, `double-gate`, `maglev-spot`) and 7 planned.

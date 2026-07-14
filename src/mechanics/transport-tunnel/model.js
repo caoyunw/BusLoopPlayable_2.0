@@ -336,6 +336,10 @@ export function createTransportTunnelRuntime({ level = null, options = {} } = {}
       };
     },
 
+    hasVehicleDestination({ game, vehicle }) {
+      return Boolean(findNearestInteraction(game, vehicle, state(game).pairs));
+    },
+
     dispatchVehicle({ game, vehicle }) {
       const nearest = findNearestInteraction(game, vehicle, state(game).pairs);
       if (!nearest) return null;

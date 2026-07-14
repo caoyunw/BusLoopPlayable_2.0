@@ -7,11 +7,14 @@ import {
   buildRoundedPath,
   buildToStationPoints,
   evaluateUnityCurve,
-  getCollisionDistance,
   getCollisionMotion,
   getHitDirection,
   getStationMotion
 } from './vehicle-motion.js';
+import {
+  createVehicleCollisionContext,
+  findCollisionContact
+} from './vehicle-collision.js';
 import {
   createMechanicRuntime,
   resolvePlayableMechanicId
@@ -103,58 +106,6 @@ function visualYawToVehicleAreaYaw(yawDegrees) {
   const local = yawDegrees - (area.rotationDegrees || 0);
   return area.mirrorZ ? 180 - local : local;
 }
-
-function vehicleForward(vehicle) {
-  const yaw = vehicle.yaw * Math.PI / 180;
-  return { x: Math.sin(yaw), z: Math.cos(yaw) };
-}
-
-function vehicleRight(forward) {
-  return { x: forward.z, z: -forward.x };
-}
-
-function dot(a, b) {
-  return a.x * b.x + a.z * b.z;
-}
-
-function makeVehicleBox(vehicle, dimensions, scanForward = false) {
-  const forward = vehicleForward(vehicle);
-  const right = vehicleRight(forward);
-  const length = scanForward ? 500 : dimensions.length;
-  const centerOffset = scanForward ? (length - dimensions.length) * 0.5 : 0;
-  return {
-    center: {
-      x: vehicle.x + forward.x * centerOffset,
-      z: vehicle.z + forward.z * centerOffset
-    },
-    forward,
-    right,
-    halfLength: length * 0.5,
-    halfWidth: dimensions.width * 0.5
-  };
-}
-
-function projectedRadius(box, axis) {
-  return Math.abs(dot(box.forward, axis)) * box.halfLength
-    + Math.abs(dot(box.right, axis)) * box.halfWidth;
-}
-
-function overlapsOnAxis(a, b, axis) {
-  const delta = { x: b.center.x - a.center.x, z: b.center.z - a.center.z };
-  return Math.abs(dot(delta, axis)) <= projectedRadius(a, axis) + projectedRadius(b, axis);
-}
-
-function blocksVehicleExit(attacker, candidate, dimensions) {
-  const exitBox = makeVehicleBox(attacker, dimensions, true);
-  const candidateBox = makeVehicleBox(candidate, dimensions);
-  return [
-    exitBox.right,
-    exitBox.forward,
-    candidateBox.right,
-    candidateBox.forward
-  ].every((axis) => overlapsOnAxis(exitBox, candidateBox, axis));
-}
-
 
 export class BusLoopGame {
   constructor(level = LEVEL_1, options = {}) {
@@ -248,6 +199,7 @@ export class BusLoopGame {
       ...this.createMechanicSlotData()
     }));
     this.mechanicRuntime.afterReset?.({ game: this });
+    this.collisionContext = createVehicleCollisionContext(this.level);
     this.lastEvent = { type: 'reset' };
     this.emit();
   }
@@ -335,61 +287,72 @@ export class BusLoopGame {
 
   getBlockers(id) {
     const vehicle = this.getVehicle(id);
-    if (!vehicle || !['parked', 'in-garage'].includes(vehicle.state)) return [];
-    if (vehicle.state === 'parked' && !this.canVehicleDispatch(vehicle)) return [];
-    if (this.level.vehicleDepthes && !vehicle.useDynamicBlockers) {
-      const authoredBlockers = this.level.vehicleDepthes[id] ?? [];
-      return authoredBlockers.filter((blockerId) => {
-        const candidate = this.getVehicle(blockerId);
-        return candidate
-          && ['parked', 'colliding'].includes(candidate.state)
-          && this.isVehicleBlocking(candidate, vehicle);
-      });
-    }
-    // Unity scales both positions and Vehicle.Size by mapScale. The authored
-    // level plane is equivalent when both are left unscaled.
-    const dimensions = {
-      width: this.level.vehicleSize.width / this.level.mapScale,
-      length: this.level.vehicleSize.length / this.level.mapScale
-    };
-    return this.vehicles.filter((candidate) => {
-      if (candidate.id === id || !['parked', 'colliding'].includes(candidate.state)) return false;
-      if (!this.isVehicleBlocking(candidate, vehicle)) return false;
-      return blocksVehicleExit(vehicle, candidate, dimensions);
-    }).map((candidate) => candidate.id);
+    if (!this.canMoveToStation(vehicle) || !this.canVehicleDispatch(vehicle)) return [];
+    return this.collisionContext.getCollisionCandidates(this, id).map((candidate) => (
+      candidate.type === 'vehicle'
+        ? candidate.id
+        : `container:${candidate.id}:${candidate.role}`
+    ));
   }
 
   clickVehicle(id) {
     if (this.status !== 'playing') return { ok: false, reason: 'finished' };
     const vehicle = this.getVehicle(id);
-    if (!vehicle || vehicle.state !== 'parked') return { ok: false, reason: 'unavailable' };
+    if (!this.canMoveToStation(vehicle)) return { ok: false, reason: 'unavailable' };
+    const spot = this.spots.find((candidate) => candidate.vehicleId === null);
+    const hasMechanicDestination = Boolean(
+      this.mechanicRuntime.hasVehicleDestination?.({ game: this, vehicle })
+    );
+    if (!spot && !hasMechanicDestination) {
+      this.lastEvent = { type: 'spots-full', vehicleId: id };
+      this.checkEndState();
+      this.emit();
+      return { ok: false, reason: 'spots-full' };
+    }
     if (!this.canVehicleDispatch(vehicle)) return { ok: false, reason: 'mechanic-disabled' };
-    const blockers = this.getBlockers(id);
-    if (blockers.length > 0) {
-      // Level positions are authored before GameScene.VehicleScale is applied.
-      // Convert the scaled Unity collider dimensions back into that same plane.
-      const collisionSize = {
-        width: this.level.vehicleSize.width / this.level.mapScale,
-        length: this.level.vehicleSize.length / this.level.mapScale
-      };
-      const targets = blockers.map((blockerId) => this.getVehicle(blockerId));
-      const target = targets.sort((a, b) => (
-        getCollisionDistance(vehicle, a, collisionSize)
-        - getCollisionDistance(vehicle, b, collisionSize)
-      ))[0];
-      const distance = getCollisionDistance(vehicle, target, collisionSize);
+
+    if (!this.collisionContext.canVehicleDriveOut(this, id)) {
+      const candidates = this.collisionContext.getCollisionCandidates(this, id);
+      const blockers = candidates.map((candidate) => (
+        candidate.type === 'vehicle'
+          ? candidate.id
+          : `container:${candidate.id}:${candidate.role}`
+      ));
+      const contact = findCollisionContact(this.level, vehicle, candidates);
+      if (!contact) {
+        this.lastEvent = { type: 'blocked', vehicleId: id, blockers, targetId: null };
+        this.emit();
+        return { ok: false, reason: 'blocked', blockers };
+      }
+      const target = contact.candidate.vehicle ?? null;
+      const distance = contact.distance;
       const motion = getCollisionMotion(distance);
       Object.assign(vehicle, {
         state: 'colliding', motion: 0,
         collision: {
-          ...motion, targetId: target.id, elapsed: 0, offset: 0,
-          contactTriggered: false, hitDirection: getHitDirection(vehicle, target)
+          ...motion,
+          targetType: contact.candidate.type,
+          targetId: target?.id ?? null,
+          targetContainerId: contact.candidate.type === 'container' ? contact.candidate.id : null,
+          targetContainerRole: contact.candidate.role ?? null,
+          contactPosition: { ...contact.position },
+          elapsed: 0,
+          offset: 0,
+          contactTriggered: false,
+          hitDirection: target ? getHitDirection(vehicle, target) : null
         }
       });
-      this.lastEvent = { type: 'blocked', vehicleId: id, blockers, targetId: target.id };
+      this.lastEvent = {
+        type: 'blocked',
+        vehicleId: id,
+        blockers,
+        targetId: target?.id ?? null,
+        targetContainerId: contact.candidate.type === 'container' ? contact.candidate.id : null
+      };
       this.emit();
       return { ok: false, reason: 'blocked', blockers };
     }
+
     const mechanicDispatch = this.mechanicRuntime.dispatchVehicle?.({
       game: this,
       vehicle
@@ -406,13 +369,14 @@ export class BusLoopGame {
       this.emit();
       return mechanicDispatch.result;
     }
-    const spot = this.spots.find((candidate) => candidate.vehicleId === null);
+
     if (!spot) {
       this.lastEvent = { type: 'spots-full', vehicleId: id };
       this.checkEndState();
       this.emit();
       return { ok: false, reason: 'spots-full' };
     }
+
     spot.vehicleId = id;
     const target = this.getSpotPosition(spot.index);
     const path = buildRoundedPath(buildToStationPoints(vehicle, target, SCENE_TUNING.vehiclePath), SCENE_TUNING.vehiclePath);
@@ -466,8 +430,15 @@ export class BusLoopGame {
         if (!collision.contactTriggered && collision.elapsed >= contactTime) {
           collision.contactTriggered = true;
           const target = this.getVehicle(collision.targetId);
-          if (target) target.hit = { startedAt: this.time, ...collision.hitDirection };
-          this.lastEvent = { type: 'vehicle-collision-contact', vehicleId: vehicle.id, targetId: collision.targetId };
+          if (target && collision.hitDirection) {
+            target.hit = { startedAt: this.time, ...collision.hitDirection };
+          }
+          this.lastEvent = {
+            type: 'vehicle-collision-contact',
+            vehicleId: vehicle.id,
+            targetId: collision.targetId,
+            targetContainerId: collision.targetContainerId
+          };
           changed = true;
         }
         if (collision.elapsed >= finishTime) {
@@ -959,6 +930,14 @@ export class BusLoopGame {
       }
     }
     return true;
+  }
+
+  canMoveToStation(vehicle) {
+    return Boolean(vehicle && vehicle.state === 'parked');
+  }
+
+  isGarageDoorClear(garageId) {
+    return this.collisionContext?.isGarageDoorClear(this, garageId) ?? true;
   }
 
   findBoardableVehicle(colorIndex, requiredGroups = 1, slots = []) {

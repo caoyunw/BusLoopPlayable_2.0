@@ -109,6 +109,17 @@ const LEVEL18_VEHICLE_DEPTHES = Object.freeze({
   74: Object.freeze([47, 35, 28, 31, 48, 60, 68, 69, 70, 71, 72, 73])
 });
 
+const LEVEL18_VEHICLE_COLLISION_SIZES = Object.freeze({
+  4: Object.freeze({ width: 0.27, length: 0.4814318817567568 }),
+  6: Object.freeze({ width: 0.27, length: 0.5639630614864864 }),
+  10: Object.freeze({ width: 0.27, length: 0.6785897 })
+});
+
+const LEVEL18_GARAGE_COLLISION_SIZE = Object.freeze({
+  width: 0.95 / 1.5,
+  length: 1.2 / 1.5
+});
+
 const PASSENGER_SEQUENCE = Object.freeze(LEVEL18_PASSENGER_QUEUES.flat());
 
 export const LEVEL_1 = Object.freeze({
@@ -129,6 +140,11 @@ export const LEVEL_1 = Object.freeze({
     snapDistance: 0.02
   },
   vehicleSize: { width: 0.27 * 1.33, length: 0.6785897 * 1.33 },
+  collision: Object.freeze({
+    vehicleSizes: LEVEL18_VEHICLE_COLLISION_SIZES,
+    maxVehicleSize: LEVEL18_VEHICLE_COLLISION_SIZES[10],
+    garageSize: LEVEL18_GARAGE_COLLISION_SIZE
+  }),
   vehicleMotion: {
     // Current Three.js parking layout expressed back in the Unity level plane.
     spotStartX: -3.85 / 3.1,
@@ -192,7 +208,7 @@ export const LEVEL_1 = Object.freeze({
     { id: 1, type: 2, x: -0.7070351, z: -0.3651944, yaw: 0 },
     { id: 2, type: 2, x: 0.66796494, z: 0.6061714, yaw: -89.999998 }
   ],
-  // level18.csv provides the authored front-vehicle blocker lists.
+  // Retained as Unity provenance/debug data; runtime dispatch uses the collision graph.
   vehicleDepthes: LEVEL18_VEHICLE_DEPTHES,
   passengerSequence: PASSENGER_SEQUENCE,
   // level18.asset provides fixed passenger entries for both DualQueue2 queues.

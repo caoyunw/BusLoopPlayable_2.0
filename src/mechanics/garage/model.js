@@ -147,6 +147,7 @@ export function createGarageRuntime({ id = 'garage', options = {} } = {}) {
   }
 
   function isGarageDoorClear(game, garage) {
+    if (!game.isGarageDoorClear(garage.id)) return false;
     if (garage.lastOutVehicleId == null) return true;
     const lastVehicle = game.getVehicle(garage.lastOutVehicleId);
     return !lastVehicle || !['parked', 'colliding'].includes(lastVehicle.state);

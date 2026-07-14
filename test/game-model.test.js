@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { BusLoopGame } from '../src/game-model.js';
 import { COLORS, LEVEL_1 } from '../src/level-data.js';
 import { SCENE_TUNING } from '../src/scene-tuning.js';
+import { findCollisionContact } from '../src/vehicle-collision.js';
 import * as sceneEditor from '../src/scene-editor.js';
 import {
   buildOutStationPoints,
@@ -13,7 +14,6 @@ import {
   chooseHitClip,
   evaluatePath,
   evaluateUnityCurve,
-  getCollisionDistance,
   sampleHitClip,
   UNITY_VEHICLE_MOTION
 } from '../src/vehicle-motion.js';
@@ -806,22 +806,33 @@ test('Unity VAT mesh matches the authored animation texture layout', () => {
   assert.equal(texture.length, 512 * 128 * 4 * 2);
 });
 
-test('initial blocker graph uses level18 Unity vehicleDepthes', () => {
+test('initial blocker graph uses Unity-style runtime geometry', () => {
   const game = new BusLoopGame();
-  const movable = LEVEL_1.vehicles
+  const movable = game.vehicles
+    .filter((vehicle) => vehicle.state === 'parked')
     .filter((vehicle) => game.getBlockers(vehicle.id).length === 0)
     .map((vehicle) => vehicle.id);
   assert.deepEqual(movable, LEVEL18_INITIAL_MOVABLE_IDS);
+  assert.deepEqual(LEVEL_1.collision.vehicleSizes[4], {
+    width: 0.27,
+    length: 0.4814318817567568
+  });
+  assert.deepEqual(LEVEL_1.collision.vehicleSizes[6], {
+    width: 0.27,
+    length: 0.5639630614864864
+  });
+  assert.deepEqual(LEVEL_1.collision.vehicleSizes[10], {
+    width: 0.27,
+    length: 0.6785897
+  });
   assert.equal(Object.keys(LEVEL_1.vehicleDepthes).length, 42);
   assert.deepEqual(LEVEL_1.vehicleDepthes[28], [31]);
   assert.deepEqual(game.getBlockers(28), [31]);
   assert.deepEqual(game.getBlockers(29), [30, 33, 56]);
-  assert.deepEqual(game.getBlockers(60), [47, 35, 28, 31, 48]);
   assert.deepEqual(LEVEL_1.vehicleDepthes[74].slice(-6), [68, 69, 70, 71, 72, 73]);
-  assert.deepEqual(game.getBlockers(74), [47, 35, 28, 31, 48]);
 });
 
-test('vehicleDepthes unlock blocked cars as authored blockers leave', () => {
+test('runtime collision graph unlocks blocked cars as blockers leave', () => {
   const game = new BusLoopGame();
   assert.deepEqual(game.getBlockers(LEVEL18_BLOCKED_ID), [31]);
   assert.deepEqual(game.clickVehicle(31), { ok: true, spotIndex: 0 });
@@ -840,20 +851,17 @@ test('dispatch reserves the first spot and unlocks cars behind it', () => {
 test('blocked click uses Unity collision advance, contact hit, and return phases', () => {
   const game = new BusLoopGame();
   const attackerBeforeClick = game.getVehicle(LEVEL18_BLOCKED_ID);
-  const collisionSize = {
-    width: game.level.vehicleSize.width / game.level.mapScale,
-    length: game.level.vehicleSize.length / game.level.mapScale
-  };
-  const expectedTarget = game.getBlockers(LEVEL18_BLOCKED_ID)
-    .map((id) => game.getVehicle(id))
-    .sort((a, b) => (
-      getCollisionDistance(attackerBeforeClick, a, collisionSize)
-      - getCollisionDistance(attackerBeforeClick, b, collisionSize)
-    ))[0];
+  const expectedContact = findCollisionContact(
+    game.level,
+    attackerBeforeClick,
+    game.collisionContext.getCollisionCandidates(game, LEVEL18_BLOCKED_ID)
+  );
+  const expectedTarget = expectedContact.candidate.vehicle;
   assert.equal(game.clickVehicle(LEVEL18_BLOCKED_ID).reason, 'blocked');
   const attacker = game.getVehicle(LEVEL18_BLOCKED_ID);
   assert.equal(attacker.state, 'colliding');
   assert.equal(attacker.collision.targetId, expectedTarget.id);
+  assert.deepEqual(attacker.collision.contactPosition, expectedContact.position);
   const forwardDuration = attacker.collision.forwardDuration;
   const expectedClip = chooseHitClip(attacker.collision.hitDirection);
   advance(game, forwardDuration + .01, .005);
