@@ -6,9 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:rotary-editor": "vite --host 127.0.0.1 --open /tools/rotary-level-editor/",
     "build": "vite build",
     "apply:tuning": "node scripts/apply-scene-tuning.mjs",
     "preview": "vite preview --host 127.0.0.1",
+    "rotary:level": "node scripts/rotary-level.mjs",
     "test": "node --test"
   },
   "dependencies": { "three": "^0.180.0" },

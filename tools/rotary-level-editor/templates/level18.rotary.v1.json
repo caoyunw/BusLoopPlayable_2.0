@@ -1,10 +1,4 @@
 {
-  "coordinates": {
-    "geometryProfile": "busloop-level18-rotary.v1",
-    "plane": "xz",
-    "unit": "level-unit",
-    "yaw": "degrees"
-  },
   "context": {
     "allowedColorIndexes": [
       0,
@@ -18,17 +12,114 @@
       8,
       9
     ],
-    "conveyors": [],
-    "garages": [],
-    "parkingSpots": [],
-    "passengerQueues": [],
+    "conveyors": [
+      {
+        "count": 32,
+        "id": "passenger-conveyor",
+        "label": "Passenger conveyor"
+      }
+    ],
+    "garages": [
+      {
+        "id": 1,
+        "length": 0.7999999999999999,
+        "width": 0.6333333333333333,
+        "x": -0.7070351,
+        "yaw": 0,
+        "z": -0.3651944
+      },
+      {
+        "id": 2,
+        "length": 0.7999999999999999,
+        "width": 0.6333333333333333,
+        "x": 0.66796494,
+        "yaw": -89.999998,
+        "z": 0.6061714
+      }
+    ],
+    "parkingSpots": [
+      {
+        "id": "parking-01",
+        "kind": "parking-spot",
+        "label": "Parking spot 1",
+        "length": 0.6785897,
+        "protected": false,
+        "width": 0.27,
+        "x": -1.2419354838709677,
+        "yaw": 0,
+        "z": 1.4774193548387096
+      },
+      {
+        "id": "parking-02",
+        "kind": "parking-spot",
+        "label": "Parking spot 2",
+        "length": 0.6785897,
+        "protected": false,
+        "width": 0.27,
+        "x": -0.8870967741935484,
+        "yaw": 0,
+        "z": 1.4774193548387096
+      },
+      {
+        "id": "parking-03",
+        "kind": "parking-spot",
+        "label": "Parking spot 3",
+        "length": 0.6785897,
+        "protected": false,
+        "width": 0.27,
+        "x": -0.532258064516129,
+        "yaw": 0,
+        "z": 1.4774193548387096
+      },
+      {
+        "id": "parking-04",
+        "kind": "parking-spot",
+        "label": "Parking spot 4",
+        "length": 0.6785897,
+        "protected": false,
+        "width": 0.27,
+        "x": -0.17741935483870974,
+        "yaw": 0,
+        "z": 1.4774193548387096
+      },
+      {
+        "id": "parking-05",
+        "kind": "parking-spot",
+        "label": "Parking spot 5",
+        "length": 0.6785897,
+        "protected": false,
+        "width": 0.27,
+        "x": 0.17741935483870974,
+        "yaw": 0,
+        "z": 1.4774193548387096
+      },
+      {
+        "id": "parking-06",
+        "kind": "parking-spot",
+        "label": "Parking spot 6",
+        "length": 0.6785897,
+        "protected": false,
+        "width": 0.27,
+        "x": 0.5322580645161292,
+        "yaw": 0,
+        "z": 1.4774193548387096
+      }
+    ],
+    "passengerQueues": [
+      {
+        "count": 115,
+        "id": "passenger-queue-1",
+        "label": "Passenger queue 1"
+      },
+      {
+        "count": 191,
+        "id": "passenger-queue-2",
+        "label": "Passenger queue 2"
+      }
+    ],
     "protectedGeometry": [],
     "rotaryRoadWidth": 0.42,
     "vehicleFootprints": {
-      "10": {
-        "length": 0.6785897,
-        "width": 0.27
-      },
       "4": {
         "length": 0.4814318817567568,
         "width": 0.27
@@ -36,16 +127,644 @@
       "6": {
         "length": 0.5639630614864864,
         "width": 0.27
+      },
+      "10": {
+        "length": 0.6785897,
+        "width": 0.27
       }
     }
   },
-  "documentId": "level18-template",
+  "coordinates": {
+    "geometryProfile": "busloop-level18-rotary.v1",
+    "plane": "xz",
+    "unit": "level-unit",
+    "yaw": "degrees"
+  },
+  "documentId": "level18-current",
   "format": "level.rotary.v1",
-  "rotaryLanes": [],
+  "rotaryLanes": [
+    {
+      "id": "outer-loop",
+      "slots": [
+        {
+          "id": "slot-01",
+          "x": -1.45,
+          "yaw": 90,
+          "z": 1.75
+        },
+        {
+          "id": "slot-02",
+          "x": 0,
+          "yaw": 90,
+          "z": 1.75
+        },
+        {
+          "id": "slot-03",
+          "x": 1.45,
+          "yaw": 0,
+          "z": 1.75
+        },
+        {
+          "id": "slot-04",
+          "x": 1.45,
+          "yaw": -90,
+          "z": 3
+        },
+        {
+          "id": "slot-05",
+          "x": 0,
+          "yaw": -90,
+          "z": 3
+        },
+        {
+          "id": "slot-06",
+          "x": -1.45,
+          "yaw": 180,
+          "z": 3
+        }
+      ]
+    }
+  ],
   "target": {
     "adapter": "busloop-level-data.v1",
-    "contextFingerprint": "sha256:896b07c67fa402d062351d6fd083646a6623c9531b032f932fbeb08ffbbaefba",
+    "contextFingerprint": "sha256:ac5b320fd8cdc9760bf1e1f7dd0bbafdc79f79553a079c502d9ba3d6b4090293",
     "levelId": "GameSceneDualQueue2/18"
   },
-  "vehicles": []
+  "vehicles": [
+    {
+      "colorIndex": 5,
+      "id": 29,
+      "placement": {
+        "kind": "field",
+        "x": -1.2571762,
+        "yaw": -179.999995,
+        "z": -0.23574443
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 5,
+      "id": 30,
+      "placement": {
+        "kind": "field",
+        "x": -1.1691761,
+        "yaw": -89.999998,
+        "z": -1.6416624
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 4,
+      "id": 33,
+      "placement": {
+        "kind": "field",
+        "x": -1.2571762,
+        "yaw": -179.999995,
+        "z": -1.0316133
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 3,
+      "id": 34,
+      "placement": {
+        "kind": "field",
+        "x": -0.54990786,
+        "yaw": 0,
+        "z": -1.1520834
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 5,
+      "id": 36,
+      "placement": {
+        "kind": "field",
+        "x": 0.91796625,
+        "yaw": -179.999995,
+        "z": -1.0053186
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 4,
+      "id": 37,
+      "placement": {
+        "kind": "field",
+        "x": 0.59796625,
+        "yaw": -179.999995,
+        "z": -0.9953187
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 8,
+      "id": 39,
+      "placement": {
+        "kind": "field",
+        "x": 1.2579668,
+        "yaw": 0,
+        "z": 0.48251456
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 8,
+      "id": 40,
+      "placement": {
+        "kind": "field",
+        "x": 0.23954469,
+        "yaw": -179.999995,
+        "z": -1.5303199
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 8,
+      "id": 41,
+      "placement": {
+        "kind": "field",
+        "x": 0.03446002,
+        "yaw": -89.999998,
+        "z": -1.0766943
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 5,
+      "id": 42,
+      "placement": {
+        "kind": "field",
+        "x": 0.02270221,
+        "yaw": -89.999998,
+        "z": -0.20331733
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 1,
+      "id": 43,
+      "placement": {
+        "kind": "field",
+        "x": 0.02270223,
+        "yaw": -89.999998,
+        "z": 0.1668058
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 1,
+      "id": 44,
+      "placement": {
+        "kind": "field",
+        "x": 0.7499656,
+        "yaw": 89.999998,
+        "z": -0.2111943
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 0,
+      "id": 45,
+      "placement": {
+        "kind": "field",
+        "x": 1.257967,
+        "yaw": 0.000008,
+        "z": -0.8534891
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 0,
+      "id": 46,
+      "placement": {
+        "kind": "field",
+        "x": 0.7592996,
+        "yaw": 89.999998,
+        "z": -0.5742679
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 3,
+      "id": 47,
+      "placement": {
+        "kind": "field",
+        "x": -1.2471762,
+        "yaw": 0,
+        "z": 0.5242751
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 3,
+      "id": 48,
+      "placement": {
+        "kind": "field",
+        "x": -0.47703415,
+        "yaw": 89.999998,
+        "z": 1.0903189
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 1,
+      "id": 49,
+      "placement": {
+        "kind": "field",
+        "x": 1.2699656,
+        "yaw": 0,
+        "z": -1.5503194
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 1,
+      "id": 50,
+      "placement": {
+        "kind": "field",
+        "x": 0.9179662,
+        "yaw": -179.999995,
+        "z": -1.560873
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 8,
+      "id": 51,
+      "placement": {
+        "kind": "field",
+        "x": 0.5979661,
+        "yaw": -179.999995,
+        "z": -1.560873
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 5,
+      "id": 52,
+      "placement": {
+        "kind": "field",
+        "x": -0.11832958,
+        "yaw": -179.999995,
+        "z": -1.5400832
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 5,
+      "id": 53,
+      "placement": {
+        "kind": "field",
+        "x": 0.7427551,
+        "yaw": 89.999998,
+        "z": 0.16680577
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 3,
+      "id": 54,
+      "placement": {
+        "kind": "field",
+        "x": 1.2579668,
+        "yaw": 0,
+        "z": -0.18531734
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 1,
+      "id": 57,
+      "placement": {
+        "kind": "field",
+        "x": 0.0423342,
+        "yaw": -179.999995,
+        "z": -0.64919424
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 1,
+      "id": 58,
+      "placement": {
+        "kind": "field",
+        "x": -0.5899078,
+        "yaw": -179.999995,
+        "z": -1.8811095
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 5,
+      "id": 59,
+      "placement": {
+        "kind": "field",
+        "x": -0.84717625,
+        "yaw": 0.000002,
+        "z": -1.1520834
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 0,
+      "id": 56,
+      "placement": {
+        "kind": "rotary-slot",
+        "laneId": "outer-loop",
+        "slotId": "slot-01"
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 3,
+      "id": 55,
+      "placement": {
+        "kind": "rotary-slot",
+        "laneId": "outer-loop",
+        "slotId": "slot-02"
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 4,
+      "id": 32,
+      "placement": {
+        "kind": "rotary-slot",
+        "laneId": "outer-loop",
+        "slotId": "slot-03"
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 4,
+      "id": 31,
+      "placement": {
+        "kind": "rotary-slot",
+        "laneId": "outer-loop",
+        "slotId": "slot-04"
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 0,
+      "id": 28,
+      "placement": {
+        "kind": "rotary-slot",
+        "laneId": "outer-loop",
+        "slotId": "slot-05"
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 1,
+      "id": 35,
+      "placement": {
+        "kind": "rotary-slot",
+        "laneId": "outer-loop",
+        "slotId": "slot-06"
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 2,
+      "id": 38,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 0,
+        "storedPose": {
+          "x": -1.3850003,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 4,
+      "id": 61,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 1,
+        "storedPose": {
+          "x": -0.8450003,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 2,
+      "id": 62,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 2,
+        "storedPose": {
+          "x": -0.3050003,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 5,
+      "id": 63,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 3,
+        "storedPose": {
+          "x": 0.23499972,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 1,
+      "id": 64,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 4,
+        "storedPose": {
+          "x": 0.77499974,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 3,
+      "id": 65,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 5,
+        "storedPose": {
+          "x": 1.3149998,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 8,
+      "id": 66,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 6,
+        "storedPose": {
+          "x": 1.8549998,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 10
+    },
+    {
+      "colorIndex": 3,
+      "id": 67,
+      "placement": {
+        "garageId": 1,
+        "kind": "garage",
+        "stockOrder": 7,
+        "storedPose": {
+          "x": 2.3949997,
+          "yaw": 0,
+          "z": 1.5028379
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 8,
+      "id": 60,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 0,
+        "storedPose": {
+          "x": -2.7299998,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 4,
+      "id": 68,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 1,
+        "storedPose": {
+          "x": -2.1899998,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 1,
+      "id": 69,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 2,
+        "storedPose": {
+          "x": -1.6499999,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 0,
+      "id": 70,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 3,
+        "storedPose": {
+          "x": -1.1099999,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 0,
+      "id": 71,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 4,
+        "storedPose": {
+          "x": -0.5699999,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 3,
+      "id": 72,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 5,
+        "storedPose": {
+          "x": -0.02999985,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 4
+    },
+    {
+      "colorIndex": 3,
+      "id": 73,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 6,
+        "storedPose": {
+          "x": 0.51000017,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 6
+    },
+    {
+      "colorIndex": 8,
+      "id": 74,
+      "placement": {
+        "garageId": 2,
+        "kind": "garage",
+        "stockOrder": 7,
+        "storedPose": {
+          "x": 1.0500002,
+          "yaw": 0,
+          "z": 0.75783837
+        }
+      },
+      "seats": 4
+    }
+  ]
 }
