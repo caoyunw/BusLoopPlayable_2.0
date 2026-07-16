@@ -4,3 +4,7 @@ vite.out.log
 vite.err.log
 .superpowers/
 .worktrees/
+.pnpm-store/
+%SystemDrive%/
+*.log
+artifacts/preview-*.log

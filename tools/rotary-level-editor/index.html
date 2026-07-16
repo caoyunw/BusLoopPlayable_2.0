@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>BusLoop 回转车道关卡编辑器</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main id="rotary-editor-app">
+    <header id="toolbar" aria-label="Editor toolbar">
+      <div class="toolbar-brand" aria-label="BusLoop Rotary Editor">
+        <span class="brand-mark" aria-hidden="true">BL</span>
+        <span class="brand-copy">
+          <strong>Rotary Lab</strong>
+          <small id="document-name">未命名关卡</small>
+        </span>
+      </div>
+      <nav class="toolbar-actions" aria-label="File actions">
+        <button type="button" data-action="new" title="新建">新建</button>
+        <button type="button" data-action="import" title="导入 JSON">导入</button>
+        <button type="button" data-action="export" title="正式导出">导出</button>
+        <button type="button" data-action="save-as" title="另存为">另存为</button>
+      </nav>
+      <span class="toolbar-divider" aria-hidden="true"></span>
+      <nav class="toolbar-actions" aria-label="History actions">
+        <button type="button" data-action="undo" title="撤销 Ctrl+Z">撤销</button>
+        <button type="button" data-action="redo" title="重做 Ctrl+Shift+Z">重做</button>
+      </nav>
+      <span class="toolbar-divider" aria-hidden="true"></span>
+      <nav class="toolbar-actions tool-modes" aria-label="Editor tools">
+        <button type="button" data-action="select" aria-pressed="true">选择</button>
+        <button type="button" data-action="add-vehicle" aria-pressed="false">添加车辆</button>
+        <button type="button" data-action="add-lane" aria-pressed="false">逐点建道</button>
+      </nav>
+      <div class="toolbar-spacer"></div>
+      <output id="draft-status" class="draft-status" aria-live="polite">草稿已保存</output>
+    </header>
+
+    <aside id="object-tree" aria-label="Level objects">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">SCENE</span>
+          <h1>关卡对象</h1>
+        </div>
+        <button type="button" class="icon-button" data-action="toggle-tree" aria-label="收起对象树">‹</button>
+      </div>
+      <div id="object-tree-content" class="panel-scroll"></div>
+    </aside>
+
+    <section id="canvas-workspace" aria-label="2D level canvas">
+      <canvas id="editor-canvas" tabindex="0" aria-label="2D orthographic level canvas"></canvas>
+      <div class="canvas-overlay canvas-overlay-top">
+        <span class="canvas-pill">XZ 正交俯视</span>
+        <span class="canvas-pill">网格 0.05</span>
+      </div>
+      <output id="canvas-status" class="canvas-status" aria-live="polite">
+        拖拽移动 · Alt 取消吸附 · Q/E 旋转 · Space 平移
+      </output>
+    </section>
+
+    <aside id="property-panel" aria-label="Properties">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">INSPECTOR</span>
+          <h2>属性</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="toggle-properties" aria-label="收起属性栏">›</button>
+      </div>
+      <div id="property-panel-content" class="panel-scroll"></div>
+    </aside>
+
+    <footer id="validation-panel" aria-live="polite">
+      <div id="validation-summary" class="validation-summary">
+        <span class="status-dot" aria-hidden="true"></span>
+        <strong>等待校验</strong>
+      </div>
+      <div id="validation-rows" class="validation-rows"></div>
+      <button type="button" data-action="toggle-validation">展开详情</button>
+    </footer>
+  </main>
+
+  <input id="import-input" type="file" accept="application/json,.json" hidden>
+
+  <dialog id="save-as-dialog" aria-labelledby="save-as-title">
+    <form method="dialog">
+      <header>
+        <span class="eyebrow">SAVE AS</span>
+        <h2 id="save-as-title">另存为关卡 JSON</h2>
+      </header>
+      <label>
+        Document ID
+        <input id="save-as-document-id" name="documentId" autocomplete="off" required>
+      </label>
+      <menu>
+        <button value="cancel">取消</button>
+        <button value="confirm" data-action="confirm-save-as">保存</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="recovery-dialog" aria-labelledby="recovery-title">
+    <form method="dialog">
+      <header>
+        <span class="eyebrow">RECOVERY</span>
+        <h2 id="recovery-title">发现未完成草稿</h2>
+      </header>
+      <p id="recovery-message">请选择恢复、丢弃，或先下载无效恢复副本。</p>
+      <menu>
+        <button value="download" data-action="download-recovery">下载恢复副本</button>
+        <button value="discard" data-action="discard-recovery">丢弃</button>
+        <button value="restore" data-action="restore-recovery">恢复草稿</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <div id="toast-region" aria-live="assertive" aria-atomic="true"></div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

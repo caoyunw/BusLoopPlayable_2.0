@@ -1,146 +1,84 @@
-﻿# AGENTS.md
+# AGENTS.md
 
-# Playable Ads Working Rules
+# BusLoop Mechanic Lab Working Rules
 
-This project is a playable ad prototype. Optimize for a small working context: read only the documents needed for the current task, summarize tool output, and avoid broad scans unless the user asks for an audit.
+This repository is a mechanic design and playtesting lab, not an advertising deliverable. Keep context focused, prefer the existing module boundaries, and record durable decisions in the project docs.
 
 ## Default Context Route
 
-For ordinary coding or debugging, read only:
+For ordinary work, read:
 
 1. `docs/project/playable-project-progress.md`
 2. `docs/project/code-navigation.md`
-3. The specific source files and paired tests named by the navigation map
+3. The source files and paired tests mapped for the change
 
-Read additional documents only when the task matches the situations below.
+For current priorities or a handoff, also read `task_plan.md` and `progress.md`. Read `findings.md` when gameplay facts, assets, tuning, or module boundaries matter.
 
-## Code Change Navigation Rule
+Legacy files under `docs/platforms/`, `docs/playable/`, and `docs/project/playable-multi-platform-execution-plan.md` are historical references. They are not the default SOP and do not create a requirement to rebuild advertising packages or store flows.
 
-For any code change, bug fix, refactor, feature work, test update, or visual/runtime behavior change:
+## Code Navigation
 
-1. Read `docs/project/code-navigation.md` first.
-2. Pick the closest change area from the navigation map.
-3. Read only the mapped source files and paired tests.
-4. Broaden with targeted `rg` only if the navigation does not cover the request or the mapped files prove insufficient.
-5. If code files are added, removed, renamed, or ownership boundaries move, update `docs/project/code-navigation.md` in the same turn.
+Before changing code:
 
-## When To Read Which Docs
+1. Read `docs/project/code-navigation.md`.
+2. Choose the closest change area.
+3. Read the mapped source and tests.
+4. Broaden with targeted `rg` only when the map is insufficient.
+5. Update the navigation file when files or ownership boundaries change.
 
-- Gameplay rules, level semantics, win/fail behavior, vehicle/passenger logic:
-  - `docs/project/playable-core-rules.md`
-  - `findings.md`
+Exclude `node_modules`, `dist`, logs, generated artifacts, and archives from broad searches unless they are directly relevant.
 
-- Asset status, missing Unity exports, texture/model/audio questions:
-  - `docs/project/playable-resource-status.md`
-  - Relevant files under `public/assets/`
+## Mechanic-First Workflow
 
-- Current implementation status, next step, or handoff:
-  - `docs/project/playable-project-progress.md`
-  - `task_plan.md`
-  - `progress.md`
+Mechanic definitions are the first source of truth. A new mechanic starts in `src/mechanic-registry.js` with complete metadata and remains `planned` until its gameplay is actually usable.
 
-- Platform packaging, AppLovin baseline, or cross-platform delivery:
-  - `docs/project/playable-multi-platform-execution-plan.md`
-  - `docs/platforms/platform-deltas.md`
-  - The target platform file: `docs/platforms/*-playable-audit.md`
+For implementation:
 
-- Manual QA, real-device/upload validation, screenshots, or browser test evidence:
-  - `docs/project/platform-manual-validation-checklist.md`
-  - `docs/playable/browser-automation.md`
+1. Define the rule and player-facing experience.
+2. Keep mechanism-specific data and behavior isolated; reuse the base runtime contracts instead of adding a large branch tree to `src/main.js`.
+3. Wire selection, URL state, pause/reset behavior, and failure recovery through the lab layer.
+4. Add registry tests plus focused gameplay/runtime tests.
+5. Verify the actual desktop and mobile browser experience before changing the status to `playable`.
 
-- SOP/process questions, document maintenance rules, or uncertain workflow order:
-  - `docs/playable/playable-sop.md`
-  - `docs/playable/platform-delivery.md`
-  - `docs/playable/project-document-rules.md`
+The current base runtime is composed from `game-model`, `level-data`, `scene-view`, audio, vehicle motion/effects, and the scene editor. Do not silently invent Unity assets or authored values; preserve known gaps and evidence.
 
-- Historical reasoning from the long planning logs:
-  - `docs/project/archive/*.full-2026-07-07.md`
-  - Read these only when current short docs are insufficient.
+## Runtime And Editor Rules
 
-## Core SOP
+- `src/main.js` owns assembly, not individual mechanic rules.
+- `src/mechanic-registry.js` owns identity and descriptive metadata.
+- `src/mechanic-lab.js` owns mechanic URL helpers and safe storage removal.
+- `src/mechanic-library.js` owns the mechanism browser UI.
+- The scene editor is a permanent lab tool and defaults to collapsed.
+- Preserve authored scene defaults before applying local overrides.
+- Treat `localStorage` as optional: read, write, migration, and removal failures must not prevent startup.
+- Keep runtime-optimized web assets under `public/assets/runtime/`; keep Unity source exports under `public/assets/unity/`.
 
-1. Clarify gameplay rules and constraints.
-2. Decouple resources and record gaps.
-3. Build/editor first.
-4. Build the AppLovin baseline first.
-5. Expand to other platforms from the AppLovin baseline.
-6. Validate manually on real platform uploads and record results.
-7. Do static checks, hardening, and obfuscation last.
+## Testing And Visual QA
 
-## Non-Negotiables
+Verified baseline on 2026-07-12:
 
-- Do not treat "runs locally" as platform-ready.
-- Do not silently invent Unity assets/config values; record gaps instead.
-- Do not skip real platform upload/manual play when platform delivery is in scope.
-- Do not leave durable project facts only in chat; update the relevant project doc when the write policy below says to.
-- Do not start heavy obfuscation before the platform path is stable.
+- The registry contains 17 mechanism definitions: 2 playable (`base`, `star-passenger`) and 15 planned.
+- Star-passenger feedback is complete and has passed desktop, 390x844 mobile, and reduced-motion browser QA.
+- Full `pnpm test`: 88/88 passing.
+- `pnpm run build`: passing with the existing non-blocking chunk-size warning.
+- The next priority is `question-passenger`; the star-passenger design and implementation plans are completed references.
 
-## Editing On This Windows Workspace
+Use the narrowest relevant tests while implementing. Do not run the full suite or production build unless the user explicitly asks for it, or unless a release-facing verification request makes it necessary and you explain why first.
 
-Prefer `apply_patch` for manual edits. However, this Windows workspace sometimes fails with `orchestrator_helper_launch_canceled` or `ShellExecuteExW failed to launch setup helper: 1223`.
+Browser QA is required for layout or interaction work. Check desktop three-column layout, mobile drawers, nonblank canvas, mechanism selection, search/empty states, frozen planned-mechanic overlay, reset/end states, editor controls, and console errors. Record viewport and remaining gaps.
 
-If `apply_patch` fails with that helper error:
+## Documentation Policy
 
-- Do not keep retrying the same patch more than twice.
-- Use targeted PowerShell editing instead, limited to the requested files.
-- Prefer exact string replacement, section insertion, or controlled whole-file rewrite for small Markdown/config files.
-- Before replacing long project notes, archive or copy the old content when it contains useful history.
-- After PowerShell editing, immediately re-read the changed section or file size to verify the edit landed.
-- Never use broad destructive commands or wildcard rewrites to work around the helper issue.
+Update:
 
-## Documentation Write Policy
+- `docs/project/playable-project-progress.md` for user-visible milestones and verification changes.
+- `findings.md` for durable gameplay, asset, storage, tuning, or architecture conclusions.
+- `task_plan.md` when goals, phases, priorities, or known debt change.
+- `docs/project/code-navigation.md` when files or responsibilities change.
+- `progress.md` for meaningful handoffs.
 
-Do not update project documents after every small code edit. Write docs only when the change creates durable project knowledge.
+Keep current sections concise and retain useful historical material under clearly marked historical/archive headings. Do not put internal absolute paths, secrets, or unverified conclusions in project docs.
 
-Update `docs/project/playable-project-progress.md` when:
+## Editing On Windows
 
-- A user-visible feature, visual pass, platform package, or validation step is completed.
-- Test/build/manual QA results materially change project status.
-- A task is blocked by a fact the next session must know.
-
-Update `findings.md` when:
-
-- A new gameplay, Unity parity, platform, asset, or technical decision is discovered.
-- A prior assumption is corrected.
-- The finding affects future implementation choices.
-
-Update `task_plan.md` when:
-
-- The current goal, active phase, next steps, or priority order changes.
-- A task is split into a new milestone or a milestone is accepted as complete.
-
-Update `docs/project/code-navigation.md` when:
-
-- Code files are added, removed, or renamed.
-- A file's main responsibility moves to another file.
-- A new major subsystem or test file is introduced.
-
-Update `progress.md` when:
-
-- There is a meaningful session handoff summary.
-- Several related edits should be summarized together.
-- The user asks for a status checkpoint.
-
-Do not update docs for:
-
-- Tiny refactors with no behavior change.
-- Formatting-only edits.
-- Intermediate failed attempts that do not affect future work.
-- Test runs whose result matches the already-recorded status.
-
-When writing docs, keep entries short: outcome, changed files or area, verification, and next action. Archive long investigations under `docs/project/archive/` instead of growing the root planning files.
-
-## Token Discipline
-
-- Read `docs/project/code-navigation.md` before touching code, then go directly to the mapped files.
-- Prefer targeted `rg` searches over whole-repo reads.
-- Exclude `node_modules`, `dist`, logs, and archive files unless directly relevant.
-- Do not open every platform doc for a single-platform task.
-- Keep `task_plan.md`, `findings.md`, and `progress.md` short; move old detail to `docs/project/archive/`.
-## Verification Discipline
-
-- Do not run a full build after every edit unless the user asks for it.
-- For small, low-risk changes, prefer the narrowest relevant check, such as targeted tests, syntax checks, or reading the affected code path.
-- Run full build verification when packaging, platform delivery, dependency/config changes, rendering pipeline changes, or broad runtime behavior changes are involved.
-- If skipping build verification, say so briefly in the final response and mention the lighter check that was used.
-
+Prefer `apply_patch` for manual edits. If it repeatedly fails with a helper-launch error, use a targeted PowerShell edit limited to the requested files, then immediately re-read the changed content. Never use broad destructive rewrites as a workaround.

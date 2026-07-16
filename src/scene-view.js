@@ -27,7 +27,29 @@ import {
 const ease = (t) => 1 - Math.pow(1 - t, 3);
 const deg = (value) => THREE.MathUtils.degToRad(value);
 const ARROW_OUTLINE_SCALE = 1.28;
-const GUIDE_HAND_TEXTURE_URL = '/assets/applovin/main-guide-hand_q80.webp';
+const GUIDE_HAND_TEXTURE_URL = '/assets/runtime/main-guide-hand_q80.webp';
+const QUESTION_PASSENGER_REVEAL_DURATION = 0.25;
+const LINKED_CONNECTOR_Y_OFFSET = 0.58;
+const LINKED_BADGE_Y_OFFSET = 0.88;
+const TRANSPORT_TUNNEL_VISUAL = Object.freeze({
+  wallThickness: 0.18,
+  depth: 0.36,
+  height: 0.76,
+  topThickness: 0.16,
+  borderThickness: 0.045,
+  feedbackDuration: 0.38
+});
+const ROTARY_LANE_VISUAL = Object.freeze({
+  roadWidth: 0.42,
+  roadHeight: 0.025,
+  separatorWidth: 0.025,
+  arrowLength: 0.24,
+  feedbackDuration: 0.42,
+  roadColor: 0x465066,
+  lineColor: 0xdce8ff,
+  arrowColor: 0x55f0c2
+});
+const linkedPassengerBadgeTextures = new Map();
 const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
   { baseColor: 0xffffff, emissionColor: 0x36a6ff },
   { baseColor: 0xffffff, emissionColor: 0xadd98a },
@@ -43,6 +65,34 @@ const PASSENGER_DEFAULT_MATERIAL_COLORS = Object.freeze([
 ]);
 const scratchPassengerBaseColor = new THREE.Color();
 const scratchPassengerEmissionColor = new THREE.Color();
+
+function makeLinkedPassengerBadgeTexture(length) {
+  if (linkedPassengerBadgeTextures.has(length)) return linkedPassengerBadgeTextures.get(length);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#18352d';
+  context.strokeStyle = '#f6d967';
+  context.lineWidth = 10;
+  context.beginPath();
+  if (typeof context.roundRect === 'function') {
+    context.roundRect(12, 12, 232, 104, 28);
+  } else {
+    context.rect(12, 12, 232, 104);
+  }
+  context.fill();
+  context.stroke();
+  context.fillStyle = '#ffffff';
+  context.font = '800 66px Arial, sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(`×${length}`, 128, 67);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  linkedPassengerBadgeTextures.set(length, texture);
+  return texture;
+}
 
 function setPassengerMaterialMaps(material, map, emissiveMap) {
   const nextMap = map ?? null;
@@ -100,6 +150,12 @@ function mapVehicleAreaPoint(vehicle) {
   );
 }
 
+function mapVehicleAreaDistance(distance) {
+  const origin = mapVehicleAreaPoint({ x: 0, z: 0 });
+  const endpoint = mapVehicleAreaPoint({ x: distance, z: 0 });
+  return origin.distanceTo(endpoint);
+}
+
 function mapMotionPoint(value, y = SCENE_TUNING.vehicleArea.y) {
   const mapped = mapVehicleAreaPoint(value);
   return new THREE.Vector3(mapped.x, y, mapped.y);
@@ -115,6 +171,10 @@ function mapVehicleAreaYaw(yawDegrees) {
   const sourceYaw = deg(yawDegrees);
   const mirroredYaw = SCENE_TUNING.vehicleArea.mirrorZ ? Math.PI - sourceYaw : sourceYaw;
   return mirroredYaw + deg(SCENE_TUNING.vehicleArea.rotationDegrees);
+}
+
+function shortestYawDelta(fromDegrees, toDegrees) {
+  return ((toDegrees - fromDegrees + 540) % 360) - 180;
 }
 
 function toWorldPoint([x, z]) {
@@ -217,6 +277,16 @@ function applyPassengerMaterial(material, colorIndex, map) {
   }
 }
 
+function applyQuestionPassengerMaterial(material) {
+  setPassengerMaterialMaps(material, null, null);
+  material.color.setHex(0x9da8b8);
+  material.emissive.setHex(0x303946);
+  material.emissiveIntensity = 0.18;
+  material.roughness = 0.72;
+  material.metalness = 0;
+  material.userData.passengerColorIndex = null;
+}
+
 async function loadVatGeometry(url, loadingManager) {
   loadingManager?.itemStart(url);
   let buffer;
@@ -303,6 +373,40 @@ function setMaterial(root, material, meshFilter = null) {
     meshes.push(child);
   });
   return meshes;
+}
+
+function getSourceMaterialNames(material) {
+  const materials = Array.isArray(material) ? material : [material];
+  return materials.map((entry) => entry?.name ?? '').filter(Boolean);
+}
+
+function isGarageMetalMaterialName(name) {
+  return /metal|matcap/i.test(name);
+}
+
+function applyGarageMaterials(root, materials) {
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    const sourceNames = child.userData.sourceMaterialNames ?? [];
+    if (sourceNames.length > 1 || child.geometry?.groups?.length > 0) {
+      child.material = sourceNames.map((name) => (
+        isGarageMetalMaterialName(name) ? materials.metal : materials.body
+      ));
+      if (child.material.length === 0) child.material = materials.body;
+    } else {
+      const sourceName = sourceNames[0] ?? child.userData.sourceMaterialName ?? '';
+      child.material = isGarageMetalMaterialName(sourceName) ? materials.metal : materials.body;
+    }
+    child.castShadow = false;
+    child.receiveShadow = false;
+  });
+}
+
+function applyGarageModelOrientation(root) {
+  root.rotation.x = deg(SCENE_TUNING.facing.garageModelPitchDegrees ?? 0);
+  root.rotation.z = deg(SCENE_TUNING.facing.garageModelRollDegrees ?? 0);
+  root.updateMatrixWorld(true);
+  return root;
 }
 
 function storeHitBase(object) {
@@ -398,6 +502,9 @@ function toStaticMeshGroup(source) {
     geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry);
     mesh.name = child.name;
+    const sourceMaterialNames = getSourceMaterialNames(child.material);
+    mesh.userData.sourceMaterialNames = sourceMaterialNames;
+    mesh.userData.sourceMaterialName = sourceMaterialNames[0] ?? '';
     root.add(mesh);
   });
   return root;
@@ -450,9 +557,258 @@ function makeVehiclePlaceholder(vehicle) {
   return root;
 }
 
+let questionPassengerBadgeTexture = null;
+let questionPassengerRevealTexture = null;
+
+function getQuestionPassengerBadgeTexture() {
+  if (questionPassengerBadgeTexture) return questionPassengerBadgeTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (context) {
+    const center = canvas.width / 2;
+    context.beginPath();
+    context.arc(center, center, 45, 0, Math.PI * 2);
+    context.fillStyle = '#ffffff';
+    context.fill();
+    context.lineWidth = 8;
+    context.strokeStyle = '#263244';
+    context.stroke();
+    context.fillStyle = '#263244';
+    context.font = '900 72px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('?', center, center + 4);
+  }
+  questionPassengerBadgeTexture = new THREE.CanvasTexture(canvas);
+  questionPassengerBadgeTexture.colorSpace = THREE.SRGBColorSpace;
+  questionPassengerBadgeTexture.needsUpdate = true;
+  return questionPassengerBadgeTexture;
+}
+
+function makeQuestionPassengerBadges(spacing) {
+  const badges = [];
+  for (let index = 0; index < 4; index += 1) {
+    const material = new THREE.SpriteMaterial({
+      map: getQuestionPassengerBadgeTexture(),
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const sprite = new THREE.Sprite(material);
+    sprite.position.set((index - 1.5) * spacing, 0.58, 0.08);
+    sprite.scale.set(0.2, 0.2, 1);
+    sprite.renderOrder = 90;
+    sprite.visible = false;
+    badges.push(sprite);
+  }
+  return badges;
+}
+
+function getQuestionPassengerRevealTexture() {
+  if (questionPassengerRevealTexture) return questionPassengerRevealTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (context) {
+    const center = canvas.width / 2;
+    const gradient = context.createRadialGradient(center, center, 0, center, center, center);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.72)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  questionPassengerRevealTexture = new THREE.CanvasTexture(canvas);
+  questionPassengerRevealTexture.colorSpace = THREE.SRGBColorSpace;
+  questionPassengerRevealTexture.needsUpdate = true;
+  return questionPassengerRevealTexture;
+}
+
+function makeQuestionPassengerRevealFlash() {
+  const material = new THREE.SpriteMaterial({
+    map: getQuestionPassengerRevealTexture(),
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.position.set(0, 0.36, 0.06);
+  sprite.scale.set(0.72, 0.72, 1);
+  sprite.renderOrder = 89;
+  sprite.visible = false;
+  sprite.userData.questionRevealBaseScale = 0.72;
+  return sprite;
+}
+
+function makeStarBadgeLabel({ width = 96, height = 96, scaleX = 0.18, scaleY = 0.18 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(scaleX, scaleY, 1);
+  sprite.renderOrder = 84;
+  return { canvas, texture, sprite };
+}
+
+function drawStarBadgeCount(label, value) {
+  const context = label.canvas.getContext('2d');
+  if (!context) return;
+  const centerX = label.canvas.width / 2;
+  const centerY = label.canvas.height / 2;
+  context.clearRect(0, 0, label.canvas.width, label.canvas.height);
+  context.beginPath();
+  context.arc(centerX, centerY, 32, 0, Math.PI * 2);
+  context.fillStyle = '#e45139';
+  context.fill();
+  context.lineWidth = 9;
+  context.strokeStyle = '#ffffff';
+  context.stroke();
+  context.fillStyle = '#ffffff';
+  context.font = '900 48px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(String(value), centerX, centerY + 2);
+  if (label.texture) label.texture.needsUpdate = true;
+}
+
+function drawStarBadgeDecrement(label) {
+  const context = label.canvas.getContext('2d');
+  if (!context) return;
+  context.clearRect(0, 0, label.canvas.width, label.canvas.height);
+  context.font = '900 52px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.lineWidth = 10;
+  context.strokeStyle = '#ffffff';
+  context.strokeText('-1', label.canvas.width / 2, label.canvas.height / 2);
+  context.fillStyle = '#ef653e';
+  context.fillText('-1', label.canvas.width / 2, label.canvas.height / 2);
+  if (label.texture) label.texture.needsUpdate = true;
+}
+
+function makeSpotMarkerLabel(text, {
+  fill = '#ffffff',
+  stroke = '#12344c',
+  width = 160,
+  height = 96,
+  scaleX = 0.46,
+  scaleY = 0.28
+} = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, width, height);
+  context.font = '900 58px Arial, sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.lineJoin = 'round';
+  context.lineWidth = 14;
+  context.strokeStyle = stroke;
+  context.strokeText(text, width / 2, height / 2 + 2);
+  context.fillStyle = fill;
+  context.fillText(text, width / 2, height / 2 + 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(scaleX, scaleY, 1);
+  sprite.renderOrder = 92;
+  return sprite;
+}
+
+function makeStarBadge() {
+  const shape = new THREE.Shape();
+  const outerRadius = 0.15;
+  const innerRadius = 0.065;
+  for (let i = 0; i < 10; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + i * Math.PI / 5;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+
+  const root = new THREE.Group();
+  const badge = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({
+      color: 0xffce42,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      toneMapped: false
+    })
+  );
+  badge.rotation.x = -Math.PI / 2;
+  badge.position.set(0, 0.58, -0.02);
+  badge.renderOrder = 80;
+  const halo = new THREE.Mesh(
+    new THREE.CircleGeometry(0.18, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      toneMapped: false
+    })
+  );
+  halo.rotation.x = -Math.PI / 2;
+  halo.position.set(0, 0.575, -0.02);
+  halo.renderOrder = 79;
+  const countLabel = makeStarBadgeLabel();
+  countLabel.sprite.position.set(0.12, 0.66, 0.02);
+  countLabel.sprite.visible = false;
+
+  const decrementLabel = makeStarBadgeLabel({ width: 128, height: 96, scaleX: 0.24, scaleY: 0.18 });
+  drawStarBadgeDecrement(decrementLabel);
+  decrementLabel.sprite.position.set(0.28, 0.63, 0.02);
+  decrementLabel.sprite.visible = false;
+
+  root.add(halo, badge, countLabel.sprite, decrementLabel.sprite);
+  root.userData.starMesh = badge;
+  root.userData.haloMesh = halo;
+  root.userData.starBadgeCountSprite = countLabel.sprite;
+  root.userData.starBadgeCountLabel = countLabel;
+  root.userData.starBadgeDecrementSprite = decrementLabel.sprite;
+  root.userData.starBadgePassengerId = null;
+  root.userData.starBadgeRemainingPasses = null;
+  root.userData.starBadgeDecrementVersion = null;
+  root.userData.starBadgeDecrementStartedAt = -Infinity;
+  root.visible = false;
+  return root;
+}
+
 function makePassengerGroup(groupScale) {
   const group = new THREE.Group();
   group.scale.setScalar(groupScale);
+  group.userData.questionRevealBaseScale = groupScale;
   group.userData.personSlots = [];
   const spacing = SCENE_TUNING.passengers.groupSpacing;
   for (let i = 0; i < 4; i += 1) {
@@ -468,6 +824,18 @@ function makePassengerGroup(groupScale) {
     group.userData.personSlots.push(slot);
     group.add(slot);
   }
+  const questionBadges = makeQuestionPassengerBadges(spacing);
+  group.userData.questionBadges = questionBadges;
+  group.add(...questionBadges);
+  const questionRevealFlash = makeQuestionPassengerRevealFlash();
+  group.userData.questionRevealFlash = questionRevealFlash;
+  group.add(questionRevealFlash);
+  group.userData.questionPassengerId = null;
+  group.userData.questionPassengerRevealVersion = null;
+  group.userData.questionPassengerRevealStartedAt = -Infinity;
+  const starBadge = makeStarBadge();
+  group.userData.starBadge = starBadge;
+  group.add(starBadge);
   return group;
 }
 
@@ -476,6 +844,9 @@ export class SceneView {
     this.canvas = canvas;
     this.onVehicleClick = onVehicleClick;
     this.hooks = hooks;
+    this.reducedMotionQuery = typeof globalThis.matchMedia === 'function'
+      ? globalThis.matchMedia('(prefers-reduced-motion: reduce)')
+      : null;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -494,37 +865,68 @@ export class SceneView {
     this.textureLoader = new THREE.TextureLoader(this.loadingManager);
     this.fbxLoader = new FBXLoader(this.loadingManager);
     this.vehicleViews = new Map();
+    this.garageViews = new Map();
+    this.transportTunnelViews = new Map();
+    this.rotaryLaneViews = new Map();
+    this.maglevSpotViews = new Map();
+    this.valveViews = [];
     this.passengerViews = [];
     this.queuePassengerViews = [[], []];
     this.spotRoots = [];
     this.spotPositions = [];
     this.seatCountBoards = [];
+    this.trainRoot = null;
+    this.trainLocomotiveView = null;
+    this.trainTrackPositions = [];
+    this.trainSeatCountBoards = [];
+    this.capacitySpotMarkers = [];
     this.passengerMaterials = [];
     this.passengerColorTextures = [];
     this.vehicleMaterials = [];
     this.vehicleColorTextures = [];
     this.vatTimeUniform = { value: 0 };
     this.boardingViews = [];
+    this.linkedPassengerConnectors = new Map();
+    this.linkedBoardingBatches = new Map();
     this.vehicleBoardingPulses = new Map();
     this.initialEntryPathStates = new Map();
     this.queueEntryPathStates = new Map();
     this.lastBoardingEventId = 0;
+    this.lastTrainFullKey = '';
+    this.trainDeparturePulseAt = null;
     this.vehicleEffects = null;
     this.guideHand = null;
     this.guideHandMaterial = null;
     this.vehiclePathLines = [];
     this.vehicleDeparturePathLines = [];
     this.lastSnapshot = null;
+    this.lastSeenResetVersion = null;
     this.lastGame = null;
+    this.destroyed = false;
     this.buildWorld();
     this.applyTuning();
     this.ready = this.loadUnityAssets();
-    window.addEventListener('resize', () => this.resize());
+    this.handleResize = () => this.resize();
+    this.handlePointerUp = (event) => this.pick(event);
+    window.addEventListener('resize', this.handleResize);
     if ('ResizeObserver' in window) {
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(canvas);
     }
-    canvas.addEventListener('pointerup', (event) => this.pick(event));
+    canvas.addEventListener('pointerup', this.handlePointerUp);
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.clearBoardingViews();
+    this.disposeTrainViews();
+    this.disposeTransportTunnelViews();
+    this.disposeRotaryLaneViews();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    globalThis.window?.removeEventListener('resize', this.handleResize);
+    this.canvas?.removeEventListener('pointerup', this.handlePointerUp);
   }
 
   buildWorld() {
@@ -550,7 +952,9 @@ export class SceneView {
     this.camera.add(this.backgroundPlane);
     this.scene.add(this.camera, this.loopPlane);
     this.buildPathCurves();
+    this.buildValveViews();
     this.buildSpots();
+    this.buildTrainViews();
     this.buildGuideHand();
 
     for (const vehicle of LEVEL_1.vehicles) {
@@ -673,6 +1077,7 @@ export class SceneView {
     for (let i = 0; i < SCENE_TUNING.parkingSpots.count; i += 1) {
       const root = new THREE.Group();
       const board = this.createSeatCountBoard();
+      const marker = this.createCapacitySpotMarker();
       board.visible = false;
       board.renderOrder = 40;
       const fallback = new THREE.Mesh(
@@ -680,14 +1085,383 @@ export class SceneView {
         new THREE.MeshStandardMaterial({ color: 0xb6a9cb, roughness: 0.76 })
       );
       fallback.position.y = 0.02;
-      root.add(fallback, board);
+      root.add(fallback, board, marker);
       this.spotRoots.push(root);
       this.spotPositions.push(new THREE.Vector3());
       this.seatCountBoards.push(board);
+      this.capacitySpotMarkers.push(marker);
       this.scene.add(root);
     }
   }
 
+  getTrainTrackPosition(slotIndex) {
+    const train = SCENE_TUNING.train;
+    return new THREE.Vector3(
+      train.headX - train.slotSpacing * (slotIndex + 1),
+      train.trackY,
+      train.trackZ
+    );
+  }
+
+  getTrainSeatCountBoardPosition(slotIndex) {
+    const position = this.getTrainTrackPosition(slotIndex);
+    const carriageRoofHeight = 0.82 * SCENE_TUNING.train.carriageScale;
+    position.y += carriageRoofHeight + 0.05;
+    return position;
+  }
+
+  configureTrainSeatCountBoard(board) {
+    const tuning = SCENE_TUNING.train.seatCountBoard;
+    board.userData.boardMesh.scale.set(tuning.width, tuning.depth, 1);
+    board.userData.textSprite.scale.set(0.42 * tuning.textScale, 0.26 * tuning.textScale, 1);
+  }
+
+  createTrainTrackView() {
+    const train = SCENE_TUNING.train;
+    const root = new THREE.Group();
+    root.name = 'Train Track';
+    const trackLength = train.slotSpacing * (train.slotCount + 1) + 1.15;
+    const trackCenterX = train.headX - trackLength / 2 + 0.55;
+    const railMaterial = new THREE.MeshStandardMaterial({
+      color: 0x46515d,
+      metalness: 0.72,
+      roughness: 0.34
+    });
+    const sleeperMaterial = new THREE.MeshStandardMaterial({
+      color: 0x65442f,
+      roughness: 0.86
+    });
+    const markerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd45e,
+      transparent: true,
+      opacity: 0.24,
+      depthWrite: false
+    });
+
+    for (const zOffset of [-0.34, 0.34]) {
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(trackLength, 0.055, 0.075),
+        railMaterial.clone()
+      );
+      rail.position.set(trackCenterX, train.trackY, train.trackZ + zOffset);
+      root.add(rail);
+    }
+    for (let index = 0; index < 14; index += 1) {
+      const sleeper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.045, 0.94),
+        sleeperMaterial.clone()
+      );
+      sleeper.position.set(
+        trackCenterX - trackLength / 2 + (index + 0.5) * trackLength / 14,
+        train.trackY - 0.025,
+        train.trackZ
+      );
+      root.add(sleeper);
+    }
+    for (let index = 0; index < train.slotCount; index += 1) {
+      const marker = new THREE.Mesh(
+        new THREE.BoxGeometry(1.02, 0.018, 0.74),
+        markerMaterial.clone()
+      );
+      marker.position.copy(this.getTrainTrackPosition(index));
+      marker.position.y = train.trackY + 0.025;
+      marker.userData.trainTrackSlotIndex = index;
+      root.add(marker);
+    }
+    return root;
+  }
+
+  createTrainLocomotiveView() {
+    const root = new THREE.Group();
+    root.name = 'Train Locomotive';
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x314252,
+      roughness: 0.48,
+      metalness: 0.16
+    });
+    const trimMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf3c950,
+      roughness: 0.45
+    });
+    const windowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xa8e5ff,
+      emissive: 0x18415b,
+      emissiveIntensity: 0.5,
+      roughness: 0.22
+    });
+    const wheelMaterial = new THREE.MeshStandardMaterial({
+      color: 0x20262d,
+      metalness: 0.62,
+      roughness: 0.38
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.44, 0.72), bodyMaterial);
+    body.position.y = 0.36;
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.52, 0.68), bodyMaterial.clone());
+    cabin.position.set(-0.22, 0.72, 0);
+    const window = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.7), windowMaterial);
+    window.position.set(-0.22, 0.78, 0);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 0.62), trimMaterial);
+    nose.position.set(0.62, 0.29, 0);
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.36, 18), bodyMaterial.clone());
+    chimney.position.set(0.28, 0.78, 0);
+    root.add(body, cabin, window, nose, chimney);
+    for (const x of [-0.36, 0.36]) {
+      for (const z of [-0.39, 0.39]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.09, 20), wheelMaterial.clone());
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(x, 0.17, z);
+        root.add(wheel);
+      }
+    }
+    root.userData.bodyMeshes = [body, cabin, nose, chimney];
+    return root;
+  }
+
+  createTrainCarriageView(vehicle) {
+    const root = new THREE.Group();
+    root.name = `Train Carriage ${vehicle.id}`;
+    const color = COLORS[vehicle.colorIndex]?.hex ?? COLORS[0].hex;
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.5,
+      metalness: 0.08
+    });
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0xf3f0e8, roughness: 0.72 });
+    const windowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xbcecff,
+      emissive: 0x164761,
+      emissiveIntensity: 0.42,
+      roughness: 0.18
+    });
+    const darkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x252b31,
+      metalness: 0.48,
+      roughness: 0.42
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.55, 1.08), bodyMaterial);
+    body.position.y = 0.43;
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.12, 1.12), roofMaterial);
+    roof.position.y = 0.76;
+    root.add(body, roof);
+    const bodyMeshes = [body];
+    for (const side of [-1, 1]) {
+      for (const z of [-0.3, 0.3]) {
+        const window = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.23, 0.32), windowMaterial.clone());
+        window.position.set(side * 0.375, 0.52, z);
+        root.add(window);
+      }
+    }
+    for (const side of [-1, 1]) {
+      for (const z of [-0.34, 0.34]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 18), darkMaterial.clone());
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(side * 0.38, 0.17, z);
+        root.add(wheel);
+      }
+    }
+    for (const z of [-0.64, 0.64]) {
+      const coupler = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.22), darkMaterial.clone());
+      coupler.position.set(0, 0.25, z);
+      root.add(coupler);
+    }
+    root.scale.setScalar(SCENE_TUNING.train.carriageScale);
+    root.traverse((object) => { object.userData.vehicleId = vehicle.id; });
+    root.userData.bodyMeshes = bodyMeshes;
+    root.visible = false;
+    return root;
+  }
+
+  buildTrainViews() {
+    this.trainTrackPositions = Array.from(
+      { length: SCENE_TUNING.train.slotCount },
+      (_, index) => this.getTrainTrackPosition(index)
+    );
+    this.trainRoot = this.createTrainTrackView();
+    this.trainLocomotiveView = this.createTrainLocomotiveView();
+    this.trainLocomotiveView.position.set(
+      SCENE_TUNING.train.headX,
+      SCENE_TUNING.train.trackY,
+      SCENE_TUNING.train.trackZ
+    );
+    this.trainRoot.add(this.trainLocomotiveView);
+    for (let index = 0; index < SCENE_TUNING.train.slotCount; index += 1) {
+      const board = this.createSeatCountBoard();
+      this.configureTrainSeatCountBoard(board);
+      board.visible = false;
+      board.renderOrder = 45;
+      board.position.copy(this.getTrainSeatCountBoardPosition(index));
+      this.trainSeatCountBoards.push(board);
+      this.trainRoot.add(board);
+    }
+    this.trainRoot.visible = false;
+    this.scene.add(this.trainRoot);
+  }
+
+  updateTrainViews(snapshot) {
+    const train = snapshot.train;
+    if (!this.trainRoot) return;
+    this.trainRoot.visible = Boolean(train);
+    if (!train) return;
+    const locomotive = train.locomotive ?? { phase: 'ready', motion: 1 };
+    this.trainLocomotiveView.visible = locomotive.phase !== 'complete';
+    let locomotiveX = SCENE_TUNING.train.headX;
+    if (locomotive.phase === 'entering') {
+      locomotiveX = THREE.MathUtils.lerp(
+        SCENE_TUNING.train.entryX,
+        SCENE_TUNING.train.headX,
+        THREE.MathUtils.smoothstep(locomotive.motion ?? 0, 0, 1)
+      );
+    } else if (locomotive.phase === 'departing') {
+      locomotiveX = THREE.MathUtils.lerp(
+        SCENE_TUNING.train.headX,
+        SCENE_TUNING.train.exitX,
+        THREE.MathUtils.smoothstep(locomotive.motion ?? 0, 0, 1)
+      );
+    }
+    this.trainLocomotiveView.position.set(
+      locomotiveX,
+      SCENE_TUNING.train.trackY,
+      SCENE_TUNING.train.trackZ
+    );
+    const pulseProgress = this.trainDeparturePulseAt == null
+      ? 1
+      : THREE.MathUtils.clamp((snapshot.time - this.trainDeparturePulseAt) / 0.3, 0, 1);
+    this.trainLocomotiveView.scale.setScalar(
+      pulseProgress >= 1 ? 1 : 1 + Math.sin(Math.PI * pulseProgress) * 0.08
+    );
+    for (let index = 0; index < this.trainSeatCountBoards.length; index += 1) {
+      const board = this.trainSeatCountBoards[index];
+      board.visible = false;
+      const trackSlot = train.trackSlots?.[index];
+      if (!trackSlot) continue;
+      const vehicle = snapshot.vehicles.find(({ id }) => id === trackSlot.vehicleId);
+      if (vehicle) this.updateSeatCountBoard(board, vehicle, snapshot.time);
+    }
+  }
+
+  disposeTrainViews() {
+    const disposeRoot = (root) => {
+      root?.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material?.map?.dispose?.();
+          material?.dispose?.();
+        }
+      });
+    };
+    disposeRoot(this.trainRoot);
+    for (const view of this.vehicleViews?.values?.() ?? []) {
+      disposeRoot(view.userData.trainCarriageRoot);
+    }
+    if (this.trainRoot) this.scene?.remove?.(this.trainRoot);
+    this.trainRoot = null;
+    this.trainLocomotiveView = null;
+    this.trainTrackPositions = [];
+    this.trainSeatCountBoards = [];
+    this.lastTrainFullKey = '';
+    this.trainDeparturePulseAt = null;
+  }
+
+  createCapacitySpotMarker() {
+    const root = new THREE.Group();
+    root.visible = false;
+
+    const upgrade = new THREE.Group();
+    const upgradeRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.62, 0.04, 8, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0x24d7ff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    upgradeRing.rotation.x = Math.PI / 2;
+    upgradeRing.position.y = 0.07;
+    upgradeRing.renderOrder = 86;
+    const upgradeArrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.36, 4),
+      new THREE.MeshBasicMaterial({
+        color: 0x7cff9e,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    upgradeArrow.position.set(0, 0.52, -0.44);
+    upgradeArrow.rotation.y = Math.PI / 4;
+    upgradeArrow.renderOrder = 88;
+    const upgradeStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 0.36, 12),
+      new THREE.MeshBasicMaterial({
+        color: 0x7cff9e,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    upgradeStem.position.set(0, 0.3, -0.44);
+    upgradeStem.renderOrder = 87;
+    const upgradeLabel = makeSpotMarkerLabel('UP', {
+      fill: '#d7fff2',
+      stroke: '#006680',
+      scaleX: 0.66,
+      scaleY: 0.39
+    });
+    upgradeLabel.position.set(0, 0.82, -0.44);
+    upgrade.add(upgradeRing, upgradeStem, upgradeArrow, upgradeLabel);
+
+    const doubleGate = new THREE.Group();
+    const postMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff7a2f,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const doorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff3b30,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const beamMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      depthWrite: false,
+      toneMapped: false
+    });
+    for (const x of [-0.46, 0.46]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.78, 14), postMaterial);
+      post.position.set(x, 0.42, -0.5);
+      post.renderOrder = 88;
+      doubleGate.add(post);
+    }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.1, 0.12), beamMaterial);
+    beam.position.set(0, 0.8, -0.5);
+    beam.renderOrder = 89;
+    const leftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.46, 0.065), doorMaterial);
+    leftDoor.position.set(-0.23, 0.5, -0.5);
+    leftDoor.rotation.y = -0.36;
+    leftDoor.renderOrder = 90;
+    const rightDoor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.46, 0.065), doorMaterial);
+    rightDoor.position.set(0.23, 0.5, -0.5);
+    rightDoor.rotation.y = 0.36;
+    rightDoor.renderOrder = 90;
+    const doubleLabel = makeSpotMarkerLabel('x2', {
+      fill: '#fff1cc',
+      stroke: '#8f1f14',
+      scaleX: 0.78,
+      scaleY: 0.46
+    });
+    doubleLabel.position.set(0, 1.04, -0.5);
+    doubleGate.add(beam, leftDoor, rightDoor, doubleLabel);
+
+    upgrade.visible = false;
+    doubleGate.visible = false;
+    root.add(upgrade, doubleGate);
+    root.userData.upgradeSpotMarker = upgrade;
+    root.userData.doubleGateMarker = doubleGate;
+    return root;
+  }
 
   clearVehiclePathLines() {
     for (const line of [...this.vehiclePathLines, ...this.vehicleDeparturePathLines]) {
@@ -732,6 +1506,7 @@ export class SceneView {
         });
         for (const vehicle of snapshot.vehicles) {
           if (vehicle.state !== 'parked') continue;
+          if (!game.canVehicleDispatch(vehicle)) continue;
           const blockers = game.getBlockers(vehicle.id);
           if (blockers.length && !tuning.showBlocked) continue;
           const points = buildToStationPoints(vehicle, target, tuning);
@@ -808,6 +1583,681 @@ export class SceneView {
     return group;
   }
 
+  createTransportTunnelBadge(pair, kind) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#182335';
+    context.strokeStyle = pair.color;
+    context.lineWidth = 10;
+    context.beginPath();
+    if (typeof context.roundRect === 'function') {
+      context.roundRect(8, 8, 240, 112, 24);
+    } else {
+      context.rect(8, 8, 240, 112);
+    }
+    context.fill();
+    context.stroke();
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#ffffff';
+    context.font = '900 50px Arial, sans-serif';
+    const marker = kind === 'entrance' ? '↓ 进' : '出 ↑';
+    context.fillText(`${marker} ${pair.label}`, 128, 64);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false
+    }));
+    badge.scale.set(0.92, 0.46, 1);
+    badge.position.set(0, TRANSPORT_TUNNEL_VISUAL.height + 0.3, 0);
+    badge.renderOrder = 70;
+    badge.userData.baseScale = badge.scale.clone();
+    return badge;
+  }
+
+  createTransportTunnelEndpointView(pair, kind) {
+    const endpoint = pair[kind];
+    const root = new THREE.Group();
+    root.name = `Transport Tunnel ${pair.id} ${kind}`;
+    const visual = TRANSPORT_TUNNEL_VISUAL;
+    const apertureWidth = mapVehicleAreaDistance(endpoint.width);
+    const wallThickness = mapVehicleAreaDistance(visual.wallThickness);
+    const depth = mapVehicleAreaDistance(visual.depth);
+    const bodyColor = 0x303a4d;
+    const leftMaterial = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.58 });
+    const rightMaterial = leftMaterial.clone();
+    const topMaterial = leftMaterial.clone();
+    const borderMaterials = [];
+    const makeBorderMaterial = () => {
+      const material = new THREE.MeshStandardMaterial({
+        color: pair.color,
+        emissive: pair.color,
+        emissiveIntensity: 0.72,
+        roughness: 0.3
+      });
+      borderMaterials.push(material);
+      return material;
+    };
+    const sideOffset = apertureWidth / 2 + wallThickness / 2;
+    const leftWall = new THREE.Mesh(
+      new THREE.BoxGeometry(wallThickness, visual.height, depth),
+      leftMaterial
+    );
+    leftWall.position.set(-sideOffset, visual.height / 2, 0);
+    const rightWall = new THREE.Mesh(
+      new THREE.BoxGeometry(wallThickness, visual.height, depth),
+      rightMaterial
+    );
+    rightWall.position.set(sideOffset, visual.height / 2, 0);
+    const top = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        apertureWidth + wallThickness * 2,
+        visual.topThickness,
+        depth
+      ),
+      topMaterial
+    );
+    top.position.set(0, visual.height - visual.topThickness / 2, 0);
+
+    const leftBorder = new THREE.Mesh(
+      new THREE.BoxGeometry(visual.borderThickness, visual.height, depth + 0.025),
+      makeBorderMaterial()
+    );
+    leftBorder.position.set(-apertureWidth / 2, visual.height / 2, 0);
+    const rightBorder = new THREE.Mesh(
+      new THREE.BoxGeometry(visual.borderThickness, visual.height, depth + 0.025),
+      makeBorderMaterial()
+    );
+    rightBorder.position.set(apertureWidth / 2, visual.height / 2, 0);
+    const topBorder = new THREE.Mesh(
+      new THREE.BoxGeometry(apertureWidth, visual.borderThickness, depth + 0.025),
+      makeBorderMaterial()
+    );
+    topBorder.position.set(0, visual.height - visual.topThickness, 0);
+
+    const arrowMaterial = new THREE.MeshBasicMaterial({
+      color: pair.color,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const arrow = new THREE.Group();
+    const arrowShaft = new THREE.Mesh(
+      new THREE.BoxGeometry(0.11, 0.035, 0.34),
+      arrowMaterial
+    );
+    const arrowHead = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.28, 3),
+      arrowMaterial
+    );
+    arrowHead.rotation.x = Math.PI / 2;
+    arrowHead.position.z = 0.28;
+    arrow.position.set(
+      0,
+      0.035,
+      kind === 'entrance' ? -depth / 2 - 0.3 : depth / 2 + 0.3
+    );
+    arrow.renderOrder = 69;
+    arrow.add(arrowShaft, arrowHead);
+
+    const badge = this.createTransportTunnelBadge(pair, kind);
+    root.add(leftWall, rightWall, top, leftBorder, rightBorder, topBorder, arrow, badge);
+    root.userData.leftWallMaterial = leftMaterial;
+    root.userData.rightWallMaterial = rightMaterial;
+    root.userData.topMaterial = topMaterial;
+    root.userData.borderMaterials = borderMaterials;
+    root.userData.badge = badge;
+    root.userData.baseBorderColor = new THREE.Color(pair.color);
+    root.userData.bodyColor = new THREE.Color(bodyColor);
+    return root;
+  }
+
+  createTransportTunnelPairView(pair) {
+    const root = new THREE.Group();
+    const entrance = this.createTransportTunnelEndpointView(pair, 'entrance');
+    const exit = this.createTransportTunnelEndpointView(pair, 'exit');
+    root.add(entrance, exit);
+    root.userData.entrance = entrance;
+    root.userData.exit = exit;
+    this.scene.add(root);
+    return root;
+  }
+
+  applyTransportTunnelFeedback(endpointView, {
+    pulse = 0,
+    redBorder = false,
+    wallSide = null,
+    reducedMotion = false
+  } = {}) {
+    const data = endpointView.userData;
+    data.leftWallMaterial.color.copy(data.bodyColor);
+    data.rightWallMaterial.color.copy(data.bodyColor);
+    data.topMaterial.color.copy(data.bodyColor);
+    for (const material of data.borderMaterials) {
+      if (redBorder) {
+        material.color.setHex(0xff4d55);
+        material.emissive.setHex(0xff222d);
+      } else {
+        material.color.copy(data.baseBorderColor);
+        material.emissive.copy(data.baseBorderColor);
+      }
+      material.emissiveIntensity = 0.72 + pulse * 1.1;
+    }
+    if (wallSide === 'left') data.leftWallMaterial.color.setHex(0xff4d55);
+    if (wallSide === 'right') data.rightWallMaterial.color.setHex(0xff4d55);
+    data.badge.scale.copy(data.badge.userData.baseScale);
+    if (!reducedMotion && pulse > 0) {
+      data.badge.scale.multiplyScalar(1 + pulse * 0.12);
+    }
+  }
+
+  updateTransportTunnelViews(snapshot) {
+    this.transportTunnelViews ??= new Map();
+    const activeIds = new Set();
+    const pairs = snapshot.transportTunnel?.pairs ?? [];
+    const reducedMotion = Boolean(this.reducedMotionQuery?.matches);
+    for (const pair of pairs) {
+      activeIds.add(pair.id);
+      let view = this.transportTunnelViews.get(pair.id);
+      if (!view) {
+        view = this.createTransportTunnelPairView(pair);
+        this.transportTunnelViews.set(pair.id, view);
+      }
+      for (const kind of ['entrance', 'exit']) {
+        const endpoint = pair[kind];
+        const endpointView = view.userData[kind];
+        const mapped = mapVehicleAreaPoint(endpoint);
+        endpointView.position.set(mapped.x, SCENE_TUNING.vehicleArea.y, mapped.y);
+        endpointView.rotation.y = mapVehicleAreaYaw(endpoint.yaw);
+      }
+
+      const feedback = pair.feedback;
+      const elapsed = feedback ? snapshot.time - feedback.startedAt : Infinity;
+      const active = elapsed >= 0 && elapsed < TRANSPORT_TUNNEL_VISUAL.feedbackDuration;
+      const wave = active
+        ? 0.5 + 0.5 * Math.sin(
+            elapsed / TRANSPORT_TUNNEL_VISUAL.feedbackDuration * Math.PI * 4
+          )
+        : 0;
+      const reason = active ? feedback.reason : null;
+      this.applyTransportTunnelFeedback(view.userData.entrance, {
+        pulse: reason === 'tunnel-busy' ? wave : 0,
+        redBorder: reason === 'tunnel-exit-blocked',
+        wallSide: reason === 'tunnel-wall-blocked' ? feedback.wallSide : null,
+        reducedMotion
+      });
+      this.applyTransportTunnelFeedback(view.userData.exit, {
+        redBorder: reason === 'tunnel-exit-blocked',
+        reducedMotion
+      });
+    }
+
+    for (const [id, view] of this.transportTunnelViews) {
+      if (activeIds.has(id)) continue;
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material?.map?.dispose?.();
+          material?.dispose?.();
+        }
+      });
+      this.scene.remove(view);
+      this.transportTunnelViews.delete(id);
+    }
+  }
+
+  disposeTransportTunnelViews() {
+    for (const view of this.transportTunnelViews?.values?.() ?? []) {
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material?.map?.dispose?.();
+          material?.dispose?.();
+        }
+      });
+      this.scene?.remove?.(view);
+    }
+    this.transportTunnelViews?.clear?.();
+  }
+
+  createRotaryLaneView(lane) {
+    const root = new THREE.Group();
+    root.name = `Rotary Lane ${lane.id}`;
+    const glowMaterials = [];
+    const arrowMaterials = [];
+    for (let index = 0; index < lane.slots.length; index += 1) {
+      const current = mapVehicleAreaPoint(lane.slots[index]);
+      const next = mapVehicleAreaPoint(lane.slots[(index + 1) % lane.slots.length]);
+      const dx = next.x - current.x;
+      const dz = next.y - current.y;
+      const length = Math.hypot(dx, dz);
+      const roadMaterial = new THREE.MeshStandardMaterial({
+        color: ROTARY_LANE_VISUAL.roadColor,
+        emissive: ROTARY_LANE_VISUAL.arrowColor,
+        emissiveIntensity: 0,
+        roughness: 0.8
+      });
+      glowMaterials.push(roadMaterial);
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          ROTARY_LANE_VISUAL.roadWidth,
+          ROTARY_LANE_VISUAL.roadHeight,
+          length
+        ),
+        roadMaterial
+      );
+      road.position.set(
+        (current.x + next.x) / 2,
+        SCENE_TUNING.vehicleArea.y - 0.035,
+        (current.y + next.y) / 2
+      );
+      road.rotation.y = Math.atan2(dx, dz);
+
+      const lineMaterial = new THREE.MeshBasicMaterial({
+        color: ROTARY_LANE_VISUAL.lineColor,
+        toneMapped: false
+      });
+      const separator = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          ROTARY_LANE_VISUAL.roadWidth * 0.9,
+          0.01,
+          ROTARY_LANE_VISUAL.separatorWidth
+        ),
+        lineMaterial
+      );
+      separator.position.set(
+        current.x,
+        SCENE_TUNING.vehicleArea.y - 0.015,
+        current.y
+      );
+      separator.rotation.y = mapVehicleAreaYaw(lane.slots[index].yaw);
+
+      const arrowMaterial = new THREE.MeshBasicMaterial({
+        color: ROTARY_LANE_VISUAL.arrowColor,
+        transparent: true,
+        opacity: 0.72,
+        toneMapped: false
+      });
+      arrowMaterials.push(arrowMaterial);
+      const arrow = new THREE.Mesh(
+        new THREE.ConeGeometry(0.09, ROTARY_LANE_VISUAL.arrowLength, 3),
+        arrowMaterial
+      );
+      arrow.rotation.x = Math.PI / 2;
+      arrow.rotation.z = -Math.PI / 2;
+      arrow.position.set(
+        (current.x + next.x) / 2,
+        SCENE_TUNING.vehicleArea.y - 0.005,
+        (current.y + next.y) / 2
+      );
+      arrow.rotation.y = Math.atan2(dx, dz);
+      root.add(road, separator, arrow);
+    }
+    root.userData.glowMaterials = glowMaterials;
+    root.userData.arrowMaterials = arrowMaterials;
+    root.userData.lastTriggerVersion = -1;
+    this.scene.add(root);
+    return root;
+  }
+
+  updateRotaryLaneViews(snapshot) {
+    this.rotaryLaneViews ??= new Map();
+    const activeIds = new Set();
+    const reducedMotion = Boolean(this.reducedMotionQuery?.matches);
+    for (const lane of snapshot.rotaryLane?.lanes ?? []) {
+      activeIds.add(lane.id);
+      let view = this.rotaryLaneViews.get(lane.id);
+      if (!view) {
+        view = this.createRotaryLaneView(lane);
+        this.rotaryLaneViews.set(lane.id, view);
+      }
+      const elapsed = snapshot.rotaryLane.startedAt == null
+        ? Infinity
+        : snapshot.time - snapshot.rotaryLane.startedAt;
+      const active = elapsed >= 0 && elapsed < ROTARY_LANE_VISUAL.feedbackDuration;
+      const pulse = active
+        ? (reducedMotion ? 0.75 : 0.5 + 0.5 * Math.sin(elapsed * 24))
+        : 0;
+      for (const material of view.userData.glowMaterials) {
+        material.emissiveIntensity = pulse * 1.25;
+      }
+      for (const material of view.userData.arrowMaterials) {
+        material.opacity = 0.72 + pulse * 0.28;
+      }
+      view.userData.lastTriggerVersion = snapshot.rotaryLane.triggerVersion;
+    }
+
+    for (const [id, view] of this.rotaryLaneViews) {
+      if (activeIds.has(id)) continue;
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) material?.dispose?.();
+      });
+      this.scene.remove(view);
+      this.rotaryLaneViews.delete(id);
+    }
+  }
+
+  disposeRotaryLaneViews() {
+    for (const view of this.rotaryLaneViews?.values?.() ?? []) {
+      view.traverse((object) => {
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) material?.dispose?.();
+      });
+      this.scene?.remove?.(view);
+    }
+    this.rotaryLaneViews?.clear?.();
+  }
+
+  createGarageCountLabel() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false
+    }));
+    sprite.renderOrder = 55;
+    sprite.scale.set(0.45, 0.45, 1);
+    sprite.userData.textCanvas = canvas;
+    sprite.userData.textTexture = texture;
+    sprite.userData.value = null;
+    return sprite;
+  }
+
+  updateGarageCountLabel(label, value, { locked = false } = {}) {
+    if (label.userData.value === value && label.userData.locked === locked) return;
+    label.userData.value = value;
+    label.userData.locked = locked;
+    const canvas = label.userData.textCanvas;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (locked) {
+      context.fillStyle = '#273244';
+      context.strokeStyle = '#ffb454';
+      context.lineWidth = 8;
+      context.beginPath();
+      context.moveTo(36, 34);
+      context.lineTo(92, 34);
+      context.quadraticCurveTo(108, 34, 108, 50);
+      context.lineTo(108, 90);
+      context.quadraticCurveTo(108, 106, 92, 106);
+      context.lineTo(36, 106);
+      context.quadraticCurveTo(20, 106, 20, 90);
+      context.lineTo(20, 50);
+      context.quadraticCurveTo(20, 34, 36, 34);
+      context.fill();
+      context.stroke();
+      context.strokeStyle = '#ffb454';
+      context.lineWidth = 9;
+      context.beginPath();
+      context.arc(64, 40, 24, Math.PI, 0);
+      context.stroke();
+      context.fillStyle = '#ffb454';
+      context.beginPath();
+      context.arc(64, 86, 7, 0, Math.PI * 2);
+      context.fill();
+      context.fillRect(61, 88, 6, 12);
+    } else {
+      context.beginPath();
+      context.arc(64, 64, 46, 0, Math.PI * 2);
+      context.fillStyle = '#f5d85f';
+      context.fill();
+      context.lineWidth = 9;
+      context.strokeStyle = '#7a3e2d';
+      context.stroke();
+    }
+
+    context.font = locked ? '900 46px Arial, sans-serif' : '900 58px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineWidth = locked ? 7 : 8;
+    context.strokeStyle = locked ? '#273244' : '#7a3e2d';
+    context.fillStyle = '#ffffff';
+    context.strokeText(String(value), 64, locked ? 65 : 66);
+    context.fillText(String(value), 64, locked ? 65 : 66);
+    label.userData.textTexture.needsUpdate = true;
+  }
+
+  makeGarageFallback() {
+    const root = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.45, 1.15),
+      new THREE.MeshStandardMaterial({ color: 0x914949, roughness: 0.62 })
+    );
+    body.position.y = 0.225;
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.58, 0.28, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x5c2f2f, roughness: 0.7 })
+    );
+    door.position.set(0, 0.22, 0.595);
+    root.add(body, door);
+    return root;
+  }
+
+  createGarageView(garage) {
+    const root = new THREE.Group();
+    const model = this.garageTemplate
+      ? this.garageTemplate.clone(true)
+      : this.makeGarageFallback();
+    const label = this.createGarageCountLabel();
+    label.position.set(0, 0.88, 0.02);
+    root.add(model, label);
+    root.userData.model = model;
+    root.userData.countLabel = label;
+    root.userData.garageId = garage.id;
+    this.scene.add(root);
+    return root;
+  }
+
+  createValveView(index) {
+    const root = new THREE.Group();
+    const postMaterial = new THREE.MeshBasicMaterial({
+      color: 0x263241,
+      depthTest: false,
+      depthWrite: false
+    });
+    const doorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff6b4a,
+      depthTest: false,
+      depthWrite: false
+    });
+    const indicatorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false
+    });
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.48, 16), postMaterial);
+    post.position.y = 0.24;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.2), doorMaterial);
+    door.position.y = 0.36;
+    const indicator = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.035, 24), indicatorMaterial);
+    indicator.position.y = 0.64;
+    for (const part of [post, door, indicator]) part.renderOrder = 80;
+    root.add(post, door, indicator);
+    root.visible = false;
+    root.userData.entryIndex = index;
+    root.userData.door = door;
+    root.userData.doorMaterial = doorMaterial;
+    root.userData.indicator = indicator;
+    root.userData.indicatorMaterial = indicatorMaterial;
+    this.scene.add(root);
+    return root;
+  }
+
+  createMaglevSpotView() {
+    const root = new THREE.Group();
+    const platformMaterial = new THREE.MeshBasicMaterial({
+      color: 0x33485f,
+      transparent: true,
+      opacity: 0.64,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const rimMaterial = new THREE.MeshBasicMaterial({
+      color: 0x5de1ff,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const indicatorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.045, 0.76), platformMaterial);
+    platform.position.y = 0.022;
+    platform.renderOrder = 72;
+    const rim = new THREE.Group();
+    const horizontal = new THREE.BoxGeometry(0.82, 0.028, 0.035);
+    const vertical = new THREE.BoxGeometry(0.035, 0.028, 0.82);
+    for (const [x, z, geometry] of [
+      [0, -0.41, horizontal],
+      [0, 0.41, horizontal],
+      [-0.41, 0, vertical],
+      [0.41, 0, vertical]
+    ]) {
+      const edge = new THREE.Mesh(geometry, rimMaterial);
+      edge.position.set(x, 0.055, z);
+      edge.renderOrder = 73;
+      rim.add(edge);
+    }
+    const indicator = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.68, 12), indicatorMaterial);
+    indicator.position.set(0.34, 0.34, -0.34);
+    indicator.renderOrder = 74;
+    root.add(platform, rim, indicator);
+    root.userData.platformMaterial = platformMaterial;
+    root.userData.rimMaterial = rimMaterial;
+    root.userData.indicator = indicator;
+    root.userData.indicatorMaterial = indicatorMaterial;
+    this.scene.add(root);
+    return root;
+  }
+
+  buildValveViews() {
+    for (let index = 0; index < LEVEL_1.entryPercents.length; index += 1) {
+      this.valveViews[index] = this.createValveView(index);
+    }
+  }
+
+  updateValves(snapshot) {
+    this.valveViews ??= [];
+    const valve = snapshot.valve;
+    if (!valve) {
+      for (const view of this.valveViews) {
+        if (view) view.visible = false;
+      }
+      return;
+    }
+
+    for (let index = 0; index < LEVEL_1.entryPercents.length; index += 1) {
+      const view = this.valveViews[index] ?? this.createValveView(index);
+      this.valveViews[index] = view;
+      const entry = valve.entries?.[index];
+      const percent = LEVEL_1.entryPercents[index] ?? 0;
+      const point = this.curve.getPointAt(percent);
+      const tangent = this.curve.getTangentAt(percent).normalize();
+      const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+      const sideOffset = index === 0 ? -0.28 : 0.28;
+      view.visible = Boolean(entry);
+      view.position.copy(point).addScaledVector(normal, sideOffset);
+      view.position.y = SCENE_TUNING.path.groundY + 0.06;
+      view.rotation.y = Math.atan2(tangent.x, tangent.z);
+      view.userData.door.rotation.y = entry?.open ? Math.PI / 2 : 0;
+      view.userData.doorMaterial.color.setHex(entry?.open ? 0x51d98b : 0xff6b4a);
+      const colorIndex = entry?.activeColorIndex ?? entry?.headColorIndex;
+      view.userData.indicatorMaterial.color.setHex(COLORS[colorIndex]?.hex ?? 0xffffff);
+      view.userData.indicator.scale.setScalar(entry?.open ? 1.18 : 0.82);
+    }
+  }
+
+  updateGarages(snapshot) {
+    const activeIds = new Set();
+    for (const garage of snapshot.garages ?? []) {
+      activeIds.add(garage.id);
+      let view = this.garageViews.get(garage.id);
+      if (!view) {
+        view = this.createGarageView(garage);
+        this.garageViews.set(garage.id, view);
+      }
+      const mapped = mapVehicleAreaPoint(garage.position);
+      view.position.set(mapped.x, SCENE_TUNING.vehicleArea.y, mapped.y);
+      view.rotation.y = mapVehicleAreaYaw(garage.yaw) + deg(SCENE_TUNING.facing.garageYawOffsetDegrees ?? 0);
+      view.visible = !garage.hidden;
+      this.updateGarageCountLabel(view.userData.countLabel, garage.displayCount, {
+        locked: garage.locked
+      });
+    }
+    for (const [id, view] of this.garageViews) {
+      if (activeIds.has(id)) continue;
+      this.scene.remove(view);
+      this.garageViews.delete(id);
+    }
+  }
+
+  updateMaglevSpots(snapshot) {
+    const maglevSpot = snapshot.maglevSpot;
+    if (!maglevSpot) {
+      for (const view of this.maglevSpotViews.values()) view.visible = false;
+      return;
+    }
+
+    const activeIds = new Set(maglevSpot.vehicleIds ?? []);
+    const elevatedIds = new Set(maglevSpot.elevatedVehicleIds ?? []);
+    for (const vehicleId of activeIds) {
+      const vehicle = snapshot.vehicles.find((candidate) => candidate.id === vehicleId);
+      if (!vehicle) continue;
+      let view = this.maglevSpotViews.get(vehicleId);
+      if (!view) {
+        view = this.createMaglevSpotView();
+        this.maglevSpotViews.set(vehicleId, view);
+      }
+      const mapped = mapVehicleAreaPoint(vehicle);
+      const isElevated = elevatedIds.has(vehicleId);
+      view.position.set(mapped.x, SCENE_TUNING.vehicleArea.y - 0.035, mapped.y);
+      view.rotation.y = mapVehicleAreaYaw(vehicle.yaw);
+      view.visible = ['parked', 'colliding'].includes(vehicle.state);
+      view.userData.rimMaterial.color.setHex(isElevated ? 0x65f0ff : 0xffd166);
+      view.userData.indicatorMaterial.color.setHex(isElevated ? 0x65f0ff : 0xffd166);
+      view.userData.indicator.scale.y = isElevated ? 1.28 : 0.42;
+      view.userData.indicator.position.y = isElevated ? 0.46 : 0.18;
+    }
+    for (const [vehicleId, view] of this.maglevSpotViews) {
+      if (activeIds.has(vehicleId)) continue;
+      view.visible = false;
+    }
+  }
+
+  updateCapacitySpotMarkers(snapshot) {
+    for (let index = 0; index < this.capacitySpotMarkers.length; index += 1) {
+      const marker = this.capacitySpotMarkers[index];
+      if (!marker) continue;
+      const isUpgradeSpot = snapshot.upgradeSpot?.spotIndex === index;
+      const isDoubleGate = snapshot.doubleGate?.spotIndex === index;
+      marker.visible = Boolean(isUpgradeSpot || isDoubleGate);
+      marker.userData.upgradeSpotMarker.visible = Boolean(isUpgradeSpot);
+      marker.userData.doubleGateMarker.visible = Boolean(isDoubleGate);
+    }
+  }
+
   async loadUnityAssets() {
     try {
       const modelPaths = LEVEL_1.assets.models;
@@ -824,9 +2274,12 @@ export class SceneView {
         carShadowFbx,
         vanShadowFbx,
         busShadowFbx,
+        garageFbx,
         shadowTexture,
         parkingTexture,
         seatCountBoardTexture,
+        garageBodyTexture,
+        garageMetalMatcapTexture,
         carShadowTexture,
         vanShadowTexture,
         busShadowTexture,
@@ -855,9 +2308,16 @@ export class SceneView {
         this.fbxLoader.loadAsync(modelPaths.vehicleShadowBySeats[4]),
         this.fbxLoader.loadAsync(modelPaths.vehicleShadowBySeats[6]),
         this.fbxLoader.loadAsync(modelPaths.vehicleShadowBySeats[10]),
+        modelPaths.garage ? this.fbxLoader.loadAsync(modelPaths.garage).catch(() => null) : Promise.resolve(null),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.shadow),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.parkingSpot),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.seatCountBoard),
+        LEVEL_1.assets.textures.garage?.body
+          ? this.textureLoader.loadAsync(LEVEL_1.assets.textures.garage.body).catch(() => null)
+          : Promise.resolve(null),
+        LEVEL_1.assets.textures.garage?.metalMatcap
+          ? this.textureLoader.loadAsync(LEVEL_1.assets.textures.garage.metalMatcap).catch(() => null)
+          : Promise.resolve(null),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.vehicleShadowBySeats[4]),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.vehicleShadowBySeats[6]),
         this.textureLoader.loadAsync(LEVEL_1.assets.textures.vehicleShadowBySeats[10]),
@@ -877,6 +2337,8 @@ export class SceneView {
       configureColorTexture(parkingTexture);
       configureColorTexture(seatCountBoardTexture);
       configureColorTexture(shadowTexture);
+      if (garageBodyTexture) configureColorTexture(garageBodyTexture);
+      if (garageMetalMatcapTexture) configureColorTexture(garageMetalMatcapTexture);
       [carShadowTexture, vanShadowTexture, busShadowTexture].forEach(configureColorTexture);
       [
         aboardSmokeTexture,
@@ -933,6 +2395,27 @@ export class SceneView {
         transparent: true,
         alphaTest: 0.02
       });
+      this.garageMaterials = {
+        body: new THREE.MeshStandardMaterial({
+          map: garageBodyTexture ?? null,
+          color: 0xffffff,
+          roughness: 0.58,
+          metalness: 0,
+          side: THREE.DoubleSide
+        }),
+        metal: garageMetalMatcapTexture
+          ? new THREE.MeshMatcapMaterial({
+            matcap: garageMetalMatcapTexture,
+            color: 0xffffff,
+            side: THREE.DoubleSide
+          })
+          : new THREE.MeshStandardMaterial({
+            color: 0x71759a,
+            roughness: 0.3,
+            metalness: 0.45,
+            side: THREE.DoubleSide
+          })
+      };
       this.seatCountBoardTexture = seatCountBoardTexture;
 
       const vatRoot = new THREE.Group();
@@ -956,6 +2439,14 @@ export class SceneView {
         depth: SCENE_TUNING.parkingSpots.modelDepth
       });
       setMaterial(this.parkingTemplate, this.parkingMaterial);
+      if (garageFbx) {
+        const garageStaticRoot = applyGarageModelOrientation(toStaticMeshGroup(garageFbx));
+        this.garageTemplate = normalizeObject(garageStaticRoot, {
+          width: 0.95,
+          depth: 1.2
+        });
+        applyGarageMaterials(this.garageTemplate, this.garageMaterials);
+      }
 
       this.vehicleTemplates = {
         4: this.prepareVehicleTemplate(carFbx, 4),
@@ -970,6 +2461,12 @@ export class SceneView {
       this.upgradePassengerViews();
       this.upgradeVehicleViews();
       this.upgradeSpotViews();
+      for (const view of this.garageViews.values()) {
+        view.userData.model?.removeFromParent?.();
+        const model = this.garageTemplate ? this.garageTemplate.clone(true) : this.makeGarageFallback();
+        view.userData.model = model;
+        view.add(model);
+      }
       this.applyTuning();
     } catch (error) {
       console.warn('Unity asset load failed; keeping geometric fallbacks.', error);
@@ -1095,9 +2592,13 @@ export class SceneView {
     const scale = SCENE_TUNING.passengers.modelScale;
     const spacing = SCENE_TUNING.passengers.groupSpacing;
     for (const root of [...this.passengerViews, ...this.queuePassengerViews.flat()]) {
+      root.userData.questionRevealBaseScale = scale;
       root.scale.setScalar(scale);
       root.userData.personSlots?.forEach((slot, index) => {
         slot.position.x = (index - 1.5) * spacing;
+      });
+      root.userData.questionBadges?.forEach((badge, index) => {
+        badge.position.x = (index - 1.5) * spacing;
       });
     }
     for (const entry of this.boardingViews) {
@@ -1129,20 +2630,24 @@ export class SceneView {
       ...this.boardingViews.map((entry) => entry.root)
     ];
     for (const root of roots) {
-      if (root.userData.vatMaterial) {
-        const colorIndex = root.userData.vatMaterial.userData.passengerColorIndex ?? root.userData.colorIndex ?? 0;
-        if (!shouldUpdateColor(colorIndex)) continue;
-        const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
-        applyPassengerMaterial(root.userData.vatMaterial, colorIndex, map);
-      }
-      for (const slot of root.userData.personSlots ?? []) {
-        const material = slot.userData.vatMaterial;
+      if (root.userData.questionPassengerHidden === true) continue;
+      const rootColorIndex = root.userData.colorIndex
+        ?? root.userData.vatMaterial?.userData.passengerColorIndex
+        ?? root.userData.personSlots
+          ?.find((slot) => slot.userData.vatMaterial)
+          ?.userData.vatMaterial.userData.passengerColorIndex
+        ?? 0;
+      if (!shouldUpdateColor(rootColorIndex)) continue;
+      const map = this.passengerColorTextures[rootColorIndex] ?? this.passengerColorTextures[0];
+      const materials = [
+        root.userData.vatMaterial,
+        ...(root.userData.personSlots ?? []).map((slot) => slot.userData.vatMaterial)
+      ];
+      for (const material of materials) {
         if (!material) continue;
-        const colorIndex = material.userData.passengerColorIndex ?? root.userData.colorIndex ?? 0;
-        if (!shouldUpdateColor(colorIndex)) continue;
-        const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
-        applyPassengerMaterial(material, colorIndex, map);
+        applyPassengerMaterial(material, rootColorIndex, map);
       }
+      root.userData.questionPassengerHidden = null;
     }
   }
 
@@ -1161,6 +2666,7 @@ export class SceneView {
       }
       view.userData.modelReady = true;
       view.userData.colorIndex = null;
+      view.userData.questionPassengerHidden = null;
     }
   }
 
@@ -1182,9 +2688,15 @@ export class SceneView {
       for (const child of [hitRoot, shadow]) {
         child.traverse((object) => { object.userData.vehicleId = vehicle.id; });
       }
-      view.add(shadow, hitRoot);
+      const trainCarriageRoot = this.createTrainCarriageView(vehicle);
+      storeHitBase(trainCarriageRoot);
+      view.add(shadow, hitRoot, trainCarriageRoot);
       view.userData.bodyMeshes = bodyMeshes;
+      view.userData.normalBodyMeshes = bodyMeshes;
       view.userData.hitMeshes = [hitRoot];
+      view.userData.normalHitMeshes = [hitRoot];
+      view.userData.normalRoots = [shadow, hitRoot];
+      view.userData.trainCarriageRoot = trainCarriageRoot;
       view.userData.modelRoot = model;
       view.userData.arrowRoot = arrow;
       view.userData.templateSize = size;
@@ -1248,8 +2760,9 @@ export class SceneView {
     for (let index = 0; index < this.spotRoots.length; index += 1) {
       const root = this.spotRoots[index];
       const board = this.seatCountBoards[index];
+      const marker = this.capacitySpotMarkers[index];
       root.clear();
-      root.add(this.parkingTemplate.clone(true), board);
+      root.add(this.parkingTemplate.clone(true), board, marker);
       board.userData.boardMesh.material.map = this.seatCountBoardTexture;
       board.userData.boardMesh.material.needsUpdate = true;
     }
@@ -1257,16 +2770,24 @@ export class SceneView {
 
 
   updateSeatCountBoard(board, vehicle, time = 0) {
-    const baseRemaining = Math.max(0, vehicle.seats - vehicle.boardedGroups) * LEVEL_1.groupSize;
+    const seatCapacity = vehicle.seatCapacity ?? vehicle.seats;
+    const baseRemaining = Math.max(0, seatCapacity - vehicle.boardedGroups) * LEVEL_1.groupSize;
     let boardingRemaining = 0;
     for (const entry of this.boardingViews) {
       if (entry.vehicleId !== vehicle.id) continue;
-      if (time < entry.startedAt + entry.delay + entry.duration) boardingRemaining += 1;
+      if (time < entry.startedAt + entry.delay + entry.duration) {
+        boardingRemaining += entry.seatCountContribution ?? 1;
+      }
     }
     const remaining = Math.max(0, baseRemaining + boardingRemaining);
     const visible = (
       remaining > 0 &&
-      (vehicle.state === 'at-spot' || vehicle.state === 'boarding-final')
+      (
+        vehicle.state === 'at-spot'
+        || vehicle.state === 'boarding-final'
+        || vehicle.state === 'at-track'
+        || vehicle.state === 'train-full'
+      )
     );
     const vehicleChanged = board.userData.vehicleId !== vehicle.id;
     board.visible = visible;
@@ -1303,21 +2824,223 @@ export class SceneView {
     board.userData.textTexture.needsUpdate = true;
   }
 
-  setPassengerColor(view, colorIndex) {
-    if (view.userData.colorIndex === colorIndex) return;
+  setPassengerAppearance(view, colorIndex, hidden = false) {
+    const questionPassengerHidden = Boolean(hidden);
+    if (
+      view.userData.colorIndex === colorIndex
+      && view.userData.questionPassengerHidden === questionPassengerHidden
+    ) return;
     view.userData.colorIndex = colorIndex;
+    view.userData.questionPassengerHidden = questionPassengerHidden;
+    this.setQuestionPassengerBadgesVisible(view, questionPassengerHidden);
     if (!view.userData.modelReady) {
       for (const slot of view.userData.personSlots) {
-        slot.userData.fallback?.material.color.setHex(COLORS[colorIndex].hex);
+        const fallbackMaterial = slot.userData.fallback?.material;
+        if (!fallbackMaterial) continue;
+        if (questionPassengerHidden) {
+          applyQuestionPassengerMaterial(fallbackMaterial);
+        } else {
+          setPassengerMaterialMaps(fallbackMaterial, null, null);
+          fallbackMaterial.color.setHex(COLORS[colorIndex].hex);
+          fallbackMaterial.emissive.setHex(0x000000);
+          fallbackMaterial.emissiveIntensity = 0;
+          fallbackMaterial.roughness = 0.62;
+          fallbackMaterial.metalness = 0;
+          fallbackMaterial.userData.passengerColorIndex = colorIndex;
+        }
       }
       return;
     }
     for (const slot of view.userData.personSlots) {
       const material = slot.userData.vatMaterial;
       if (material) {
-        const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
-        applyPassengerMaterial(material, colorIndex, map);
+        if (questionPassengerHidden) {
+          applyQuestionPassengerMaterial(material);
+        } else {
+          const map = this.passengerColorTextures[colorIndex] ?? this.passengerColorTextures[0];
+          applyPassengerMaterial(material, colorIndex, map);
+        }
       }
+    }
+  }
+
+  setQuestionPassengerBadgesVisible(view, visible) {
+    for (const badge of view.userData.questionBadges ?? []) {
+      badge.visible = Boolean(visible);
+      if (badge.material) badge.material.opacity = 1;
+    }
+  }
+
+  updateQuestionPassengerReveal(view, state, time = 0, passengerId = null) {
+    const baseScale = view.userData.questionRevealBaseScale ?? SCENE_TUNING.passengers.modelScale;
+    const flash = view.userData.questionRevealFlash;
+    const revealVersion = Math.max(0, Number(state?.revealVersion) || 0);
+    const changedPassenger = view.userData.questionPassengerId !== passengerId;
+    const increasedVersion = !changedPassenger
+      && revealVersion > (view.userData.questionPassengerRevealVersion ?? 0);
+    const eligibleReveal = state?.wasHidden === true && revealVersion > 0;
+
+    if (changedPassenger) {
+      view.userData.questionPassengerId = passengerId;
+      view.userData.questionPassengerRevealVersion = revealVersion;
+      view.userData.questionPassengerRevealStartedAt = -Infinity;
+    } else if (increasedVersion) {
+      view.userData.questionPassengerRevealVersion = revealVersion;
+    }
+
+    if (!eligibleReveal) {
+      view.userData.questionPassengerRevealStartedAt = -Infinity;
+    } else if (changedPassenger || increasedVersion) {
+      view.userData.questionPassengerRevealStartedAt = time;
+    }
+
+    const startedAt = view.userData.questionPassengerRevealStartedAt ?? -Infinity;
+    const elapsed = time - startedAt;
+    const active = eligibleReveal
+      && elapsed >= 0
+      && elapsed < QUESTION_PASSENGER_REVEAL_DURATION;
+    const flashBaseScale = flash?.userData.questionRevealBaseScale ?? flash?.scale.x ?? 0.72;
+    if (flash) flash.userData.questionRevealBaseScale = flashBaseScale;
+
+    if (!active) {
+      view.scale.setScalar(baseScale);
+      if (flash) {
+        flash.visible = false;
+        flash.scale.set(flashBaseScale, flashBaseScale, 1);
+        if (flash.material) flash.material.opacity = 0;
+      }
+      this.setQuestionPassengerBadgesVisible(view, false);
+      return;
+    }
+
+    const progress = THREE.MathUtils.clamp(elapsed / QUESTION_PASSENGER_REVEAL_DURATION, 0, 1);
+    const reduceMotion = Boolean(this.reducedMotionQuery?.matches);
+    const pulseScale = reduceMotion ? 1 : 1 + Math.sin(Math.PI * progress) * 0.08;
+    view.scale.setScalar(baseScale * pulseScale);
+    if (flash) {
+      flash.visible = true;
+      if (!reduceMotion) {
+        const expandingScale = flashBaseScale * (0.7 + progress * 0.8);
+        flash.scale.set(expandingScale, expandingScale, 1);
+      } else {
+        flash.scale.set(flashBaseScale, flashBaseScale, 1);
+      }
+      if (flash.material) flash.material.opacity = 1 - progress;
+    }
+    for (const badge of view.userData.questionBadges ?? []) {
+      badge.visible = true;
+      if (badge.material) badge.material.opacity = 1 - progress;
+    }
+  }
+
+  resetQuestionPassengerReveal(
+    view,
+    baseScale = view.userData.questionRevealBaseScale ?? SCENE_TUNING.passengers.modelScale
+  ) {
+    view.userData.questionPassengerId = null;
+    view.userData.questionPassengerRevealVersion = null;
+    view.userData.questionPassengerRevealStartedAt = -Infinity;
+    view.scale.setScalar(baseScale);
+    const flash = view.userData.questionRevealFlash;
+    if (flash) {
+      const flashBaseScale = flash.userData.questionRevealBaseScale ?? flash.scale.x ?? 0.72;
+      flash.visible = false;
+      flash.scale.set(flashBaseScale, flashBaseScale, 1);
+      if (flash.material) flash.material.opacity = 0;
+    }
+    this.setQuestionPassengerBadgesVisible(view, false);
+  }
+
+  syncQuestionPassengerRevealResetVersion(resetVersion) {
+    if (this.lastSeenResetVersion === resetVersion) return false;
+    this.lastSeenResetVersion = resetVersion;
+    for (const view of this.passengerViews ?? []) {
+      this.resetQuestionPassengerReveal(view);
+    }
+    return true;
+  }
+
+  resetPassengerAppearance(view) {
+    this.resetQuestionPassengerReveal(view);
+    view.userData.colorIndex = null;
+    view.userData.questionPassengerHidden = null;
+  }
+
+  updateStarPassengerBadge(view, reward, time = 0, passengerId = null) {
+    const badge = view.userData.starBadge;
+    if (!badge) return;
+
+    const starMesh = badge.userData.starMesh;
+    const haloMesh = badge.userData.haloMesh;
+    const countSprite = badge.userData.starBadgeCountSprite;
+    const decrementSprite = badge.userData.starBadgeDecrementSprite;
+
+    if (!reward) {
+      badge.visible = false;
+      badge.scale.setScalar(1);
+      if (starMesh) starMesh.visible = false;
+      if (haloMesh) haloMesh.visible = false;
+      if (countSprite) countSprite.visible = false;
+      if (decrementSprite) {
+        decrementSprite.visible = false;
+        decrementSprite.position.y = 0.63;
+        if (decrementSprite.material) decrementSprite.material.opacity = 1;
+      }
+      badge.userData.starBadgePassengerId = null;
+      badge.userData.starBadgeRemainingPasses = null;
+      badge.userData.starBadgeDecrementVersion = null;
+      badge.userData.starBadgeDecrementStartedAt = -Infinity;
+      return;
+    }
+
+    const changedPassenger = badge.userData.starBadgePassengerId !== passengerId;
+    if (changedPassenger) {
+      badge.userData.starBadgePassengerId = passengerId;
+      badge.userData.starBadgeRemainingPasses = null;
+      badge.userData.starBadgeDecrementVersion = reward.decrementVersion ?? 0;
+      badge.userData.starBadgeDecrementStartedAt = -Infinity;
+      if (decrementSprite) {
+        decrementSprite.visible = false;
+        decrementSprite.position.y = 0.63;
+        if (decrementSprite.material) decrementSprite.material.opacity = 1;
+      }
+    } else if ((reward.decrementVersion ?? 0) > (badge.userData.starBadgeDecrementVersion ?? 0)) {
+      badge.userData.starBadgeDecrementVersion = reward.decrementVersion;
+      badge.userData.starBadgeDecrementStartedAt = time;
+    }
+
+    const remainingPasses = Math.max(0, reward.remainingPasses ?? 0);
+    const rewardVisible = Boolean(reward.active && !reward.expired && remainingPasses > 0);
+    const decrementElapsed = time - badge.userData.starBadgeDecrementStartedAt;
+    const showDecrement = decrementElapsed >= 0 && decrementElapsed < 0.65;
+    const reduceMotion = Boolean(this.reducedMotionQuery?.matches);
+
+    badge.visible = rewardVisible || showDecrement;
+    if (starMesh) starMesh.visible = rewardVisible;
+    if (haloMesh) haloMesh.visible = rewardVisible;
+    if (countSprite) countSprite.visible = rewardVisible;
+    if (decrementSprite) decrementSprite.visible = showDecrement;
+
+    if (rewardVisible && badge.userData.starBadgeRemainingPasses !== remainingPasses) {
+      badge.userData.starBadgeRemainingPasses = remainingPasses;
+      const countLabel = badge.userData.starBadgeCountLabel;
+      if (countLabel?.canvas) drawStarBadgeCount(countLabel, remainingPasses);
+    }
+
+    if (rewardVisible && !reduceMotion) {
+      const pulse = 1 + Math.sin(time * 6) * 0.08;
+      badge.scale.setScalar(pulse);
+    } else {
+      badge.scale.setScalar(1);
+    }
+
+    if (showDecrement && decrementSprite) {
+      const progress = decrementElapsed / 0.65;
+      decrementSprite.position.y = reduceMotion ? 0.63 : 0.63 + progress * 0.2;
+      if (decrementSprite.material) decrementSprite.material.opacity = 1 - progress;
+    } else if (decrementSprite) {
+      decrementSprite.position.y = 0.63;
+      if (decrementSprite.material) decrementSprite.material.opacity = 1;
     }
   }
 
@@ -1342,6 +3065,7 @@ export class SceneView {
     this.loopPlane.material.opacity = conveyor.opacity;
 
     this.buildPathCurves();
+    this.updateValves(this.lastSnapshot ?? {});
     const spots = SCENE_TUNING.parkingSpots;
     for (let i = 0; i < this.spotRoots.length; i += 1) {
       const position = this.spotPositions[i];
@@ -1395,12 +3119,13 @@ export class SceneView {
   }
 
   update(snapshot, game) {
+    const resetVersionChanged = this.syncQuestionPassengerRevealResetVersion(snapshot.resetVersion);
+    if (resetVersionChanged) this.clearBoardingViews();
     const previousUpdateTime = this.lastSnapshot?.time ?? snapshot.time;
     const visualDelta = Math.max(0, Math.min(snapshot.time - previousUpdateTime, 0.1));
     this.lastSnapshot = snapshot;
     this.lastGame = game;
     this.vatTimeUniform.value = snapshot.time;
-    if (snapshot.lastEvent.type === 'reset' && snapshot.time === 0) this.clearBoardingViews();
     this.processBoardingEvents(snapshot);
     this.updateBoardingViews(snapshot.time);
     const vehicleArea = SCENE_TUNING.vehicleArea;
@@ -1408,6 +3133,14 @@ export class SceneView {
     for (const board of this.seatCountBoards) {
       board.visible = false;
     }
+    this.updateGarages(snapshot);
+    this.updateTransportTunnelViews(snapshot);
+    this.updateRotaryLaneViews(snapshot);
+    this.updateMaglevSpots(snapshot);
+    this.updateValves(snapshot);
+    this.processTrainEvents(snapshot);
+    this.updateTrainViews(snapshot);
+    this.updateCapacitySpotMarkers(snapshot);
     for (const vehicle of snapshot.vehicles) {
       const view = this.vehicleViews.get(vehicle.id);
       const layoutStart = mapVehicleAreaPoint(vehicle);
@@ -1418,9 +3151,22 @@ export class SceneView {
         layoutStart.y
       );
       const spot = this.spotPositions[vehicle.spotIndex ?? 0];
-      view.visible = vehicle.state !== 'done';
-      let vehicleScale = vehicle.state === 'parked' || vehicle.state === 'colliding'
-        ? 1 : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
+      const useTrainCarriage = Boolean(vehicle.trainCarriage);
+      const trainCarriageRoot = view.userData.trainCarriageRoot;
+      for (const root of view.userData.normalRoots ?? []) root.visible = !useTrainCarriage;
+      if (trainCarriageRoot) trainCarriageRoot.visible = useTrainCarriage;
+      view.userData.bodyMeshes = useTrainCarriage
+        ? (trainCarriageRoot?.userData.bodyMeshes ?? [])
+        : (view.userData.normalBodyMeshes ?? []);
+      view.userData.hitMeshes = useTrainCarriage
+        ? [trainCarriageRoot].filter(Boolean)
+        : (view.userData.normalHitMeshes ?? []);
+      view.visible = !['done', 'in-garage', 'hidden-in-tunnel'].includes(vehicle.state);
+      const usesFieldScale = ['parked', 'colliding', 'rotary-lane-shifting']
+        .includes(vehicle.state);
+      let vehicleScale = usesFieldScale
+        ? 1
+        : (UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1);
       if (vehicle.state === 'parked') {
         view.position.copy(start);
         view.rotation.y = startYaw;
@@ -1432,6 +3178,20 @@ export class SceneView {
         };
         view.position.copy(mapMotionPoint(position));
         view.rotation.y = startYaw;
+      } else if (vehicle.state === 'rotary-lane-shifting') {
+        const data = vehicle.motionData;
+        const from = data?.from ?? vehicle;
+        const to = data?.to ?? vehicle;
+        const reducedMotion = Boolean(this.reducedMotionQuery?.matches);
+        const rawProgress = reducedMotion && vehicle.motion > 0 ? 1 : vehicle.motion;
+        const t = THREE.MathUtils.smoothstep(rawProgress, 0, 1);
+        const position = {
+          x: THREE.MathUtils.lerp(from.x, to.x, t),
+          z: THREE.MathUtils.lerp(from.z, to.z, t)
+        };
+        const yaw = from.yaw + shortestYawDelta(from.yaw, to.yaw) * t;
+        view.position.copy(mapMotionPoint(position));
+        view.rotation.y = mapVehicleAreaYaw(yaw) + vehicleYawOffset;
       } else if (vehicle.state === 'moving-to-spot') {
         const data = vehicle.motionData;
         const curveValue = evaluateUnityCurve(data.curve, vehicle.motion);
@@ -1443,9 +3203,59 @@ export class SceneView {
           UNITY_VEHICLE_MOTION.stationScaleBySeats[vehicle.seats] ?? 1,
           evaluateUnityCurve(UNITY_CURVES.smoothScale, vehicle.motion)
         );
+      } else if (vehicle.state === 'leaving-garage') {
+        const data = vehicle.motionData;
+        const from = data?.from ?? vehicle;
+        const to = data?.to ?? vehicle;
+        const t = THREE.MathUtils.smoothstep(vehicle.motion, 0, 1);
+        const position = {
+          x: THREE.MathUtils.lerp(from.x, to.x, t),
+          z: THREE.MathUtils.lerp(from.z, to.z, t)
+        };
+        view.position.copy(mapMotionPoint(position));
+        view.rotation.y = mapVehicleAreaYaw(THREE.MathUtils.lerp(from.yaw, to.yaw, t)) + vehicleYawOffset;
+      } else if (
+        vehicle.state === 'entering-tunnel'
+        || vehicle.state === 'exiting-tunnel'
+      ) {
+        const data = vehicle.motionData;
+        const from = data?.from ?? vehicle;
+        const to = data?.to ?? vehicle;
+        const t = THREE.MathUtils.smoothstep(vehicle.motion, 0, 1);
+        const position = {
+          x: THREE.MathUtils.lerp(from.x, to.x, t),
+          z: THREE.MathUtils.lerp(from.z, to.z, t)
+        };
+        view.position.copy(mapMotionPoint(position));
+        view.rotation.y = mapVehicleAreaYaw(
+          THREE.MathUtils.lerp(from.yaw, to.yaw, t)
+        ) + vehicleYawOffset;
+      } else if (vehicle.state === 'moving-to-track') {
+        const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
+        if (trackPosition) {
+          const t = THREE.MathUtils.smoothstep(vehicle.motion, 0, 1);
+          view.position.lerpVectors(start, trackPosition, t);
+          view.rotation.y = THREE.MathUtils.lerp(startYaw, Math.PI / 2, t);
+        }
       } else if (vehicle.state === 'at-spot' || vehicle.state === 'boarding-final') {
         view.position.copy(spot);
         view.rotation.y = deg(SCENE_TUNING.facing.parkingSpotYawDegrees + 180) + vehicleYawOffset;
+      } else if (vehicle.state === 'at-track' || vehicle.state === 'train-full') {
+        const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
+        if (trackPosition) view.position.copy(trackPosition);
+        view.rotation.y = Math.PI / 2;
+      } else if (vehicle.state === 'train-departing') {
+        const trackPosition = this.trainTrackPositions[vehicle.trackSlotIndex];
+        if (trackPosition) {
+          const departureOffset = THREE.MathUtils.lerp(
+            0,
+            SCENE_TUNING.train.exitX - SCENE_TUNING.train.headX,
+            THREE.MathUtils.smoothstep(vehicle.motion, 0, 1)
+          );
+          view.position.copy(trackPosition);
+          view.position.x += departureOffset;
+        }
+        view.rotation.y = Math.PI / 2;
       } else if (vehicle.state === 'departing') {
         const data = vehicle.motionData;
         const total = data.backwardDuration + data.forwardDuration;
@@ -1466,10 +3276,15 @@ export class SceneView {
           view.rotation.y = mapMotionTangentYaw(sample.tangent);
         }
       }
+      if (snapshot.maglevSpot?.elevatedVehicleIds?.includes(vehicle.id)) {
+        view.position.y += snapshot.maglevSpot.elevation ?? 0.62;
+      }
       const boardingPulseScale = this.getVehicleBoardingPulseScale(vehicle.id, snapshot.time);
       view.scale.setScalar(vehicleScale * SCENE_TUNING.vehicleArea.modelScale * boardingPulseScale);
       this.applyVehicleHit(view, vehicle, snapshot.time);
-      const isMovable = vehicle.state === 'parked' && game.getBlockers(vehicle.id).length === 0;
+      const isMovable = vehicle.state === 'parked'
+        && game.canVehicleDispatch(vehicle)
+        && game.getBlockers(vehicle.id).length === 0;
       for (const mesh of view.userData.bodyMeshes ?? []) {
         if (!mesh.material.emissive) continue;
         mesh.material.emissive.setHex(isMovable ? 0x123a20 : 0x000000);
@@ -1488,7 +3303,11 @@ export class SceneView {
     for (const slot of snapshot.slots) {
       const view = this.passengerViews[slot.index];
       view.visible = slot.colorIndex !== null;
-      if (!view.visible) continue;
+      if (!view.visible) {
+        this.resetPassengerAppearance(view);
+        this.updateStarPassengerBadge(view, null, snapshot.time);
+        continue;
+      }
       const point = this.curve.getPointAt(slot.progress);
       const tangent = this.curve.getTangentAt(slot.progress);
       point.y += passengerHeight;
@@ -1511,8 +3330,10 @@ export class SceneView {
         view.position.copy(point);
         view.rotation.y = Math.atan2(tangent.x, tangent.z) + passengerYaw;
       }
-      this.setPassengerColor(view, slot.colorIndex);
+      this.setPassengerAppearance(view, slot.colorIndex, false);
+      this.updateQuestionPassengerReveal(view, slot.questionPassenger, snapshot.time, slot.passengerId);
       this.setPassengerAnimation(view, 'move', slot.index > 0 && slot.index % 2 === 0 ? 0.3 : 0);
+      this.updateStarPassengerBadge(view, slot.starReward, snapshot.time, slot.passengerId);
     }
     this.pruneInitialEntryPathStates(activeInitialEntryKeys);
 
@@ -1530,7 +3351,11 @@ export class SceneView {
         const item = queue[i];
         const colorIndex = item?.colorIndex;
         view.visible = colorIndex !== undefined;
-        if (!view.visible) continue;
+        if (!view.visible) {
+          this.resetPassengerAppearance(view);
+          this.updateStarPassengerBadge(view, null, snapshot.time);
+          continue;
+        }
         const t = this.getQueueProgressAtDistance(curve, item.distanceFromHead);
         const point = curve.getPointAt(t);
         const tangent = curve.getTangentAt(t);
@@ -1546,11 +3371,13 @@ export class SceneView {
         );
         view.position.copy(queueVisual.position);
         view.rotation.y = Math.atan2(-queueVisual.tangent.x, -queueVisual.tangent.z) + passengerYaw;
-        this.setPassengerColor(view, colorIndex);
+        this.setPassengerAppearance(view, colorIndex, Boolean(item.questionPassenger?.hidden));
         this.setPassengerAnimation(view, 'idle', (i % 4) * 0.17);
+        this.updateStarPassengerBadge(view, item.starReward, snapshot.time, item.id);
       }
     });
     this.pruneQueueEntryPathStates(queueSnapshots);
+    this.syncLinkedPassengerConnectors(snapshot, queueSnapshots);
     this.processBoardingEvents(snapshot);
     this.updateBoardingViews(snapshot.time);
     this.vehicleEffects?.update(snapshot);
@@ -1767,7 +3594,156 @@ export class SceneView {
     }
   }
 
+  positionLinkedConnectorSegment(segment, startRoot, endRoot) {
+    const start = startRoot.position.clone();
+    const end = endRoot.position.clone();
+    start.y += LINKED_CONNECTOR_Y_OFFSET;
+    end.y += LINKED_CONNECTOR_Y_OFFSET;
+    const direction = end.clone().sub(start);
+    const length = direction.length();
+    segment.position.copy(start).add(end).multiplyScalar(0.5);
+    segment.scale.set(1, Math.max(0.001, length), 1);
+    if (length > 0) {
+      segment.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+    } else {
+      segment.quaternion.identity();
+    }
+    return length;
+  }
+
+  makeLinkedPassengerConnector(length) {
+    const root = new THREE.Group();
+    const segments = Array.from({ length: length - 1 }, () => {
+      const segment = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 1, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0xf6d967,
+          emissive: 0x5d4a08,
+          emissiveIntensity: 0.35,
+          roughness: 0.45
+        })
+      );
+      segment.renderOrder = 20;
+      root.add(segment);
+      return segment;
+    });
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeLinkedPassengerBadgeTexture(length),
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
+    }));
+    badge.scale.set(0.52, 0.26, 1);
+    badge.renderOrder = 21;
+    root.add(badge);
+    this.scene.add(root);
+    return { root, segments, badge, length };
+  }
+
+  disposeLinkedPassengerConnector(record) {
+    if (!record) return;
+    this.scene.remove(record.root);
+    for (const segment of record.segments ?? []) {
+      segment.geometry?.dispose();
+      segment.material?.dispose();
+    }
+    record.badge?.material?.dispose();
+  }
+
+  clearLinkedPassengerConnectors() {
+    for (const record of this.linkedPassengerConnectors.values()) {
+      this.disposeLinkedPassengerConnector(record);
+    }
+    this.linkedPassengerConnectors.clear();
+  }
+
+  syncLinkedPassengerConnectors(snapshot, queueSnapshots) {
+    const chains = new Map();
+    const collectMember = (linkedPassenger, root, location) => {
+      const chainId = linkedPassenger?.chainId;
+      if (!chainId || !root?.visible) return;
+      const chain = chains.get(chainId) ?? { members: [], location, mixedLocations: false };
+      if (chain.location !== location) chain.mixedLocations = true;
+      chain.members.push({ linkedPassenger, root });
+      chains.set(chainId, chain);
+    };
+
+    (queueSnapshots ?? []).forEach((queue, queueIndex) => {
+      queue.forEach((item, itemIndex) => {
+        collectMember(
+          item?.linkedPassenger,
+          this.queuePassengerViews[queueIndex]?.[itemIndex],
+          `queue-${queueIndex}`
+        );
+      });
+    });
+    for (const slot of snapshot.slots ?? []) {
+      collectMember(slot.linkedPassenger, this.passengerViews[slot.index], 'belt');
+    }
+
+    const activeChainIds = new Set();
+    for (const [chainId, chain] of chains) {
+      const expectedLength = chain.members[0]?.linkedPassenger.length;
+      chain.members.sort((left, right) => (
+        left.linkedPassenger.memberIndex - right.linkedPassenger.memberIndex
+      ));
+      const isComplete = !chain.mixedLocations
+        && Number.isInteger(expectedLength)
+        && expectedLength >= 2
+        && chain.members.length === expectedLength
+        && chain.members.every(({ linkedPassenger }, memberIndex) => (
+          linkedPassenger.chainId === chainId
+          && linkedPassenger.length === expectedLength
+          && linkedPassenger.memberIndex === memberIndex
+          && linkedPassenger.isHead === (memberIndex === 0)
+        ));
+      if (!isComplete) continue;
+
+      let record = this.linkedPassengerConnectors.get(chainId);
+      if (record && record.length !== expectedLength) {
+        this.disposeLinkedPassengerConnector(record);
+        this.linkedPassengerConnectors.delete(chainId);
+        record = null;
+      }
+      if (!record) {
+        record = this.makeLinkedPassengerConnector(expectedLength);
+        this.linkedPassengerConnectors.set(chainId, record);
+      }
+      for (let index = 0; index < record.segments.length; index += 1) {
+        this.positionLinkedConnectorSegment(
+          record.segments[index],
+          chain.members[index].root,
+          chain.members[index + 1].root
+        );
+      }
+      const headPosition = chain.members[0].root.position;
+      record.badge.position.set(
+        headPosition.x,
+        headPosition.y + LINKED_BADGE_Y_OFFSET,
+        headPosition.z
+      );
+      record.root.visible = true;
+      record.root.scale.set(1, 1, 1);
+      if (record.badge.material) record.badge.material.opacity = 1;
+      activeChainIds.add(chainId);
+    }
+
+    for (const [chainId, record] of this.linkedPassengerConnectors) {
+      if (activeChainIds.has(chainId)) continue;
+      this.disposeLinkedPassengerConnector(record);
+      this.linkedPassengerConnectors.delete(chainId);
+    }
+  }
+
   clearBoardingViews() {
+    this.clearLinkedPassengerConnectors();
+    for (const batch of this.linkedBoardingBatches.values()) {
+      this.disposeLinkedBoardingBatch(batch);
+    }
+    this.linkedBoardingBatches.clear();
     for (const entry of this.boardingViews) {
       this.scene.remove(entry.root);
       entry.material.dispose();
@@ -1817,13 +3793,37 @@ export class SceneView {
     if (!this.personTemplate) return;
     for (const event of snapshot.boardingEvents ?? []) {
       if (event.id <= this.lastBoardingEventId) continue;
-      this.spawnBoardingGroup(event);
+      if ((event.groupCount ?? 1) > 1 && event.linkedPassenger) {
+        this.spawnLinkedBoardingBatch(event);
+      } else {
+        this.spawnBoardingGroup(event);
+      }
       this.lastBoardingEventId = event.id;
     }
   }
 
+  resolveBoardingTarget(event) {
+    if (event.trainTrackSlotIndex != null) {
+      return this.trainTrackPositions[event.trainTrackSlotIndex];
+    }
+    return this.spotPositions[event.spotIndex];
+  }
+
+  processTrainEvents(snapshot) {
+    const event = snapshot.lastEvent;
+    if (event?.type !== 'train-full') return;
+    const key = `${snapshot.resetVersion ?? 0}:${event.cycle ?? 0}`;
+    if (key === this.lastTrainFullKey) return;
+    this.lastTrainFullKey = key;
+    this.trainDeparturePulseAt = snapshot.time;
+    const leadVehicleId = event.vehicleIds?.[0];
+    if (leadVehicleId == null) return;
+    this.triggerVehicleBoardingPulse(leadVehicleId, snapshot.time);
+    this.vehicleEffects?.spawnAboardSmoke(leadVehicleId);
+  }
+
   spawnBoardingGroup(event) {
-    const spot = this.spotPositions[event.spotIndex];
+    const spot = this.resolveBoardingTarget(event);
     if (!spot) return;
     const startCenter = this.curve.getPointAt(event.progress);
     startCenter.y += SCENE_TUNING.passengers.heightAbovePath;
@@ -1851,6 +3851,7 @@ export class SceneView {
         root: visual,
         material: visual.userData.vatMaterial,
         vehicleId: event.vehicleId,
+        seatCountContribution: Math.max(1, event.boardingCost ?? 1),
         start,
         target: target.clone(),
         startedAt: event.startedAt,
@@ -1860,17 +3861,157 @@ export class SceneView {
     }
   }
 
+  spawnLinkedBoardingBatch(event) {
+    const spot = this.resolveBoardingTarget(event);
+    const groupCount = Math.max(0, Math.trunc(event.groupCount ?? 0));
+    if (!spot || groupCount <= 1 || !event.linkedPassenger) return;
+
+    const target = spot.clone();
+    target.y = SCENE_TUNING.path.groundY + SCENE_TUNING.passengers.heightAbovePath;
+    const rowCenters = [];
+    const entries = [];
+
+    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+      const progress = event.progresses?.[groupIndex] ?? event.progress;
+      if (!Number.isFinite(progress)) continue;
+      const startCenter = this.curve.getPointAt(progress);
+      startCenter.y += SCENE_TUNING.passengers.heightAbovePath;
+      rowCenters.push({ position: startCenter.clone() });
+      const tangent = this.curve.getTangentAt(progress);
+      const pathYaw = Math.atan2(tangent.x, tangent.z)
+        + deg(SCENE_TUNING.facing.passengerYawDegrees);
+
+      for (let personIndex = 0; personIndex < LEVEL_1.groupSize; personIndex += 1) {
+        const visual = this.createPassengerVisual(event.colorIndex);
+        visual.scale.setScalar(SCENE_TUNING.passengers.modelScale);
+        const rowOffset = new THREE.Vector3(
+          (personIndex - 1.5)
+            * SCENE_TUNING.passengers.groupSpacing
+            * SCENE_TUNING.passengers.modelScale,
+          0,
+          0
+        ).applyAxisAngle(new THREE.Vector3(0, 1, 0), pathYaw);
+        const start = startCenter.clone().add(rowOffset);
+        const direction = target.clone().sub(start);
+        visual.position.copy(start);
+        visual.rotation.y = Math.atan2(direction.x, direction.z)
+          + deg(SCENE_TUNING.facing.passengerYawDegrees);
+        this.setVatAnimation(visual.userData.vatMaterial, 'move');
+        this.scene.add(visual);
+        const entry = {
+          root: visual,
+          material: visual.userData.vatMaterial,
+          vehicleId: event.vehicleId,
+          start,
+          target: target.clone(),
+          startedAt: event.startedAt,
+          delay: 0,
+          duration: 0.25,
+          linkedBatchId: event.id
+        };
+        this.boardingViews.push(entry);
+        entries.push(entry);
+      }
+    }
+
+    if (rowCenters.length !== groupCount || entries.length !== groupCount * LEVEL_1.groupSize) {
+      for (const entry of entries) {
+        this.scene.remove(entry.root);
+        entry.material.dispose();
+        const index = this.boardingViews.indexOf(entry);
+        if (index >= 0) this.boardingViews.splice(index, 1);
+      }
+      return;
+    }
+
+    const connector = this.makeLinkedPassengerConnector(groupCount);
+    for (let index = 0; index < connector.segments.length; index += 1) {
+      this.positionLinkedConnectorSegment(
+        connector.segments[index],
+        rowCenters[index],
+        rowCenters[index + 1]
+      );
+    }
+    connector.badge.position.set(
+      rowCenters[0].position.x,
+      rowCenters[0].position.y + LINKED_BADGE_Y_OFFSET,
+      rowCenters[0].position.z
+    );
+    const connectorMaterials = connector.segments
+      .map((segment) => segment.material)
+      .filter(Boolean);
+    for (const material of connectorMaterials) material.transparent = true;
+    const badgeMaterial = connector.badge.material;
+    this.linkedBoardingBatches.set(event.id, {
+      remaining: entries.length,
+      vehicleId: event.vehicleId,
+      connectorRoot: connector.root,
+      connectorSegments: connector.segments,
+      connectorMaterials,
+      badgeMaterial,
+      startedAt: event.startedAt,
+      duration: 0.25
+    });
+  }
+
+  disposeLinkedBoardingBatch(batch) {
+    if (!batch) return;
+    this.scene.remove(batch.connectorRoot);
+    for (const segment of batch.connectorSegments ?? []) segment.geometry?.dispose();
+    for (const material of new Set(batch.connectorMaterials ?? [])) material.dispose?.();
+    batch.badgeMaterial?.dispose?.();
+  }
+
+  finishLinkedBoardingBatch(linkedBatchId, batch, time) {
+    if (this.linkedBoardingBatches.get(linkedBatchId) !== batch) return;
+    this.triggerVehicleBoardingPulse(batch.vehicleId, time);
+    this.vehicleEffects?.spawnAboardSmoke(batch.vehicleId);
+    this.hooks.onPassengerAboard?.(batch.vehicleId);
+    this.disposeLinkedBoardingBatch(batch);
+    this.linkedBoardingBatches.delete(linkedBatchId);
+  }
+
   updateBoardingViews(time) {
+    for (const batch of this.linkedBoardingBatches.values()) {
+      const progress = THREE.MathUtils.clamp(
+        (time - batch.startedAt) / batch.duration,
+        0,
+        1
+      );
+      const opacity = 1 - progress;
+      for (const material of batch.connectorMaterials ?? []) {
+        material.opacity = opacity;
+        material.emissiveIntensity = 0.35 + 1.65 * (1 - progress);
+      }
+      if (batch.badgeMaterial) batch.badgeMaterial.opacity = opacity;
+    }
+
     for (let index = this.boardingViews.length - 1; index >= 0; index -= 1) {
       const entry = this.boardingViews[index];
       const elapsed = time - entry.startedAt - entry.delay;
       if (elapsed < 0) continue;
       const progress = THREE.MathUtils.clamp(elapsed / entry.duration, 0, 1);
-      entry.root.position.lerpVectors(entry.start, entry.target, ease(progress));
+      if (this.reducedMotionQuery?.matches && entry.linkedBatchId != null) {
+        entry.root.position.copy(entry.start);
+        entry.material.transparent = true;
+        entry.material.opacity = 1 - progress;
+      } else {
+        entry.root.position.lerpVectors(entry.start, entry.target, ease(progress));
+      }
       if (progress < 1) continue;
-      this.triggerVehicleBoardingPulse(entry.vehicleId, time);
-      this.vehicleEffects?.spawnAboardSmoke(entry.vehicleId);
-      this.hooks.onPassengerAboard?.(entry.vehicleId);
+      if (entry.linkedBatchId != null) {
+        const batch = this.linkedBoardingBatches.get(entry.linkedBatchId);
+        if (batch) {
+          batch.remaining = Math.max(0, batch.remaining - 1);
+          if (batch.remaining === 0) {
+            this.finishLinkedBoardingBatch(entry.linkedBatchId, batch, time);
+          }
+        }
+      } else {
+        this.triggerVehicleBoardingPulse(entry.vehicleId, time);
+        this.vehicleEffects?.spawnAboardSmoke(entry.vehicleId);
+        this.hooks.onPassengerAboard?.(entry.vehicleId);
+      }
       this.scene.remove(entry.root);
       entry.material.dispose();
       this.boardingViews.splice(index, 1);

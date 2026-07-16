@@ -1,49 +1,182 @@
-﻿# Findings
+# Findings
 
-## Current Durable Findings - 2026-07-08
+## Vehicle Collision Parity Research - 2026-07-14
+
+### Conflict Integration Constraint
+
+- Normal station-bound clicks must reject a full station before collision feedback, while train and transport-tunnel destinations remain usable without consuming or requiring a normal parking spot. The mechanic runtime therefore needs a pure per-vehicle destination query before the model chooses the normal station-capacity gate; the existing mutating `dispatchVehicle` hook must still run only after collision clearance.
+
+### Implementation Constraints
+
+- Web reset creates runtime vehicles first and runs mechanic `afterReset` afterward; therefore a Unity-style collision context must be initialized after `afterReset` so garage stock already marked `in-garage` is excluded from ordinary ground-vehicle graph nodes.
+- Garage release currently mutates vehicle position/yaw and returns it to `parked` inside the garage runtime. Collision-context refresh must be driven from that lifecycle rather than continuing to rely on the legacy `useDynamicBlockers` flag.
+- The existing garage release gate only checks the previously released vehicle state. Unity parity requires the collision context to own door/out-path/body blocker semantics while the garage runtime continues to own stock order and animation.
+- Unity garage collision semantics are explicit five-node graph wiring (`head`, `tail`, `door`, `out`, `body`), including links from ordinary vehicle forward scans to door/body and links from the out path to vehicles occupying it. This can be isolated in a collision-context module without moving garage stock/animation ownership.
+- Unity C# defines the per-vehicle size selection rule (combination, ambulance/luxury override, then 4/6/10 seats), but the numeric `vehicleSize4/6/10`, `garageSize`, and conveyor dimensions are serialized configuration values rather than C# constants. The web implementation must reuse evidenced project values or expose explicit level collision dimensions; it must not invent silent defaults.
+- Unity conveyor containers use a separate lateral interval algorithm rather than the ordinary forward SAT graph. Current level/container enum and web level usage must be checked before deciding whether a conveyor collision adapter is active for level18.
+- Repository code/docs contain only the existing level-wide `0.27 x 0.6785897` collision footprint; no evidenced 4-seat/6-seat numeric footprints or garage/conveyor collision dimensions are currently exported into web source.
+- Existing blocker tests assert the legacy static full-depth table and simplified target selection. They must be replaced by tests built from explicit collision dimensions so graph/direct-candidate/contact behavior is verified independently from unavailable serialized Unity configuration values.
+- The model calls mechanic `update` after vehicle motion each tick. A collision-context refresh can be requested after garage lifecycle changes without changing the garage module's ownership of release animation.
+- The implemented collision context rebuilds the Unity-style graph from current runtime state at query time. This intentionally preserves the web's state-based immediate removal strategy (difference 7) while keeping drive-out decisions, direct candidates, garage helper nodes, and contact geometry behaviorally aligned.
+- Focused collision-parity tests now pass 7/7 for explicit size selection, geometry-over-legacy-depth behavior, parked-state gating, station-full ordering, edge contact, garage body candidates, and blocked collision feedback.
+- Existing authored web model depths are 4-seat `1.05`, 6-seat `1.23`, and 10-seat `1.48`; applying those ratios to the evidenced 10-seat collision length `0.6785897` yields 4-seat `0.4814318817567568` and 6-seat `0.5639630614864864`. With shared width `0.27`, the runtime geometry graph exactly reproduces the known five level18 initially movable ground vehicles. These are evidence-derived web fallback values, not claimed serialized Unity values.
+- No garage collision body dimensions are present in web source, tuning export, or the prior Unity extraction spec. The spec confirms only the method: body uses `garageSize`, door uses max vehicle size, and door center is offset by both half-depths.
+- The active web garage model is normalized to world width/depth `0.95 x 1.2`, while vehicle-area positions use scale `positionUnitScale 0.75 * unityToWorldScale 2 = 1.5`. Mapping the authored visible body back to the level plane gives the explicit web collision fallback `0.6333333333333333 x 0.8`; this shares the same coordinate conversion as vehicle collision sizes and is subject to focused garage graph/release verification.
+- With the derived garage body size active, collision tests remain 8/8, garage tests remain 7/7, and every collision-related `game-model` assertion passes; the only three `game-model` failures are the pre-existing question/asset baseline.
+- Active level18 has no conveyor vehicle container (`ParkingArea=1`, `Garage=2`, `ConveyorBelt=3`). Conveyor collision parity can therefore be implemented behind explicit collision configuration and tested on a focused synthetic level without changing current level18 behavior.
+
+- Unity `Vehicle.CanMoveToStation` is a state-only property (`AtState<StatePark>()`), not the collision test itself. Its normal-input caller and the vehicle state transition path must be included in the comparison.
+- The web model decides a click synchronously in `BusLoopGame.getBlockers()` / `clickVehicle()`: blockers lead to a `colliding` feedback state; no blockers reserve a station and begin `to-station` motion.
+- Web authored vehicles primarily use `level.vehicleDepthes`; dynamic blocker computation is a fallback/override for vehicles marked `useDynamicBlockers`.
+- Unity normal input first rejects non-`StatePark` vehicles, then asks `GameState.GetAvailableParkingSpot()`, and only then calls `vehicle.MoveToStation(parkingSpot)`. Thus parking-capacity rejection precedes the vehicle's collision/state transition path in Unity, while the web checks blockers before checking for a free spot.
+- In the web authored blocker branch, only blocker IDs still in `parked` or `colliding` state and accepted by the active mechanic's `isVehicleBlocking` hook remain blocking. Once a blocker starts moving to a spot it is removed from the blocking set immediately.
+- Unity `Vehicle.MoveToStation` delegates the movement decision to `VehicleContext.CanVehicleDriveOut`. A leaf collision-graph node can reserve the supplied spot and enter `StateToStation`; a blocked vehicle with an `ICollideVehicle` shape enters `StateCollide` instead.
+- Unity separates logical blocking from collision-feedback contact geometry. The graph decides whether drive-out is allowed and supplies collision candidates; `StateCollide` then uses current vehicle/container positions, rotations, and sizes plus edge/ray intersection math to select the actual nearest contact and distance.
+- Unity's graph includes container-specific nodes/semantics (not only vehicles), including garage body/door/path handling and conveyor-specific drive-out logic. The web base authored `vehicleDepthes` path contains vehicle IDs only; its garage mechanism is a separate approximation.
+- Unity builds ordinary vehicle edges at runtime by extending each vehicle's oriented box 500 units forward and applying 2D rotated-rectangle SAT against current vehicle boxes. Web dynamic blocking mirrors the 500-unit scan concept, but most authored level18 vehicles bypass it and use pre-exported `vehicleDepthes` IDs.
+- Unity removes a leaving vehicle's graph node and propagates container graph updates through `OnVehicleLeaveParkingArea`; this runtime graph mutation is structurally richer than the web's state-based filtering of a fixed authored list.
+- Normal-input ordering differs observably when both conditions are true: Unity checks for a free parking spot before calling the collision decision, so a full station suppresses collision feedback; the web checks blockers first, so a blocked vehicle still performs collision feedback even if all spots are full.
+- Both ordinary web dynamic blocking and Unity graph construction use oriented-box SAT with a 500-unit forward extension and treat edge touching as overlap. The main parity gap is not the SAT primitive itself, but when/where it is used: always at Unity runtime versus only the web dynamic-blocker branch.
+- Unity uses each vehicle's current `Vehicle.Size` (derived from its config and scene scale) for both graph SAT and collision contact. The web uses one level-wide width/length for every attacker and candidate after undoing `mapScale`, so mixed vehicle lengths/widths can produce different blocker/contact results.
+- Web level18 `vehicleDepthes` entries contain full downstream depth chains, not merely the current direct collision candidates. Web collision feedback sorts all still-active IDs in that chain by a simplified forward distance; Unity obtains direct graph collision candidates and then tests current oriented edges.
+- Unity sends `VehicleLeavePark` on entry to `StateToStation`, and `StatePlay` synchronously removes the graph node and updates containers. Web achieves similar immediate unblocking by changing the dispatched vehicle state away from `parked` before returning from the click.
+- `CanMoveToStation` should not be mapped one-to-one to web `getBlockers()`: it only answers whether the behavior FSM is exactly `StatePark`. Unity's actual layered gate is state -> available spot -> shape lock -> collision-graph leaf -> spot reservation/state transition. Web's gate is game status -> `parked` -> mechanic dispatch hook -> blockers -> free spot -> reservation/state transition.
+
+## Current Durable Findings - 2026-07-13
+
+### Mechanic Lab Boundaries
+
+- The active product is a mechanic design and experience lab. After recent merges the registry contains 18 definitions: 11 playable (`base`, `question-passenger`, `garage`, `star-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`, `upgrade-spot`, `double-gate`, `maglev-spot`) and 7 planned.
+- Each `src/mechanics/*/index.js` owns its mechanic identity, metadata, status, and optional runtime/detail hooks; `src/mechanics/index.js` is the assembled module source of truth. `src/mechanic-registry.js` derives the frozen metadata collection and provides lookup, fallback, and search.
+- `src/mechanic-library.js` owns list/detail DOM and responsive drawer behavior. It consumes registry data and must not implement gameplay rules.
+- `src/mechanic-lab.js` owns URL selection helpers and safe storage removal. `src/main.js` assembles the current base runtime and freezes input for planned mechanisms.
+- New mechanism behavior should live behind an isolated module boundary and reuse base runtime contracts. Do not grow a large mechanism switch inside `src/main.js`.
+- A mechanism stays `planned` until its real play loop, focused tests, and browser QA are complete.
+- The lab is no longer a continuation path for playable-ad production. New mechanics do not require production minification/bundling, final-single-page dependency collection, Vite/Three.js delivery verification, or advertising-package checks; Vite remains only a local browser-playtest server.
+
+### Question-Passenger Rules And Architecture
+
+- Question state changes waiting-stage visibility only. Real `colorIndex`, queue order, matching, boarding, vehicle departure, and win/fail rules remain unchanged.
+- `chance` mode assigns each new queue group independently and defaults to 0.3; reset rerolls question positions. `authored` mode reads only `level.mechanics['question-passenger'].authoredMasks` and does not call random. The merged level18 data currently omits that mask, so authored question assignment has no active marks until the level data is reconciled.
+- Authored summaries and assignments ignore mask rows/items beyond the actual `passengerQueues`; missing entries remain non-question groups.
+- Mode/chance controls are page-session state only: switching away and back retains them, while refresh restores chance/30%. They are not stored or added to the URL.
+- Active `setMechanicOptions` rebuilds the runtime and resets exactly once. Scene reveal de-duplication uses passenger ID plus `revealVersion`; `resetVersion` clears transient state when passenger IDs are reused.
+- Hidden waiting groups use a neutral-gray material and four question badges. Belt groups always show real color and receive one non-blocking reveal. The reduced-motion branch keeps color/brightness/fade while removing scale/pop/expanding-flash transforms.
+- Browser QA exercised a live forced reduced-motion branch because the in-app browser lacked native media-feature emulation; this is not evidence of native OS preference emulation.
+
+### Linked-Passengers Released Rules And Architecture
+
+- `linked-passengers` is playable after focused automated, desktop, mobile, capacity-pressure, and reduced-motion browser gates passed.
+- A chain contains 2–N consecutive same-color passenger rows, capped by the level's largest vehicle capacity. It is atomic at the visible-queue boundary, belt entry, and boarding.
+- Chance mode defaults to 30% with a configurable maximum length; authored mode uses per-queue integer arrays whose nonzero start value is the chain length. Settings are page-session only.
+- Chains occupy N consecutive belt slots, allow ring wrap, and board when the head crosses the exit only if one matching arrived vehicle has N remaining seats.
+- The selected visual is a segmented top connector with a chain-length badge; successful boarding uses one non-blocking synchronized fan-in event, with a no-translation reduced-motion branch.
+- Composite runtimes must forward generic batch hooks and retain scalar fallback; the game model must not branch on the `linked-passengers` ID.
+- Authored-chain summaries derive from authored level data and remain independent of the active chance value.
+- Scene transient connector/boarding state is cleared by `resetVersion` because passenger IDs can be reused after reset.
+- The linked and shared-architecture gate passes 34/34. Full `pnpm test` runs 155 tests with 148 passing; the remaining 7 are the user-approved B baseline from question/garage/registry integration, and none is a linked regression. Production build and advertising packaging are not part of this mechanic-lab gate.
+
+### Runtime Asset Naming
+
+- Dependency caches, accidental system files, and transient logs are not project sources and are ignored.
+- Runtime assets remain under `public/assets/runtime/`; Unity provenance assets remain under `public/assets/unity/`.
+- Runtime asset paths must use neutral names. Advertising platform names are not runtime ownership boundaries.
+- `src/level-data.js` is the primary asset URL inventory; `src/scene-view.js` directly owns the runtime guide-hand URL.
+- Existing FBXLoader material warnings remain. Four Unity texture references currently resolve to the HTML fallback rather than image bytes: `Idle_girl01_pink.png`, `img_v3_0212c_69706fc5-c18e-4959-86cf-3f9625ee0fdg.png`, `Idle_boy02_blue.png`, and `Car_P2.png`; do not invent replacements without source assets.
+
+### Persistent Editor And Authored Defaults
+
+- The scene editor is a permanent lab tool and defaults to collapsed; it is no longer stripped from a production-oriented runtime path.
+- `src/main.js` clones `SCENE_TUNING` before any saved override is merged. Reset therefore returns to authored source values instead of values already mutated during the session.
+- `src/scene-tuning.js` is the authored runtime truth; `artifacts/scene-tuning.json` is its exact export counterpart.
+
+### Safe Storage
+
+- Scene tuning uses `bus-loop-scene-tuning-v3`; legacy `v2` data is migrated without replacing the current `vehicleArea` object wholesale.
+- Storage reads, JSON parsing, writes, and removal are exception-safe. Failure should warn and leave the lab usable.
+- Tuning writes are debounced and flushed on unload; explicit save can flush immediately.
+- Mechanic selection is represented by `?mechanic=` rather than sharing the tuning storage key. Unknown IDs resolve to `base`.
 
 ### Active Level Layout
 
-- The playable now targets imported level12-style data for `GameSceneDualQueue2` rather than the original 6-vehicle level1 prototype.
-- Active data has 94 visible vehicles, two fixed queues with 219 groups each, and authored `vehicleDepthes` blocker data for 90 vehicles.
-- Vehicle seat totals match fixed passenger queue totals by color. Initial movable vehicles are `1, 4, 34, 51`.
+- The base mechanism now targets imported level18 `GameSceneDualQueue2` data rather than earlier prototypes. Active data includes 47 vehicles, two fixed queues (115 and 191 groups), CSV-sourced `vehicleDepthes` blocker relationships, and two garage containers with stocked vehicles. A duplicate `})` introduced during the merge was removed and `src/level-data.js` now passes syntax checks.
 
-### Conveyor / Passenger Entry Parity
+### Conveyor And Passenger Entry
 
-- Unity conveyor progress is based on actual spline path length: initial fill uses passenger speed, normal belt motion uses conveyor speed, both divided by spline length.
-- Unity queue supply waits until the queue head is ready. During initial fill, empty belt slots clamp just before the entry with `InitialEntryOffsetPercent = 0.0001` until a passenger can enter.
-- Web should reuse the full queue-entry visual path for both initial-fill and later refill groups.
+- Unity conveyor progress is based on actual spline path length: initial fill uses passenger speed and normal belt motion uses conveyor speed, both divided by spline length.
+- Queue supply waits until the head is ready. During initial fill, empty belt slots clamp just before the entry until a passenger can enter.
+- The web runtime reuses the full queue-entry visual path for initial-fill and later refill groups.
 
-### Vehicle / Passenger Materials
+### Materials, Effects, Audio, And Shadows
 
-- Vehicle prefabs use full Unity color atlases; authored model UVs should remain active for window/light/body regions.
-- Passenger prefabs are color-specific materials/textures rather than simple runtime swatches. Unity materials combine `_MainTex`, `_BaseCol`, and `_EmissionCol` through `AnimSimpleLit`.
-- Current web tuning exposes passenger material color/brightness controls for parity adjustment.
+- Vehicle prefabs use full Unity color atlases; authored model UVs remain active for windows, lights, and body regions.
+- Passenger prefabs are color-specific materials/textures rather than simple runtime swatches. Current tuning also supports solid-color adjustment while retaining VAT animation data.
+- Core audio is wired for collision, passenger boarding, and full-vehicle departure.
+- Collision, smoke trail, ribbon, and boarding effects retain Unity-authored source relationships.
+- Authored fake shadows are the active solution; the heavier real-time Three.js shadow-map experiment was removed.
 
-### Effects / Audio / Shadows
+### Camera And Motion
 
-- Effect_Hit uses ParticleHit_2/Circle_01_Add, ParticleHit_1/Round_02_Add, and ParticleHit/Round_01_Add at vehicle collision contact.
-- Effect_SmokeTrail uses ParticleTrail/Round_01_Alp as a looping moving-vehicle trail.
-- Core audio clips are wired for collision, passenger boarding, and full-vehicle departure.
-- Real-time Three.js shadow maps were removed after experimentation; authored fake shadows are the active shadow layer.
+- Current authored camera behavior keeps configured visible height across viewport aspects; wider screens reveal more horizontal content.
+- Phone preview framing is an editor tool and must not be confused with the actual responsive stage dimensions during browser QA.
+- Vehicle arrows move with the vehicle hit root. Collision and station paths remain owned by `src/vehicle-motion.js` and tuning.
 
-### AppLovin Packaging
+### Unity Garage Mechanic Extraction
 
-- When inserting large inlined JS/CSS strings into HTML, use function replacers with `String.replace`; plain replacement strings interpret minified `$&` sequences and can inject the matched `</head>` text into the bundle, causing `SyntaxError: Unexpected token '<'` and a loading screen stuck at 0%.
-- Editor tuning saved in browser `localStorage` is not a delivery artifact. Before AppLovin packaging, export the tuning JSON and apply it into `src/scene-tuning.js`; the AppLovin single HTML should not include the scene editor UI or editor code.
-- Production/AppLovin runtime must not restore editor tuning from `localStorage`; stale platform-preview storage can override newly baked camera/CTA adaptation values and make repeated package changes appear unchanged on device.
-- iOS AppLovin store jumps should use `itms-apps://itunes.apple.com/app/id6746743297` as the first MRAID URL, with the `https://apps.apple.com/app/id6746743297` link retained as a fallback. The static AppLovin checker now verifies the direct iOS scheme is present.
-- The 10-vehicle install gate must fire from a successful vehicle dispatch user gesture on real devices; waiting until an asynchronous arrival/frame update can lose the MRAID-open gesture context.
+- Unity garage behavior is owned by `VehicleContainerGarage`, `StateOutGarage`, and `GarageContainerCollideInfo`; the prefab provides `InitPos`, `BusObject`, `uiPos`, `ParkPos`, an animator, and a feedback player.
+- Garage stock is built from level vehicles with `containerType == Garage` and matching `containerId`; vehicles are stored hidden and released one at a time when the door/front is clear.
+- The displayed garage count subtracts the currently driving-out vehicle immediately, before the out animation completes.
+- Unity models garage blocking through five graph nodes: head, tail, door, out path, and body. A web first pass can approximate this through the existing blocker model, but the durable rule is that the garage door and out path must block/release sequentially.
+- Full extraction notes are recorded in `docs/superpowers/specs/2026-07-13-garage-unity-extraction.md`.
 
-### Camera / Screen Adaptation
+### Web Garage Implementation
 
-- Current trial design-cover behavior is fixed visible height: `camera.fitHeight` remains the vertical visible height across viewport aspects. With `fitHeight: 14.9`, short/wide screens keep visible height 14.9 and only reveal more horizontal content.
-- The phone preview frame is an editor-only tool. Production/AppLovin must not add `is-phone-preview`, otherwise CSS can force the stage back to the 1080x2160 design aspect and prevent camera adaptation from seeing the real device/container aspect.
+- `garage` is now playable in the web mechanic lab. The first pass stores matching garage vehicles as hidden `in-garage` vehicles, releases them through `leaving-garage`, and returns them to normal `parked` state after the out duration.
+- Garage containers are also treated as an automatic level feature. Any level with `type: 2` garage containers enables the garage runtime alongside the selected playable mechanic, so the default `base` view still hides stocked garage vehicles and renders garage snapshots.
+- Garage release does not reuse the ordinary vehicle `vehicleDepthes` graph. That graph controls whether a visible vehicle can be clicked to leave the field; it must not stop the first hidden garage vehicle from spawning. On level18, the first stocked vehicles `38` and `60` enter `leaving-garage` on the first gameplay update. A full five-node garage collision graph remains a possible fidelity upgrade.
+- Garage drive-out uses Unity prefab anchors rather than hidden-stock layout coordinates: `BusObject` local `{ x: 0, z: -0.1748478 }` is the out animation start and `ParkPos` local `{ x: 0, z: 0.70000005 }` is the parking point after release. For level18 this parks vehicle `38` at `(-0.7070351, 0.33480565)` and vehicle `60` at approximately `(-0.03203511, 0.60617142)`. Released garage vehicles use dynamic collision blockers from their new position instead of stale authored `vehicleDepthes`.
+- Garage model visibility follows the displayed inside-stock count. When the last stocked vehicle begins `leaving-garage`, the counter reaches `0` and the garage snapshot is marked hidden, while the exiting vehicle continues its own drive-out animation.
+- The scene renders garage snapshots with the Unity `Truck_01.fbx` model. The web renderer preserves source material slot names, uses `Truck_Main_DarkBlue.png` for the body and `Truck_Metal_Matcap.png` through `MeshMatcapMaterial` for metal parts, and applies garage model axis correction before sizing. The simple geometry remains only as a no-asset fallback.
+- Garage container coordinates are still parsed from authored `containers[].position.x/z`, while container rotation is converted from the Unity quaternion to yaw. Rendering maps those through `vehicleArea` transforms; model pitch/roll correction is a local asset-orientation fix and should not be baked back into level data.
+- Garage audio events are named `garage_out` and `garage_clear`; they are silent unless future audio config provides matching clips.
 
-### Vehicle Arrow / Motion
+### Web Count Garage Implementation
 
-- Bus prefab hierarchy treats Arrow as part of the vehicle visual. Web hit clips should move the vehicle model and arrow under one shared hit root.
-- Arrow outline parity is approximated with a dark outline layer behind the white Arrow_01 geometry.
+- `count-garage` is playable in the web mechanic lab. It reuses the garage hidden-stock/release runtime with per-garage unlock thresholds.
+- Successful `clickVehicle` dispatches increment the count-garage unlock counter. Garage id `1` unlocks after 10 successful vehicle dispatches; garage id `2` unlocks after 20.
+- Locked count garages keep their stocked vehicles hidden as `in-garage` and block release. Their garage label uses a dark lock-shaped badge and displays remaining unlock count; once unlocked, the label returns to the ordinary yellow stock-count badge and release follows the existing one-at-a-time garage rules.
+- The count-garage runtime declares that it handles garage containers, so selecting `count-garage` does not also stack the default auto-enabled `garage` feature runtime.
+
+### Web Valve Implementation
+
+- `valve` is playable in the web mechanic lab. It adds a model-level `canPassengerEnterBelt` gate so mechanic modules can decide whether an empty conveyor slot may receive a passenger from a side entry.
+- Valve state is side-based, not player-toggle based. During initial conveyor fill, both side queues can enter normally and switching has not started. After initial fill completes, the valve starts on entry `0` when that side still has supply, locks to that side's current queue-head color, and switches to the next side after that visible same-color run has entered the belt.
+- Closed side entries do not clamp initial conveyor fill because closed-side gating only applies after the initial-fill phase.
+- The scene renders lightweight valve markers at `LEVEL_1.entryPercents`, using open/closed door rotation and the current/head color as the marker color. No new art asset is required for this first playable pass.
+- Browser QA on 2026-07-13 confirmed the selected valve card, nonblank canvas, visible left/right entrance markers, collapsed mobile drawers at 390x844, and no console errors.
+
+### Web Order Passenger Implementation
+
+- `order-passenger` is playable in the web mechanic lab. It replaces the level-completion goal with a mechanic-owned order goal: finish all red, yellow, and brown passenger groups.
+- The order target counts are derived from the active level queues and displayed as passenger counts by multiplying group counts by `level.groupSize` (4 in level18). Current level18 order totals are red `184`, yellow `224`, and brown `176`.
+- The base model exposes a mechanic runtime `hasWon(game)` hook. `order-passenger` uses it to end the level as soon as all three order targets reach zero, even if unrelated vehicles/passengers remain.
+- The order HUD lives in `src/mechanics/order-passenger/view.js` and renders a top stage panel with color passenger icons plus remaining passenger counts. It only appears while the selected mechanic is `order-passenger`.
+- Browser QA on 2026-07-13 confirmed the selected order-passenger card, top order HUD, level18 counts `184/224/176`, nonblank canvas, collapsed mobile drawers at 390x844, and no console errors.
+
+### Web Capacity Mechanics Implementation
+
+- `upgrade-spot` and `double-gate` are now separate playable mechanisms fixed to the first parking spot.
+- `upgrade-spot` doubles the effective passenger-group capacity for the vehicle assigned to the first spot while preserving the original vehicle model sizing.
+- `double-gate` keeps vehicle capacity unchanged, but each passenger group boarding through the first spot consumes two capacity groups. A 10-seat vehicle therefore departs after boarding 5 groups there.
+- Seat-count boards read mechanic-adjusted effective capacity and boarding-cost contribution, so upgraded capacity and double-cost boarding display remaining passengers correctly.
+- Scene feedback is distinct: upgrade spot uses a cyan ring, upward green marker, and `UP` label; double gate uses orange/red gate posts, doors, and an `x2` label.
+- Browser QA on 2026-07-14 confirmed both markers on desktop and 390x844 mobile, nonblank canvas, selected playable cards, collapsed mobile drawer, hidden planned overlay, and no page error logs.
+
+## Historical Advertising Packaging - Removed
+
+- The advertising package, platform-specific runtime assets, CTA/store flow, install gate, MRAID startup path, package scripts, static package checker, and generated package artifacts were removed in commit `8f78492`.
+- Earlier inline-HTML replacement, store-routing, and package-cache findings apply only to archived advertising-delivery history. They are not requirements for the mechanic lab.
+- Historical platform and delivery documents remain available for provenance under `docs/platforms/`, `docs/playable/`, and `docs/project/archive/`.
 
 ## Archive
 

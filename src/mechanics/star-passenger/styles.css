@@ -1,0 +1,182 @@
+.star-reward-hud {
+  position: absolute;
+  z-index: 6;
+  top: 18px;
+  left: 50%;
+  width: min(224px, calc(100% - 132px));
+  padding: 8px 10px 9px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(151, 126, 52, .58);
+  border-radius: 6px;
+  color: #2c3024;
+  background: rgba(255, 250, 229, .92);
+  box-shadow: 0 8px 20px rgba(45, 44, 30, .14);
+  pointer-events: none;
+}
+
+.star-reward-hud[hidden] { display: none; }
+
+.star-reward-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.star-reward-label {
+  margin: 0;
+  color: #7b6421;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+#star-reward-count {
+  color: #2d352b;
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.star-reward-progress {
+  height: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(121, 102, 43, .42);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .78);
+}
+
+.star-reward-progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #f1b33d, #ffd96c);
+  transition: width .22s ease;
+}
+
+.star-reward-fly {
+  position: absolute;
+  z-index: 15;
+  left: 50%;
+  top: 68%;
+  color: #ffd45a;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 2px 0 #8c6420, 0 5px 12px rgba(88, 61, 14, .35);
+  pointer-events: none;
+  animation: star-reward-fly .72s ease-in forwards;
+}
+
+@keyframes star-reward-fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(.72);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -12vh) scale(1.08);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -54vh) scale(.5);
+  }
+}
+
+.star-reward-hud.is-charge-complete {
+  animation: star-charge-hud-pulse 1s cubic-bezier(.2, .9, .25, 1);
+}
+
+.star-reward-hud.is-charge-complete .star-reward-progress-bar {
+  background: linear-gradient(90deg, #f2a62d, #fff08b 55%, #f6b32f);
+  background-size: 220% 100%;
+  box-shadow: 0 0 12px rgba(255, 206, 62, .9), 0 0 26px rgba(255, 191, 38, .55);
+  animation: star-charge-sweep .55s linear 2;
+}
+
+.star-charge-celebration {
+  position: absolute;
+  z-index: 18;
+  inset: -44px -34px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.star-charge-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70px;
+  height: 70px;
+  border: 4px solid rgba(255, 215, 74, .84);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(.3);
+  opacity: 0;
+  animation: star-charge-ring 1s ease-out forwards;
+}
+
+.star-charge-particle {
+  --particle-distance: 68px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: #ffc83d;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+  text-shadow: 0 2px 0 #895f11, 0 0 8px rgba(255, 226, 105, .9);
+  transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateY(0) scale(.5);
+  animation: star-charge-particle .9s cubic-bezier(.15, .75, .22, 1) forwards;
+  animation-delay: calc(var(--particle-index) * 12ms);
+}
+
+.star-charge-particle.is-star {
+  color: #fff3a4;
+  font-size: 17px;
+}
+
+@keyframes star-charge-hud-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  22% { transform: translateX(-50%) scale(1.08); }
+  48% { transform: translateX(-50%) scale(.98); }
+  70% { transform: translateX(-50%) scale(1.035); }
+}
+
+@keyframes star-charge-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@keyframes star-charge-ring {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.3); }
+  22% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.6); }
+}
+
+@keyframes star-charge-particle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateY(0) scale(.5);
+  }
+  18% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateY(calc(var(--particle-distance) * -1)) scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star-reward-progress-bar {
+    transition: none;
+  }
+
+  .star-reward-hud.is-charge-complete,
+  .star-reward-hud.is-charge-complete .star-reward-progress-bar,
+  .star-charge-ring,
+  .star-charge-particle,
+  .star-reward-fly {
+    animation-duration: .01ms;
+    animation-iteration-count: 1;
+  }
+}

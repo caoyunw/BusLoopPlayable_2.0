@@ -1,15 +1,18 @@
 {
-  "name": "bus-loop-playable-prototype",
+  "name": "bus-loop-mechanic-lab",
+  "description": "BusLoop gameplay mechanic design and experimentation lab",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:rotary-editor": "vite --host 127.0.0.1 --open /tools/rotary-level-editor/",
     "build": "vite build",
+    "package:mechanic-lab": "pnpm run build && node scripts/package-mechanic-lab-single-html.mjs && node scripts/check-mechanic-lab-single-html.mjs",
+    "check:mechanic-lab": "node scripts/check-mechanic-lab-single-html.mjs",
     "apply:tuning": "node scripts/apply-scene-tuning.mjs",
-    "check:applovin": "node scripts/check-applovin-package.mjs",
-    "package:applovin": "node scripts/package-applovin-single-html.mjs",
     "preview": "vite preview --host 127.0.0.1",
+    "rotary:level": "node scripts/rotary-level.mjs",
     "test": "node --test"
   },
   "dependencies": { "three": "^0.180.0" },

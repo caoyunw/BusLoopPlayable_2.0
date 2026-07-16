@@ -1,6 +1,80 @@
 # Playable Project Progress
 
-## Current Snapshot - 2026-07-08
+## Current Snapshot - 2026-07-13
+
+The active project is now the BusLoop mechanic lab, not an advertising playable. The lab is for designing and experiencing gameplay mechanisms and contains no active advertising package flow or store redirect.
+
+### Mechanic Lab Foundation
+
+- The registry contains 18 mechanism definitions: 11 playable (`base`, `garage`, `star-passenger`, `question-passenger`, `linked-passengers`, `valve`, `order-passenger`, `count-garage`, `upgrade-spot`, `double-gate`, `maglev-spot`) and 7 planned.
+- The shell provides a searchable mechanism library, desktop three-column layout, mobile drawers, mechanism detail/overlay states, `?mechanic=` selection, invalid-ID fallback, and planned-mechanic input freeze.
+- The base runtime, active level18 data, Three.js scene, audio, win/fail/reset flow, QA API, and scene editor remain available.
+- Scene tuning now preserves authored defaults before applying local overrides; storage read/write/migration/removal failures are non-fatal.
+
+### Star-Passenger Feedback
+
+- Star badges show `3/2/1` remaining exit passes and one `-1` per crossing; the third crossing expires only the reward.
+- Boarding advances a repeatable `0/20` charge. Completion holds `20/20` during the celebration, resets to `0/20`, and continues at `1/20` on the next reward.
+- The feedback supports reduced motion. The design and implementation plans remain completed references.
+
+### Question-Passenger
+
+- Waiting-queue groups can use independent 30% chance assignment or a fixed authored mask. The merged level18 data currently has no question authored marks.
+- Hidden groups keep their models and shadows, use neutral-gray materials with four readable question badges, and reveal their real color once on entering the belt. True color order and base boarding/win/fail rules are unchanged.
+- Chance resets reroll only question positions; authored resets remain fixed. Mode/chance options persist only for the page session, survive switching away and back, and return to chance/30% on refresh.
+- Reveal de-duplication uses passenger identity plus `revealVersion`; reset generations clear transient reveal state. The reduced-motion branch preserves color/brightness/fade feedback without scale or expanding-flash transforms.
+
+### Garage Mechanic
+
+- `garage` is now a playable runtime mechanic instead of a planned card. Hidden vehicles are stocked by container and release one at a time; the visible counter decrements when a vehicle begins exiting and the model hides when count reaches `0`.
+
+### Valve Mechanic
+
+- `valve` is now a playable runtime mechanic instead of a planned card. After initial conveyor fill only the currently open side may feed its same-color run; the valve switches automatically after that run completes. Entrance markers render at both entry points.
+
+### Count Garage Mechanic
+
+- `count-garage` is a dispatch-count-gated garage variant that unlocks per configured thresholds and reuses the garage one-at-a-time flow.
+
+### Capacity And Maglev Mechanics
+
+- `upgrade-spot` and `double-gate` are playable first-parking-spot capacity mechanics. Upgrade spot doubles effective capacity; double gate keeps capacity unchanged but makes each boarded group consume two capacity groups.
+- `maglev-spot` is playable for vehicles `28`, `35`, `33`, `50`, `39`, `58`, `41`, and `52`. Every successful dispatch toggles raised/lowered state; raised maglev vehicles do not block ground vehicles and cannot be dispatched. Vehicles `31` and `48` remain ordinary vehicles.
+- The scene uses compact square maglev spot markers and hides the marker as soon as its vehicle starts moving to a parking spot.
+
+### Active Level18 Configuration
+
+- The active runtime level is `GameSceneDualQueue2` level18 with 47 vehicles, two fixed queues of 115 and 191 passenger groups, and 306 total passenger groups. The level includes two garage containers and stocked garage vehicles where provided.
+
+### Unity Collision Parity
+
+- Vehicle dispatch now follows the Unity decision order: parked-state gate, available parking spot, mechanic/shape gate, collision-context decision, then spot reservation and station motion.
+- Runtime blocking no longer consumes the exported full-depth chain. An isolated collision context builds current 500-unit forward SAT edges from per-size vehicle footprints and returns direct collision candidates.
+- Collision feedback uses current rotated vehicle/container boxes and edge-contact geometry. Garage body/door/out-path helper nodes and optional conveyor lateral-interval/wall semantics participate in the same context.
+- Level18 exposes explicit 4/6/10-seat and garage collision footprints derived from existing authored web dimensions and validated against the known Unity initial movable set. The legacy `vehicleDepthes` data remains only for provenance/debug comparison.
+
+### Linked-Passengers
+
+- Same-color passenger rows can form chains of 2 through the configured maximum length in independent 30% chance mode, or use level18-authored start arrays. The authored configuration contains 12 chains covering 66 rows.
+- Chains remain atomic when admitted to a visible queue, entering and wrapping around the belt, and boarding. A matching arrived vehicle must have room for the entire chain; insufficient capacity never splits it.
+- The scene shows segmented top connectors and a head `xN` badge, then uses one aggregate boarding event. Page-session mode/chance/maximum-length settings survive mechanic switching and reset to 30%/10 on refresh.
+- Composite runtimes forward the generic batch hooks and preserve scalar fallback, so linked passengers remain compatible with level18 garage behavior without a linked-specific branch in the game model.
+
+### Advertising Cleanup And Runtime Assets
+
+- CTA/store routing, install gates, MRAID startup, advertising package scripts/checkers, generated package artifacts, and platform-specific runtime ownership were removed.
+- Active compressed web assets moved to neutral `/assets/runtime/...` paths. Unity source/export assets remain under `/assets/unity/...`.
+- Historical platform and playable-delivery documents remain for provenance but are no longer the default workflow.
+
+### Verification
+
+- Focused verification highlights: collision parity 11/11, garage 7/7, maglev 4/4, capacity 4/4, count-garage 2/2, valve 5/5, and order-passenger 4/4 passed. The paired game-model collision assertions pass; that file retains three documented unrelated question/asset baseline failures. `pnpm run build` has historically passed with a known non-blocking chunk-size warning. Full suite and build should only be run when explicitly requested; focused checks are the default verification path.
+
+## Historical Playable/Advertising Log
+
+The entries below describe the repository before or during the conversion to the mechanic lab. They are retained as implementation history and are not the current SOP.
+
+### Historical Snapshot - 2026-07-08
 
 The project moved from the original 6-vehicle level1 prototype to the imported level12-style playable layout on 2026-07-07. The active runtime now targets `GameSceneDualQueue2` with 94 visible vehicles, two fixed passenger queues, authored depth blockers, Unity-style motion/effects/audio, and editor controls for major visual tuning.
 
@@ -237,19 +311,19 @@ The project moved from the original 6-vehicle level1 prototype to the imported l
 - Added directional-light/editor controls, passenger material controls, vehicle arrow outline controls, and Map Scale editor naming.
 - Restored bus/van fake shadow sizing and removed the bottom operation toast while preserving gameplay events/audio/end panel.
 
-## Current Verification State
+## Historical Verification State — 2026-07-07
 
 - Many touched files passed `node --check` during the 2026-07-07 sessions.
 - Several targeted tests passed with elevated execution where sandboxed Node child process spawning hit `EPERM`.
 - Some full test/build runs passed with the existing Vite `>500 kB` chunk warning.
 - Later queue/conveyor full-suite verification was blocked by existing blocker-test expectation failures and then by usage-limit rejection for elevated build execution.
 
-## Current Risks / Open Follow-Up
+## Historical Risks / Follow-Up From Playable Phase
 
-- Re-check current full `node --test` when the environment allows child-process spawning reliably.
-- Revisit existing blocker expectation failures around querying blockers while a vehicle is colliding.
-- Manually compare current level12 gameplay, passenger entry, effects, audio timing, fake shadows, and material colors against Unity reference.
-- Keep platform packaging paused until the AppLovin baseline visual/playability pass is accepted.
+- At that point, the playable project still needed a full `node --test` re-check when the environment allowed child-process spawning reliably.
+- Existing blocker expectation failures around querying blockers while a vehicle is colliding still needed investigation.
+- Level12 gameplay, passenger entry, effects, audio timing, fake shadows, and material colors still needed comparison against the Unity reference.
+- Platform packaging was intentionally paused during the old AppLovin playable phase; it is no longer part of the active mechanic-lab workflow.
 
 ## Archive
 

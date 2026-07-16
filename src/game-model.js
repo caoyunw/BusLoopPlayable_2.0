@@ -7,17 +7,80 @@ import {
   buildRoundedPath,
   buildToStationPoints,
   evaluateUnityCurve,
-  getCollisionDistance,
   getCollisionMotion,
   getHitDirection,
   getStationMotion
 } from './vehicle-motion.js';
+import {
+  createVehicleCollisionContext,
+  findCollisionContact
+} from './vehicle-collision.js';
+import {
+  createMechanicRuntime,
+  resolvePlayableMechanicId
+} from './mechanics/index.js';
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 const wrap01 = (value) => ((value % 1) + 1) % 1;
 const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 const INITIAL_ENTRY_OFFSET_PERCENT = 0.0001;
 const PASSENGER_READY_DISTANCE_THRESHOLD = 0.02;
+
+function normalizeQueueCapacity(value, maximum) {
+  const fallback = Number.isFinite(maximum) ? Math.max(0, Math.floor(maximum)) : 0;
+  const numeric = Number(value);
+  return clampNumber(
+    Number.isFinite(numeric) ? Math.floor(numeric) : fallback,
+    0,
+    fallback
+  );
+}
+
+function isDenseQueuePrefix(queue, batch) {
+  if (!Array.isArray(queue) || !Array.isArray(batch) || batch.length === 0 || batch.length > queue.length) {
+    return false;
+  }
+  for (let index = 0; index < batch.length; index += 1) {
+    if (!Object.hasOwn(batch, index) || batch[index] !== queue[index]) return false;
+  }
+  return true;
+}
+
+function isDenseSlotBatch(slots, batch, headSlot) {
+  if (!Array.isArray(batch) || batch.length === 0 || batch[0] !== headSlot) return false;
+  const seen = new Set();
+  for (let index = 0; index < batch.length; index += 1) {
+    if (!Object.hasOwn(batch, index)) return false;
+    const candidate = batch[index];
+    if (
+      !candidate
+      || !Number.isInteger(candidate.index)
+      || slots[candidate.index] !== candidate
+      || seen.has(candidate)
+    ) return false;
+    seen.add(candidate);
+  }
+  return true;
+}
+
+function cloneSnapshotValue(value, seen = new WeakMap()) {
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) return seen.get(value);
+  if (Array.isArray(value)) {
+    const clone = [];
+    seen.set(value, clone);
+    for (const item of value) clone.push(cloneSnapshotValue(item, seen));
+    return clone;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  const clone = Object.create(prototype);
+  seen.set(value, clone);
+  for (const [key, item] of Object.entries(value)) {
+    clone[key] = cloneSnapshotValue(item, seen);
+  }
+  return clone;
+}
 
 function visualToVehicleAreaPoint(x, z) {
   const area = SCENE_TUNING.vehicleArea;
@@ -44,66 +107,56 @@ function visualYawToVehicleAreaYaw(yawDegrees) {
   return area.mirrorZ ? 180 - local : local;
 }
 
-function vehicleForward(vehicle) {
-  const yaw = vehicle.yaw * Math.PI / 180;
-  return { x: Math.sin(yaw), z: Math.cos(yaw) };
-}
-
-function vehicleRight(forward) {
-  return { x: forward.z, z: -forward.x };
-}
-
-function dot(a, b) {
-  return a.x * b.x + a.z * b.z;
-}
-
-function makeVehicleBox(vehicle, dimensions, scanForward = false) {
-  const forward = vehicleForward(vehicle);
-  const right = vehicleRight(forward);
-  const length = scanForward ? 500 : dimensions.length;
-  const centerOffset = scanForward ? (length - dimensions.length) * 0.5 : 0;
-  return {
-    center: {
-      x: vehicle.x + forward.x * centerOffset,
-      z: vehicle.z + forward.z * centerOffset
-    },
-    forward,
-    right,
-    halfLength: length * 0.5,
-    halfWidth: dimensions.width * 0.5
-  };
-}
-
-function projectedRadius(box, axis) {
-  return Math.abs(dot(box.forward, axis)) * box.halfLength
-    + Math.abs(dot(box.right, axis)) * box.halfWidth;
-}
-
-function overlapsOnAxis(a, b, axis) {
-  const delta = { x: b.center.x - a.center.x, z: b.center.z - a.center.z };
-  return Math.abs(dot(delta, axis)) <= projectedRadius(a, axis) + projectedRadius(b, axis);
-}
-
-function blocksVehicleExit(attacker, candidate, dimensions) {
-  const exitBox = makeVehicleBox(attacker, dimensions, true);
-  const candidateBox = makeVehicleBox(candidate, dimensions);
-  return [
-    exitBox.right,
-    exitBox.forward,
-    candidateBox.right,
-    candidateBox.forward
-  ].every((axis) => overlapsOnAxis(exitBox, candidateBox, axis));
-}
-
-
 export class BusLoopGame {
-  constructor(level = LEVEL_1) {
+  constructor(level = LEVEL_1, options = {}) {
     this.level = level;
     this.listeners = new Set();
+    this.random = typeof options.random === 'function' ? options.random : Math.random;
+    this.mechanicOptions = {
+      ...(options.mechanics ?? {}),
+      ...(options.starPassenger ? { 'star-passenger': options.starPassenger } : {})
+    };
+    this.resetVersion = 0;
+    this.configureMechanic(options.mechanicId);
     this.reset();
   }
 
+  getMechanicId() {
+    return this.mechanicId;
+  }
+
+  setMechanic(id) {
+    const next = resolvePlayableMechanicId(id);
+    if (next === this.mechanicId) return false;
+    this.configureMechanic(next);
+    this.reset();
+    return true;
+  }
+
+  setMechanicOptions(id, options = {}) {
+    this.mechanicOptions[id] = {
+      ...(this.mechanicOptions[id] ?? {}),
+      ...options
+    };
+    if (id !== this.mechanicId) return false;
+    this.configureMechanic(id);
+    this.reset();
+    return true;
+  }
+
+  configureMechanic(id) {
+    this.mechanicId = resolvePlayableMechanicId(id);
+    this.mechanicRuntime = createMechanicRuntime(this.mechanicId, {
+      level: this.level,
+      random: this.random,
+      level: this.level,
+      mechanicOptions: this.mechanicOptions,
+      options: this.mechanicOptions[this.mechanicId] ?? {}
+    });
+  }
+
   reset() {
+    this.resetVersion += 1;
     this.time = 0;
     this.status = 'playing';
     this.speedMultiplier = 1;
@@ -112,14 +165,21 @@ export class BusLoopGame {
     this.nextPassengerId = 1;
     this.initialFillActive = true;
     this.initialFilledSlotIndices = new Set();
+    this.mechanicState = this.mechanicRuntime.createState?.(this) ?? {};
     this.conveyorPathLength = Math.max(0.0001, this.level.conveyorPathLength ?? 1);
     const authoredQueues = this.level.passengerQueues ?? [this.level.passengerSequence];
     this.queueSpacing = this.level.passengerQueue?.spacing ?? 0.4;
     this.queueAvailableLengths = authoredQueues.map(() => Math.max(0, (this.level.queueCapacity - 1) * this.queueSpacing));
-    this.queues = authoredQueues.map((queue, queueIndex) => (
-      this.createQueueItems(queue.slice(0, this.level.queueCapacity), queueIndex)
+    const queueCapacities = authoredQueues.map(() => this.level.queueCapacity);
+    this.queueCapacities = queueCapacities.map((capacity) => (
+      normalizeQueueCapacity(capacity, this.level.queueCapacity)
     ));
-    this.sourceQueues = authoredQueues.map((queue) => queue.slice(this.level.queueCapacity));
+    this.queues = authoredQueues.map(() => []);
+    this.sourceQueues = authoredQueues.map((queue) => queue.slice());
+    this.sourceQueueIndices = authoredQueues.map(() => 0);
+    for (let queueIndex = 0; queueIndex < authoredQueues.length; queueIndex += 1) {
+      this.fillQueueFromSource(queueIndex, { initial: true });
+    }
     this.vehicles = this.level.vehicles.map((vehicle) => ({
       ...vehicle, state: 'parked', spotIndex: null, boardedGroups: 0, motion: 0,
       motionData: null, collision: null, hit: null
@@ -133,9 +193,13 @@ export class BusLoopGame {
       progress: wrap01(index / this.level.conveyorCapacity),
       previousProgress: wrap01(index / this.level.conveyorCapacity),
       colorIndex: null,
+      passengerId: null,
       entryIndex: null,
-      entryMotion: null
+      entryMotion: null,
+      ...this.createMechanicSlotData()
     }));
+    this.mechanicRuntime.afterReset?.({ game: this });
+    this.collisionContext = createVehicleCollisionContext(this.level);
     this.lastEvent = { type: 'reset' };
     this.emit();
   }
@@ -148,16 +212,16 @@ export class BusLoopGame {
       0,
       queueLengths[index] ?? ((this.level.queueCapacity - 1) * this.queueSpacing)
     ));
-    this.queues = authoredQueues.map((queue, index) => {
-      const capacity = Math.max(0, Math.min(
-        this.level.queueCapacity,
-        Math.floor(queueCapacities[index] ?? this.level.queueCapacity)
-      ));
-      return this.createQueueItems(queue.slice(0, capacity), index);
-    });
-    this.sourceQueues = authoredQueues.map((queue, index) => (
-      queue.slice(this.queues[index]?.length ?? 0)
+    this.queueCapacities = authoredQueues.map((_, index) => normalizeQueueCapacity(
+      queueCapacities?.[index] ?? this.level.queueCapacity,
+      this.level.queueCapacity
     ));
+    this.queues = authoredQueues.map(() => []);
+    this.sourceQueues = authoredQueues.map((queue) => queue.slice());
+    this.sourceQueueIndices = authoredQueues.map(() => 0);
+    for (let queueIndex = 0; queueIndex < authoredQueues.length; queueIndex += 1) {
+      this.fillQueueFromSource(queueIndex, { initial: true });
+    }
     this.lastEvent = { type: 'queues-initialized' };
     this.emit();
   }
@@ -176,15 +240,20 @@ export class BusLoopGame {
   snapshot() {
     return {
       time: this.time,
+      resetVersion: this.resetVersion,
       status: this.status,
       speedMultiplier: this.speedMultiplier,
       initialFillActive: this.initialFillActive,
       sourceRemaining: this.sourceQueues.reduce((sum, queue) => sum + queue.length, 0),
       queues: this.queues.map((queue) => queue.map((item) => item.colorIndex)),
-      queueItems: this.queues.map((queue) => queue.map((item) => ({ ...item }))),
+      queueItems: this.queues.map((queue) => queue.map((item) => ({
+        ...item,
+        ...this.cloneMechanicQueueItemSnapshot(item)
+      }))),
       queueRemaining: this.queues.map((queue) => queue.length),
       vehicles: this.vehicles.map((vehicle) => ({
         ...vehicle,
+        seatCapacity: this.getVehicleSeatCapacity(vehicle),
         motionData: vehicle.motionData ? { ...vehicle.motionData } : null,
         collision: vehicle.collision ? { ...vehicle.collision } : null,
         hit: vehicle.hit ? { ...vehicle.hit } : null
@@ -192,10 +261,12 @@ export class BusLoopGame {
       spots: this.spots.map((spot) => ({ ...spot })),
       slots: this.slots.map((slot) => ({
         ...slot,
-        entryMotion: slot.entryMotion ? { ...slot.entryMotion } : null
+        entryMotion: slot.entryMotion ? { ...slot.entryMotion } : null,
+        ...this.cloneMechanicSlotSnapshot(slot)
       })),
-      boardingEvents: this.boardingEvents.map((event) => ({ ...event })),
-      lastEvent: { ...this.lastEvent },
+      boardingEvents: cloneSnapshotValue(this.boardingEvents),
+      ...this.decorateMechanicSnapshot(),
+      lastEvent: cloneSnapshotValue(this.lastEvent),
       remainingGroups: this.getRemainingGroups(),
       remainingByColor: this.getRemainingByColor()
     };
@@ -216,63 +287,96 @@ export class BusLoopGame {
 
   getBlockers(id) {
     const vehicle = this.getVehicle(id);
-    if (!vehicle || vehicle.state !== 'parked') return [];
-    if (this.level.vehicleDepthes) {
-      const authoredBlockers = this.level.vehicleDepthes[id] ?? [];
-      return authoredBlockers.filter((blockerId) => {
-        const candidate = this.getVehicle(blockerId);
-        return candidate && ['parked', 'colliding'].includes(candidate.state);
-      });
-    }
-    // Unity scales both positions and Vehicle.Size by mapScale. The authored
-    // level plane is equivalent when both are left unscaled.
-    const dimensions = {
-      width: this.level.vehicleSize.width / this.level.mapScale,
-      length: this.level.vehicleSize.length / this.level.mapScale
-    };
-    return this.vehicles.filter((candidate) => {
-      if (candidate.id === id || !['parked', 'colliding'].includes(candidate.state)) return false;
-      return blocksVehicleExit(vehicle, candidate, dimensions);
-    }).map((candidate) => candidate.id);
+    if (!this.canMoveToStation(vehicle) || !this.canVehicleDispatch(vehicle)) return [];
+    return this.collisionContext.getCollisionCandidates(this, id).map((candidate) => (
+      candidate.type === 'vehicle'
+        ? candidate.id
+        : `container:${candidate.id}:${candidate.role}`
+    ));
   }
 
   clickVehicle(id) {
     if (this.status !== 'playing') return { ok: false, reason: 'finished' };
     const vehicle = this.getVehicle(id);
-    if (!vehicle || vehicle.state !== 'parked') return { ok: false, reason: 'unavailable' };
-    const blockers = this.getBlockers(id);
-    if (blockers.length > 0) {
-      // Level positions are authored before GameScene.VehicleScale is applied.
-      // Convert the scaled Unity collider dimensions back into that same plane.
-      const collisionSize = {
-        width: this.level.vehicleSize.width / this.level.mapScale,
-        length: this.level.vehicleSize.length / this.level.mapScale
-      };
-      const targets = blockers.map((blockerId) => this.getVehicle(blockerId));
-      const target = targets.sort((a, b) => (
-        getCollisionDistance(vehicle, a, collisionSize)
-        - getCollisionDistance(vehicle, b, collisionSize)
-      ))[0];
-      const distance = getCollisionDistance(vehicle, target, collisionSize);
+    if (!this.canMoveToStation(vehicle)) return { ok: false, reason: 'unavailable' };
+    const spot = this.spots.find((candidate) => candidate.vehicleId === null);
+    const hasMechanicDestination = Boolean(
+      this.mechanicRuntime.hasVehicleDestination?.({ game: this, vehicle })
+    );
+    if (!spot && !hasMechanicDestination) {
+      this.lastEvent = { type: 'spots-full', vehicleId: id };
+      this.checkEndState();
+      this.emit();
+      return { ok: false, reason: 'spots-full' };
+    }
+    if (!this.canVehicleDispatch(vehicle)) return { ok: false, reason: 'mechanic-disabled' };
+
+    if (!this.collisionContext.canVehicleDriveOut(this, id)) {
+      const candidates = this.collisionContext.getCollisionCandidates(this, id);
+      const blockers = candidates.map((candidate) => (
+        candidate.type === 'vehicle'
+          ? candidate.id
+          : `container:${candidate.id}:${candidate.role}`
+      ));
+      const contact = findCollisionContact(this.level, vehicle, candidates);
+      if (!contact) {
+        this.lastEvent = { type: 'blocked', vehicleId: id, blockers, targetId: null };
+        this.emit();
+        return { ok: false, reason: 'blocked', blockers };
+      }
+      const target = contact.candidate.vehicle ?? null;
+      const distance = contact.distance;
       const motion = getCollisionMotion(distance);
       Object.assign(vehicle, {
         state: 'colliding', motion: 0,
         collision: {
-          ...motion, targetId: target.id, elapsed: 0, offset: 0,
-          contactTriggered: false, hitDirection: getHitDirection(vehicle, target)
+          ...motion,
+          targetType: contact.candidate.type,
+          targetId: target?.id ?? null,
+          targetContainerId: contact.candidate.type === 'container' ? contact.candidate.id : null,
+          targetContainerRole: contact.candidate.role ?? null,
+          contactPosition: { ...contact.position },
+          elapsed: 0,
+          offset: 0,
+          contactTriggered: false,
+          hitDirection: target ? getHitDirection(vehicle, target) : null
         }
       });
-      this.lastEvent = { type: 'blocked', vehicleId: id, blockers, targetId: target.id };
+      this.lastEvent = {
+        type: 'blocked',
+        vehicleId: id,
+        blockers,
+        targetId: target?.id ?? null,
+        targetContainerId: contact.candidate.type === 'container' ? contact.candidate.id : null
+      };
       this.emit();
       return { ok: false, reason: 'blocked', blockers };
     }
-    const spot = this.spots.find((candidate) => candidate.vehicleId === null);
+
+    const mechanicDispatch = this.mechanicRuntime.dispatchVehicle?.({
+      game: this,
+      vehicle
+    });
+    if (mechanicDispatch?.handled) {
+      if (mechanicDispatch.event) this.lastEvent = mechanicDispatch.event;
+      if (mechanicDispatch.result?.ok) {
+        this.mechanicRuntime.onVehicleDispatched?.({
+          game: this,
+          vehicle,
+          destination: mechanicDispatch.destination
+        });
+      }
+      this.emit();
+      return mechanicDispatch.result;
+    }
+
     if (!spot) {
       this.lastEvent = { type: 'spots-full', vehicleId: id };
       this.checkEndState();
       this.emit();
       return { ok: false, reason: 'spots-full' };
     }
+
     spot.vehicleId = id;
     const target = this.getSpotPosition(spot.index);
     const path = buildRoundedPath(buildToStationPoints(vehicle, target, SCENE_TUNING.vehiclePath), SCENE_TUNING.vehiclePath);
@@ -282,6 +386,7 @@ export class BusLoopGame {
       motionData: { path, duration: stationMotion.duration, curve: stationMotion.curve }
     });
     this.lastEvent = { type: 'vehicle-dispatched', vehicleId: id, spotIndex: spot.index };
+    this.mechanicRuntime.onVehicleDispatched?.({ game: this, vehicle, spot });
     this.emit();
     return { ok: true, spotIndex: spot.index };
   }
@@ -325,8 +430,15 @@ export class BusLoopGame {
         if (!collision.contactTriggered && collision.elapsed >= contactTime) {
           collision.contactTriggered = true;
           const target = this.getVehicle(collision.targetId);
-          if (target) target.hit = { startedAt: this.time, ...collision.hitDirection };
-          this.lastEvent = { type: 'vehicle-collision-contact', vehicleId: vehicle.id, targetId: collision.targetId };
+          if (target && collision.hitDirection) {
+            target.hit = { startedAt: this.time, ...collision.hitDirection };
+          }
+          this.lastEvent = {
+            type: 'vehicle-collision-contact',
+            vehicleId: vehicle.id,
+            targetId: collision.targetId,
+            targetContainerId: collision.targetContainerId
+          };
           changed = true;
         }
         if (collision.elapsed >= finishTime) {
@@ -374,6 +486,8 @@ export class BusLoopGame {
       }
     }
 
+    changed = Boolean(this.mechanicRuntime.update?.({ game: this, delta })) || changed;
+
     this.updateQueues(delta);
 
     const entryMotion = this.level.passengerEntryMotion ?? {};
@@ -387,29 +501,30 @@ export class BusLoopGame {
     for (const slot of this.slots) {
       slot.previousProgress = slot.progress;
       slot.progress = wrap01(slot.progress + progressDelta);
-      if (slot.colorIndex === null) {
-        const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
-        if (!entry) continue;
-        const passenger = this.dequeuePassenger(entry.index, true);
-        if (passenger === null) {
-          if (this.initialFillActive) {
-            const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
-            const clamp = wrap01(slot.progress - holdProgress);
-            if (clamp > initialFillClamp) {
-              initialFillClamp = clamp;
-              initialFillHoldSlot = slot;
-              initialFillHoldProgress = holdProgress;
-            }
+    }
+
+    for (const slot of this.slots) {
+      if (slot.colorIndex !== null) continue;
+      const entry = this.getFirstPassedEntry(slot.previousProgress, slot.progress);
+      if (!entry) continue;
+      if (!this.canPassengerEnterBelt(entry)) continue;
+      const waitingBatch = this.peekPassengerBatch(entry.index);
+      if (!this.tryEnterPassengerBatch(slot, entry)) {
+        if (this.initialFillActive && waitingBatch) {
+          this.initialFillActive = false;
+          changed = true;
+        } else if (this.initialFillActive) {
+          const holdProgress = wrap01(entry.percent - INITIAL_ENTRY_OFFSET_PERCENT);
+          const clamp = wrap01(slot.progress - holdProgress);
+          if (clamp > initialFillClamp) {
+            initialFillClamp = clamp;
+            initialFillHoldSlot = slot;
+            initialFillHoldProgress = holdProgress;
           }
-          continue;
         }
-        slot.colorIndex = passenger.colorIndex;
-        slot.entryIndex = entry.index;
-        slot.entryMotion = this.createEntryMotion(entry.index, passenger);
-        if (this.initialFillActive) this.initialFilledSlotIndices.add(slot.index);
-        this.lastEvent = { type: 'group-entered-belt', colorIndex: passenger.colorIndex, entryIndex: entry.index };
-        changed = true;
+        continue;
       }
+      changed = true;
     }
 
     if (this.initialFillActive && initialFillClamp > 0) {
@@ -429,32 +544,15 @@ export class BusLoopGame {
     }
 
     for (const slot of this.slots) {
-      if (slot.colorIndex === null || !this.inExitRange(slot.progress)) continue;
-      const vehicle = this.findBoardableVehicle(slot.colorIndex);
-      if (!vehicle) continue;
-      const colorIndex = slot.colorIndex;
-      this.boardingEvents.push({
-        id: ++this.boardingEventId,
-        vehicleId: vehicle.id,
-        spotIndex: vehicle.spotIndex,
-        colorIndex,
-        slotIndex: slot.index,
-        progress: slot.progress,
-        startedAt: this.time
-      });
-      if (this.boardingEvents.length > 24) this.boardingEvents.shift();
-      slot.colorIndex = null;
-      slot.entryIndex = null;
-      slot.entryMotion = null;
-      vehicle.boardedGroups += 1;
-      this.lastEvent = {
-        type: 'group-boarded', vehicleId: vehicle.id, colorIndex,
-        boardedGroups: vehicle.boardedGroups
-      };
-      changed = true;
-      if (vehicle.boardedGroups >= vehicle.seats) {
-        Object.assign(vehicle, { state: 'boarding-final', motion: 0 });
-        this.lastEvent = { type: 'vehicle-boarding-final', vehicleId: vehicle.id };
+      if (slot.colorIndex === null) continue;
+      const crossedExit = this.crossedPoint(slot.previousProgress, slot.progress, this.level.exitStart);
+      const inExit = this.inExitRange(slot.progress);
+      if (inExit && this.tryBoardPassengerBatch(slot)) {
+        changed = true;
+        continue;
+      }
+      if (crossedExit) {
+        changed = Boolean(this.mechanicRuntime.onPassengerExitPassed?.({ game: this, slot })) || changed;
       }
     }
 
@@ -477,6 +575,48 @@ export class BusLoopGame {
       if (!best || distance < best.distance) best = { index, percent, distance };
     }
     return best;
+  }
+
+  tryEnterPassengerBatch(headSlot, entry) {
+    if (
+      !headSlot
+      || !Number.isInteger(headSlot.index)
+      || this.slots[headSlot.index] !== headSlot
+      || !entry
+      || !Number.isInteger(entry.index)
+    ) return false;
+    const passengerBatch = this.peekPassengerBatch(entry.index);
+    if (!passengerBatch || passengerBatch.length > this.slots.length) return false;
+    const slotBatch = Array.from({ length: passengerBatch.length }, (_, memberIndex) => (
+      this.slots[(headSlot.index - memberIndex + this.slots.length) % this.slots.length]
+    ));
+    if (
+      new Set(slotBatch).size !== slotBatch.length
+      || slotBatch.some((slot) => !slot || slot.colorIndex !== null)
+    ) return false;
+
+    const dequeued = this.dequeuePassengerBatch(entry.index, true, passengerBatch);
+    if (!dequeued || dequeued.length !== slotBatch.length) return false;
+    dequeued.forEach((passenger, memberIndex) => {
+      const slot = slotBatch[memberIndex];
+      slot.colorIndex = passenger.colorIndex;
+      slot.passengerId = passenger.id;
+      slot.entryIndex = entry.index;
+      slot.entryMotion = this.createEntryMotion(entry.index, passenger);
+      this.mechanicRuntime.onPassengerEnteredBelt?.({ game: this, slot, passenger });
+      if (this.initialFillActive) this.initialFilledSlotIndices.add(slot.index);
+    });
+    this.lastEvent = {
+      type: 'group-entered-belt',
+      colorIndex: dequeued[0].colorIndex,
+      entryIndex: entry.index,
+      passengerId: dequeued[0].id,
+      passengerIds: dequeued.map((passenger) => passenger.id),
+      slotIndex: slotBatch[0].index,
+      slotIndices: slotBatch.map((slot) => slot.index),
+      groupCount: dequeued.length
+    };
+    return true;
   }
 
   hasEnteringSlots() {
@@ -522,40 +662,152 @@ export class BusLoopGame {
     };
   }
 
-  dequeuePassenger(queueIndex, includeDetails = false) {
+  getQueueAdmissionBatchSize(queueIndex) {
+    const source = this.sourceQueues[queueIndex] ?? [];
+    if (source.length === 0) return 0;
+    const sourceIndex = this.sourceQueueIndices[queueIndex] ?? 0;
+    const requested = this.mechanicRuntime.getQueueAdmissionBatchSize?.({
+      game: this,
+      queueIndex,
+      sourceIndex,
+      sourceColors: source
+    }) ?? 1;
+    return Number.isInteger(requested) && requested >= 1 && requested <= source.length
+      ? requested
+      : 1;
+  }
+
+  fillQueueFromSource(queueIndex, { initial = false } = {}) {
+    const queue = this.queues[queueIndex];
+    const source = this.sourceQueues[queueIndex];
+    const capacity = this.queueCapacities[queueIndex] ?? this.level.queueCapacity;
+    if (!queue || !source) return;
+
+    while (source.length > 0) {
+      const batchSize = this.getQueueAdmissionBatchSize(queueIndex);
+      if (batchSize < 1 || queue.length + batchSize > capacity) break;
+      const sourceIndex = this.sourceQueueIndices[queueIndex];
+      const colors = source.splice(0, batchSize);
+      const availableLength = this.queueAvailableLengths[queueIndex] ?? 0;
+      const lastDistance = queue.at(-1)?.distanceFromHead;
+      const startDistance = initial
+        ? queue.length * this.queueSpacing
+        : (Number.isFinite(lastDistance) ? lastDistance + this.queueSpacing : availableLength);
+      queue.push(...this.createQueueItems(
+        colors,
+        queueIndex,
+        sourceIndex,
+        startDistance
+      ));
+      this.sourceQueueIndices[queueIndex] += batchSize;
+    }
+  }
+
+  peekPassengerBatch(queueIndex) {
     const queue = this.queues[queueIndex];
     if (!queue?.length) return null;
     if (queue[0].distanceFromHead > PASSENGER_READY_DISTANCE_THRESHOLD) return null;
-    const passenger = queue.shift();
-    const source = this.sourceQueues[queueIndex];
-    if (source?.length) {
-      const lastDistance = queue.at(-1)?.distanceFromHead;
-      const spawnDistance = Number.isFinite(lastDistance)
-        ? lastDistance + this.queueSpacing
-        : this.queueAvailableLengths[queueIndex] ?? 0;
-      queue.push({
-        id: this.nextPassengerId++,
-        colorIndex: source.shift(),
-        createdAt: this.time,
-        distanceFromHead: clampNumber(
-          spawnDistance,
-          0,
-          this.queueAvailableLengths[queueIndex] ?? spawnDistance
-        )
-      });
-    }
-    return includeDetails ? { ...passenger } : passenger.colorIndex;
+    const batch = this.mechanicRuntime.getBeltEntryBatch?.({
+      game: this,
+      queueIndex,
+      queue
+    }) ?? [queue[0]];
+    return isDenseQueuePrefix(queue, batch) ? batch.slice() : null;
   }
 
-  createQueueItems(colors, queueIndex) {
+  dequeuePassengerBatch(queueIndex, includeDetails = false, expectedBatch = undefined) {
+    const queue = this.queues[queueIndex];
+    const batch = expectedBatch === undefined
+      ? this.peekPassengerBatch(queueIndex)
+      : expectedBatch;
+    if (!isDenseQueuePrefix(queue, batch)) return null;
+    queue.splice(0, batch.length);
+    this.fillQueueFromSource(queueIndex);
+    return includeDetails
+      ? batch.map((passenger) => ({
+          ...passenger,
+          ...this.cloneMechanicQueueItemSnapshot(passenger)
+        }))
+      : batch;
+  }
+
+  dequeuePassenger(queueIndex, includeDetails = false) {
+    const batch = this.dequeuePassengerBatch(queueIndex, includeDetails);
+    if (!batch) return null;
+    return includeDetails ? batch[0] : batch[0].colorIndex;
+  }
+
+  createQueueItems(colors, queueIndex, startIndex = 0, startDistance = 0) {
     const availableLength = this.queueAvailableLengths?.[queueIndex]
       ?? Math.max(0, (this.level.queueCapacity - 1) * (this.queueSpacing ?? 0.4));
     return colors.map((colorIndex, index) => ({
       id: this.nextPassengerId++,
+      sourceIndex: startIndex + index,
       colorIndex,
       createdAt: this.time,
-      distanceFromHead: Math.min(index * (this.queueSpacing ?? 0.4), availableLength)
+      distanceFromHead: clampNumber(
+        startDistance + index * (this.queueSpacing ?? 0.4),
+        0,
+        availableLength
+      ),
+      ...this.createMechanicQueueItemData({ queueIndex, sourceIndex: startIndex + index })
     }));
+  }
+
+  createMechanicQueueItemData(context = {}) {
+    return this.mechanicRuntime.createQueueItemData?.({ game: this, ...context }) ?? {};
+  }
+
+  createMechanicSlotData() {
+    return this.mechanicRuntime.createSlotData?.({ game: this }) ?? {};
+  }
+
+  cloneMechanicQueueItemSnapshot(item) {
+    return this.mechanicRuntime.cloneQueueItemSnapshot?.(item) ?? {};
+  }
+
+  cloneMechanicSlotSnapshot(slot) {
+    return this.mechanicRuntime.cloneSlotSnapshot?.(slot) ?? {};
+  }
+
+  decorateMechanicSnapshot() {
+    return this.mechanicRuntime.decorateSnapshot?.(this) ?? {};
+  }
+
+  getVehicleSeatCapacity(vehicle) {
+    const rawCapacity = this.mechanicRuntime.getVehicleSeatCapacity?.({
+      game: this,
+      vehicle
+    }) ?? vehicle?.seats ?? 0;
+    return Math.max(0, Math.floor(Number(rawCapacity) || 0));
+  }
+
+  getPassengerBoardingCost(slot, vehicle) {
+    const rawCost = this.mechanicRuntime.getPassengerBoardingCost?.({
+      game: this,
+      slot,
+      vehicle
+    }) ?? 1;
+    return Math.max(1, Math.floor(Number(rawCost) || 1));
+  }
+
+  canVehicleDispatch(vehicle) {
+    return this.mechanicRuntime.canVehicleDispatch?.({
+      game: this,
+      vehicle
+    }) ?? true;
+  }
+
+  isVehicleBlocking(candidate, vehicle = null) {
+    return this.mechanicRuntime.isVehicleBlocking?.({
+      game: this,
+      candidate,
+      vehicle
+    }) ?? true;
+  }
+
+  canPassengerEnterBelt(entry) {
+    return this.mechanicRuntime.canPassengerEnterBelt?.({ game: this, entry }) ?? true;
   }
 
   updateQueues(delta) {
@@ -594,32 +846,148 @@ export class BusLoopGame {
       : progress >= exitStart || progress <= exitEnd;
   }
 
-  findBoardableVehicle(colorIndex) {
+  getBoardingBatch(slot) {
+    const batch = this.mechanicRuntime.getBoardingBatch?.({
+      game: this,
+      slot,
+      slots: this.slots
+    }) ?? [slot];
+    return isDenseSlotBatch(this.slots, batch, slot) ? batch : [];
+  }
+
+  tryBoardPassengerBatch(slot) {
+    const batch = this.getBoardingBatch(slot);
+    if (batch.length === 0) return false;
+    const colorIndex = batch[0].colorIndex;
+    if (
+      colorIndex === null
+      || batch.some((candidate) => candidate.colorIndex !== colorIndex)
+    ) return false;
+    const vehicle = this.findBoardableVehicle(colorIndex, batch.length, batch);
+    if (!vehicle) return false;
+
+    const passengerIds = batch.map((candidate) => candidate.passengerId);
+    const slotIndices = batch.map((candidate) => candidate.index);
+    const progresses = batch.map((candidate) => candidate.progress);
+    const boardingCosts = batch.map((candidate) => this.getPassengerBoardingCost(candidate, vehicle));
+    const boardingCost = boardingCosts.reduce((sum, cost) => sum + cost, 0);
+    const mechanicBoardingEvent = this.mechanicRuntime.onPassengerBatchBoarded?.({
+      game: this,
+      slots: batch,
+      vehicle
+    }) ?? this.mechanicRuntime.onPassengerBoarded?.({
+      game: this,
+      slot: batch[0],
+      vehicle
+    }) ?? {};
+    this.boardingEvents.push({
+      id: ++this.boardingEventId,
+      vehicleId: vehicle.id,
+      spotIndex: vehicle.spotIndex,
+      colorIndex,
+      passengerId: passengerIds[0],
+      passengerIds,
+      boardingCost,
+      boardingCosts,
+      ...mechanicBoardingEvent,
+      slotIndex: slotIndices[0],
+      slotIndices,
+      progress: progresses[0],
+      progresses,
+      groupCount: batch.length,
+      startedAt: this.time
+    });
+    if (this.boardingEvents.length > 24) this.boardingEvents.shift();
+
+    for (const candidate of batch) {
+      candidate.colorIndex = null;
+      candidate.passengerId = null;
+      candidate.entryIndex = null;
+      candidate.entryMotion = null;
+      this.mechanicRuntime.clearSlotData?.({ game: this, slot: candidate });
+    }
+    vehicle.boardedGroups += boardingCost;
+    this.lastEvent = {
+      type: 'group-boarded',
+      vehicleId: vehicle.id,
+      colorIndex,
+      boardedGroups: vehicle.boardedGroups,
+      passengerId: passengerIds[0],
+      passengerIds,
+      groupCount: batch.length,
+      boardingCost,
+      boardingCosts,
+      ...mechanicBoardingEvent
+    };
+    if (vehicle.boardedGroups >= this.getVehicleSeatCapacity(vehicle)) {
+      const handled = this.mechanicRuntime.onVehicleFilled?.({
+        game: this,
+        vehicle
+      }) ?? false;
+      if (!handled) {
+        Object.assign(vehicle, { state: 'boarding-final', motion: 0 });
+        this.lastEvent = { type: 'vehicle-boarding-final', vehicleId: vehicle.id };
+      }
+    }
+    return true;
+  }
+
+  canMoveToStation(vehicle) {
+    return Boolean(vehicle && vehicle.state === 'parked');
+  }
+
+  isGarageDoorClear(garageId) {
+    return this.collisionContext?.isGarageDoorClear(this, garageId) ?? true;
+  }
+
+  findBoardableVehicle(colorIndex, requiredGroups = 1, slots = []) {
+    const mechanicVehicle = this.mechanicRuntime.findBoardableVehicle?.({
+      game: this,
+      colorIndex,
+      requiredGroups
+    });
+    if (mechanicVehicle) return mechanicVehicle;
     for (const spot of this.spots) {
       if (spot.vehicleId === null) continue;
       const vehicle = this.getVehicle(spot.vehicleId);
+      const freeGroups = vehicle ? this.getVehicleSeatCapacity(vehicle) - vehicle.boardedGroups : 0;
+      const requiredCapacity = slots.length
+        ? slots.reduce((sum, candidate) => sum + this.getPassengerBoardingCost(candidate, vehicle), 0)
+        : requiredGroups;
       if (
         vehicle?.state === 'at-spot' &&
         vehicle.colorIndex === colorIndex &&
-        vehicle.boardedGroups < vehicle.seats
+        freeGroups >= requiredCapacity
       ) return vehicle;
     }
     return null;
   }
 
   hasBoardablePassenger() {
-    return this.slots.some((slot) => (
-      slot.colorIndex !== null && this.findBoardableVehicle(slot.colorIndex) !== null
-    ));
+    return this.slots.some((slot) => {
+      if (slot.colorIndex === null) return false;
+      const batch = this.getBoardingBatch(slot);
+      if (batch.length === 0) return false;
+      const colorIndex = batch[0].colorIndex;
+      if (batch.some((candidate) => candidate.colorIndex !== colorIndex)) return false;
+      return this.findBoardableVehicle(colorIndex, batch.length, batch) !== null;
+    });
   }
 
   checkEndState() {
+    if (this.mechanicRuntime.hasWon?.(this)) {
+      this.status = 'won';
+      this.lastEvent = { type: 'win', reason: 'mechanic-goal-complete', mechanicId: this.mechanicId };
+      return;
+    }
     if (this.vehicles.every((vehicle) => vehicle.state === 'done')) {
       this.status = 'won';
       this.lastEvent = { type: 'win' };
       return;
     }
-    const enabledSpotsFull = this.spots.every((spot) => spot.vehicleId !== null);
+    if (this.mechanicRuntime.hasPendingVehicles?.(this)) return;
+    const enabledSpotsFull = this.spots.every((spot) => spot.vehicleId !== null)
+      && !this.mechanicRuntime.hasOpenVehicleDestination?.(this);
     const beltFull = this.slots.every((slot) => slot.colorIndex !== null);
     const upstreamEmpty = this.sourceQueues.every((queue) => queue.length === 0)
       && this.queues.every((queue) => queue.length === 0);

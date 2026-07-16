@@ -21,27 +21,14 @@ export const SCENE_TUNING = {
     "offsetX": 0,
     "offsetY": 211
   },
-  "cta": {
-    "enabled": 1,
-    "x": 540,
-    "y": 1981,
-    "worldX": 0,
-    "worldY": 0.99,
-    "worldZ": 11.57,
-    "height": 73,
-    "stretchX": 2.83,
-    "fontSize": 32,
-    "fontHeight": 64,
-    "strokeColor": 1665799,
-    "strokeWidth": 2.9,
-    "pulseScale": 1.15,
-    "pulseSpeed": 0.21
-  },
   "facing": {
     "passengerYawDegrees": 180,
     "passengerModelYawDegrees": -90,
     "passengerShadowYawDegrees": 90,
     "vehicleYawOffsetDegrees": 0,
+    "garageYawOffsetDegrees": 180,
+    "garageModelPitchDegrees": -90,
+    "garageModelRollDegrees": 0,
     "parkingSpotYawDegrees": 16,
     "arrowYawDegrees": 180
   },
@@ -102,41 +89,7 @@ export const SCENE_TUNING = {
         "x": 101.5,
         "y": -9.5,
         "z": -99
-      },
-      "shadowType": 2,
-      "shadowStrength": 0.46
-    },
-    "realtimeShadows": {
-      "enabled": 0,
-      "mapSize": 1024,
-      "cameraSize": 18,
-      "cameraNear": 0.1,
-      "cameraFar": 40,
-      "shadowLightDistance": 21,
-      "bias": -0.0044,
-      "normalBias": 0.057,
-      "radius": 3.7,
-      "shadowColor": 0,
-      "receiverEnabled": 1,
-      "receiverX": -3.9,
-      "receiverY": -0.1,
-      "receiverZ": -1.05,
-      "receiverWidth": 40,
-      "receiverDepth": 50,
-      "receiverOpacity": 0.66,
-      "receiverDepthTest": 1,
-      "receiverDebugEnabled": 0,
-      "receiverDebugColor": 3528703,
-      "receiverDebugOpacity": 0.24,
-      "debugCasterEnabled": 0,
-      "debugCasterX": -2.45,
-      "debugCasterY": 0.6,
-      "debugCasterZ": 1.6,
-      "debugCasterSize": 0.6,
-      "debugCasterHeight": 1.2,
-      "vehiclesCast": 0,
-      "passengersCast": 0,
-      "parkingSpotsReceive": 1
+      }
     }
   },
   "conveyorArt": {
@@ -157,6 +110,24 @@ export const SCENE_TUNING = {
     "modelDepth": 1.46,
     "scaleX": 0.7,
     "scaleZ": 0.65
+  },
+  "train": {
+    "trackY": 0.045,
+    "trackZ": 2.6,
+    "headX": 3.2,
+    "slotSpacing": 1.25,
+    "slotCount": 4,
+    "carriageScale": 0.82,
+    "seatCountBoard": {
+      "width": 0.46,
+      "depth": 0.34,
+      "textScale": 0.76
+    },
+    "dispatchDuration": 0.9,
+    "departureDuration": 1.4,
+    "locomotiveEntryDuration": 1.2,
+    "exitX": 9,
+    "entryX": -9
   },
   "seatCountBoard": {
     "x": -0.17,
